@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Gplanchat\Durable\Port;
+
+use Gplanchat\Durable\ExecutionEngine;
+
+/**
+ * Implémentation locale du backend workflow (EventStore + Messenger).
+ *
+ * Utilise ExecutionEngine avec l'event store et le transport configurés.
+ * Pas de dépendance à RoadRunner ou Temporal.
+ *
+ * @see WorkflowBackendInterface
+ * @see ADR005 Intégration Messenger
+ */
+final class LocalWorkflowBackend implements WorkflowBackendInterface
+{
+    public function __construct(
+        private readonly ExecutionEngine $engine,
+    ) {
+    }
+
+    public function start(string $executionId, callable $handler): mixed
+    {
+        return $this->engine->start($executionId, $handler);
+    }
+}

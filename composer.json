@@ -1,0 +1,39 @@
+{
+    "name": "gplanchat/durable",
+    "description": "PHP library for durable execution: workflows, activities, event journal, and transports (HttpKernel integration lives in the bundle).",
+    "license": "proprietary",
+    "type": "library",
+    "version": "0.1.0",
+    "require": {
+        "php": ">=8.2",
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0",
+        "symfony/uid": "^6.4 || ^7.4",
+        "doctrine/dbal": "^4.4",
+        "symfony/contracts": "^3.5",
+        "symfony/dependency-injection": "^6.4 || ^7.4",
+        "symfony/config": "^6.4 || ^7.4",
+        "symfony/routing": "^6.4 || ^7.4",
+        "symfony/console": "^6.4 || ^7.4"
+    },
+    "suggest": {
+        "gplanchat/durable-phpstan": "Optional PHPStan extension (ActivityStub + Awaitable; see ADR012)",
+        "gplanchat/durable-psalm-plugin": "Optional Psalm plugin entry point; prefer durable-phpstan for stubs (ADR012)"
+    },
+    "autoload": {
+        "psr-4": {
+            "Gplanchat\\Durable\\": "./"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    },
+    "authors": [
+        {
+            "name": "Grégory Planchat",
+            "email": "gregory@gyroscops.com"
+        }
+    ]
+}
