@@ -19,10 +19,11 @@ interface WorkflowBackendInterface
     /**
      * Démarre une exécution de workflow.
      *
-     * @param string   $executionId Identifiant unique de l'exécution
-     * @param callable $handler     Handler du workflow (ExecutionContext, ExecutionRuntime) -> mixed
+     * @param string      $executionId  Identifiant unique de l'exécution
+     * @param callable    $handler      Handler du workflow (ExecutionContext, ExecutionRuntime) -> mixed
+     * @param string|null $workflowType Type enregistré (toolbar / observabilité) ; optionnel
      *
      * @return mixed Le résultat du workflow
      */
-    public function start(string $executionId, callable $handler): mixed;
+    public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed;
 }

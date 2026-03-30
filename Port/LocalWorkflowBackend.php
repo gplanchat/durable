@@ -22,8 +22,9 @@ final class LocalWorkflowBackend implements WorkflowBackendInterface
     ) {
     }
 
-    public function start(string $executionId, callable $handler): mixed
+    #[\Override]
+    public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
-        return $this->engine->start($executionId, $handler);
+        return $this->engine->start($executionId, $handler, $workflowType);
     }
 }

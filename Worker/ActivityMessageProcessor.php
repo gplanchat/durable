@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Worker;
 
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\ActivityExecutor;
+use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -16,7 +17,7 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
 /**
  * Traite un {@see ActivityMessage} : timeouts, exécution, journal, reprise workflow, retry.
  *
- * Réutilisable par le bundle Symfony ({@see \Gplanchat\Durable\Bundle\Command\ActivityWorkerCommand})
+ * Réutilisable par le bundle Symfony ({@see \Gplanchat\Durable\Bundle\Handler\ActivityRunHandler})
  * et par d’autres runtimes (ex. module Magento en mode DBAL).
  */
 final class ActivityMessageProcessor
@@ -27,6 +28,7 @@ final class ActivityMessageProcessor
         private readonly ActivityExecutor $activityExecutor,
         private readonly WorkflowResumeDispatcher $resumeDispatcher,
         private readonly int $maxRetries = 0,
+        private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {
     }
 
@@ -58,7 +60,17 @@ final class ActivityMessageProcessor
                 set_time_limit(max(1, (int) ceil($stc)));
             }
             try {
+                $t0 = microtime(true);
                 $result = $this->activityExecutor->execute($message->activityName, $message->payload);
+                $duration = microtime(true) - $t0;
+                $this->workflowExecutionObserver?->onActivityExecuted(
+                    $message->executionId,
+                    $message->activityId,
+                    $message->activityName,
+                    $duration,
+                    true,
+                    null,
+                );
             } finally {
                 if (null !== $stc && $stc > 0) {
                     ini_restore('max_execution_time');
@@ -71,6 +83,17 @@ final class ActivityMessageProcessor
             ));
             $this->resumeDispatcher->dispatchResume($message->executionId);
         } catch (\Throwable $e) {
+            if (isset($t0)) {
+                $duration = microtime(true) - $t0;
+                $this->workflowExecutionObserver?->onActivityExecuted(
+                    $message->executionId,
+                    $message->activityId,
+                    $message->activityName,
+                    $duration,
+                    false,
+                    $e::class,
+                );
+            }
             $maxAttempts = null !== $options && $options->maxAttempts > 0
                 ? $options->maxAttempts
                 : $this->maxRetries;

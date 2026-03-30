@@ -9,6 +9,7 @@ use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
+use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\TimerCompleted;
@@ -32,6 +33,7 @@ final class ExecutionRuntime
         private readonly int $maxActivityRetries = 0,
         ?callable $clock = null,
         private readonly bool $distributed = false,
+        private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {
         $this->clock = $clock ?? static fn (): float => microtime(true);
     }
@@ -85,8 +87,18 @@ final class ExecutionRuntime
             return;
         }
 
+        $t0 = microtime(true);
         try {
             $result = $this->activityExecutor->execute($message->activityName, $message->payload);
+            $duration = microtime(true) - $t0;
+            $this->workflowExecutionObserver?->onActivityExecuted(
+                $message->executionId,
+                $message->activityId,
+                $message->activityName,
+                $duration,
+                true,
+                null,
+            );
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -94,6 +106,15 @@ final class ExecutionRuntime
             ));
             $context->resolveActivity($message->activityId, $result);
         } catch (\Throwable $e) {
+            $duration = microtime(true) - $t0;
+            $this->workflowExecutionObserver?->onActivityExecuted(
+                $message->executionId,
+                $message->activityId,
+                $message->activityName,
+                $duration,
+                false,
+                $e::class,
+            );
             if ($message->attempt() <= $this->maxActivityRetries) {
                 $this->activityTransport->enqueue($message->withAttempt($message->attempt() + 1));
             } else {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 use Gplanchat\Durable\Activity\ActivityContractResolver;
+use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
@@ -29,11 +30,14 @@ final class ExecutionEngine
         private readonly ?ParentChildWorkflowCoordinatorInterface $parentChildCoordinator = null,
         private readonly ?ActivityContractResolver $activityContractResolver = null,
         private readonly ?WorkflowDefinitionLoader $workflowDefinitionLoader = null,
+        private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {
     }
 
-    public function start(string $executionId, callable $handler): mixed
+    public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
+        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
+
         $context = new ExecutionContext(
             $executionId,
             $this->eventStore,
@@ -50,8 +54,10 @@ final class ExecutionEngine
      * Reprend une exécution suspendue. N'ajoute pas ExecutionStarted.
      * Utilisé après WorkflowSuspendedException lorsque les activités ont été exécutées.
      */
-    public function resume(string $executionId, callable $handler): mixed
+    public function resume(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
+        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
+
         $context = new ExecutionContext(
             $executionId,
             $this->eventStore,
