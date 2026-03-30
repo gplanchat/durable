@@ -19,4 +19,9 @@ interface EventStoreInterface
      * @return iterable<Event> événements de l’exécution identifiée uniquement, ordre d’insertion ; le store DBAL parcourt le résultat comme un curseur
      */
     public function readStream(string $executionId): iterable;
+
+    /**
+     * Nombre d’événements persistés pour cette exécution (équivalent à compter le flux {@see readStream} sans le matérialiser entièrement côté DBAL lorsque possible).
+     */
+    public function countEventsInStream(string $executionId): int;
 }

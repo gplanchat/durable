@@ -47,6 +47,20 @@ final class DbalEventStore implements EventStoreInterface
         }
     }
 
+    public function countEventsInStream(string $executionId): int
+    {
+        $sql = 'SELECT COUNT(*) FROM '.$this->connection->quoteIdentifier($this->tableName)
+            .' WHERE execution_id = ?';
+
+        $n = $this->connection->fetchOne(
+            $sql,
+            [$executionId],
+            [ParameterType::STRING],
+        );
+
+        return (int) $n;
+    }
+
     public function createSchema(): void
     {
         $schema = $this->connection->createSchemaManager();
