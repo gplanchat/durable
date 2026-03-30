@@ -46,7 +46,7 @@ final class InMemoryWorkflowRunner
         try {
             return $engine->start($executionId, $handler);
         } catch (WorkflowSuspendedException) {
-            // Premier await non résolu : exécuter les activités puis reprendre
+            // ADR018: suspension attendue (contrôle de flux), pas une erreur — la boucle while exécute le worker puis resume().
         }
 
         while (true) {
@@ -55,7 +55,7 @@ final class InMemoryWorkflowRunner
             try {
                 return $engine->resume($executionId, $handler);
             } catch (WorkflowSuspendedException) {
-                // Autre await non résolu : exécuter les activités restantes puis reprendre
+                // ADR018: idem — suspension attendue jusqu’à ce que les activités aient produit les événements nécessaires au replay.
             }
         }
     }

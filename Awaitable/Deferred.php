@@ -98,7 +98,14 @@ final class Deferred
                     }
                 }
             } catch (\Throwable $e) {
-                // Swallow for now; could propagate
+                // ADR018: journal minimal — un callback then() ne doit pas faire échouer les autres ; la cause reste traçable.
+                error_log(\sprintf(
+                    '[Gplanchat\\Durable\\Awaitable\\Deferred] callback in notify() threw %s: %s at %s:%d',
+                    $e::class,
+                    $e->getMessage(),
+                    $e->getFile(),
+                    $e->getLine(),
+                ));
             }
         }
         $this->callbacks = [];
