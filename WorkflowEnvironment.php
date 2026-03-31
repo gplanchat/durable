@@ -122,11 +122,23 @@ final class WorkflowEnvironment
     }
 
     /**
+     * Planifie un workflow enfant sans l’attendre ; à combiner avec {@see all} / {@see parallel} pour plusieurs enfants en parallèle.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return Awaitable<mixed>
+     */
+    public function scheduleChildWorkflow(string $childWorkflowType, array $input = [], ?ChildWorkflowOptions $options = null): Awaitable
+    {
+        return $this->context->executeChildWorkflow($childWorkflowType, $input, $options);
+    }
+
+    /**
      * @param array<string, mixed> $input
      */
     public function executeChildWorkflow(string $childWorkflowType, array $input = [], ?ChildWorkflowOptions $options = null): mixed
     {
-        return $this->await($this->context->executeChildWorkflow($childWorkflowType, $input, $options));
+        return $this->await($this->scheduleChildWorkflow($childWorkflowType, $input, $options));
     }
 
     /**

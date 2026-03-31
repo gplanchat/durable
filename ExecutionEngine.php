@@ -142,4 +142,9 @@ final class ExecutionEngine
     {
         $this->parentChildCoordinator?->onParentClosed($context->executionId(), ParentClosureReason::Failed);
     }
+
+    public function getRuntime(): ExecutionRuntime
+    {
+        return $this->runtime;
+    }
 }

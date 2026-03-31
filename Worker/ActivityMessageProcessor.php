@@ -10,6 +10,7 @@ use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
+use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
@@ -34,6 +35,14 @@ final class ActivityMessageProcessor
 
     public function process(ActivityMessage $message): void
     {
+        if (ActivityEventJournal::hasTerminalOutcomeForActivity(
+            $this->eventStore,
+            $message->executionId,
+            $message->activityId,
+        )) {
+            return;
+        }
+
         $options = ActivityOptions::fromMetadata($message->metadata);
         $now = microtime(true);
         $firstQueued = isset($message->metadata['first_queued_at']) ? (float) $message->metadata['first_queued_at'] : null;

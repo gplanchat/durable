@@ -21,6 +21,7 @@ final class WorkflowSuspendedException extends \RuntimeException
         int $code = 0,
         ?\Throwable $previous = null,
         private readonly bool $shouldDispatchResume = true,
+        private readonly bool $waitingOnTimer = false,
     ) {
         parent::__construct($message, $code, $previous);
     }
@@ -32,5 +33,14 @@ final class WorkflowSuspendedException extends \RuntimeException
     public function shouldDispatchResume(): bool
     {
         return $this->shouldDispatchResume;
+    }
+
+    /**
+     * Si vrai, l’attente porte sur un minuteur durable : ne pas enchaîner des reprises immédiates ;
+     * planifier {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (éventuellement avec délai Messenger).
+     */
+    public function waitingOnTimer(): bool
+    {
+        return $this->waitingOnTimer;
     }
 }

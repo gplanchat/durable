@@ -225,6 +225,10 @@ final class ExecutionContext
             ));
         }
 
+        if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStartToMessenger()) {
+            return $deferred->awaitable();
+        }
+
         try {
             $result = $this->childWorkflowRunner->runChild($childExecutionId, $childWorkflowType, $input, $this->executionId);
             $this->eventStore->append(new ChildWorkflowCompleted($this->executionId, $childExecutionId, $result));

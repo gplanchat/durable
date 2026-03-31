@@ -18,9 +18,14 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
+use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
+/**
+ * Le bundle Symfony enregistre toujours la suspension sur await non résolu (6ᵉ argument à true).
+ * Les tests peuvent passer false pour simuler un drain synchrone dans le même processus.
+ */
 final class ExecutionRuntime
 {
     /** @var callable(): float */
@@ -44,7 +49,13 @@ final class ExecutionRuntime
     public function await(Awaitable $awaitable, ExecutionContext $context): mixed
     {
         if (!$awaitable->isSettled() && $this->distributed) {
-            throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable));
+            throw new WorkflowSuspendedException(
+                \sprintf('Workflow %s suspended (distributed mode)', $context->executionId()),
+                0,
+                null,
+                $this->awaitableShouldDispatchResume($awaitable),
+                $awaitable instanceof TimerAwaitable,
+            );
         }
 
         while (!$awaitable->isSettled()) {
@@ -75,9 +86,18 @@ final class ExecutionRuntime
             }
             if ($now >= $info['at']) {
                 $this->eventStore->append(new TimerCompleted($context->executionId(), $info['id']));
+                $completedIds[$info['id']] = true;
                 $context->resolveTimer($info['id']);
             }
         }
+    }
+
+    /**
+     * Horloge utilisée par {@see checkTimers()} et par le calcul de délai Messenger pour les minuteurs.
+     */
+    public function nowSeconds(): float
+    {
+        return ($this->clock)();
     }
 
     public function drainActivityQueueOnce(ExecutionContext $context): void
