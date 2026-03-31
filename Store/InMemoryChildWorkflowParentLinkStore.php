@@ -22,6 +22,18 @@ final class InMemoryChildWorkflowParentLinkStore implements ChildWorkflowParentL
         return $this->childToParent[$childExecutionId] ?? null;
     }
 
+    public function getChildExecutionIdsForParent(string $parentExecutionId): array
+    {
+        $children = [];
+        foreach ($this->childToParent as $childExecutionId => $p) {
+            if ($p === $parentExecutionId) {
+                $children[] = $childExecutionId;
+            }
+        }
+
+        return $children;
+    }
+
     public function unlink(string $childExecutionId): void
     {
         unset($this->childToParent[$childExecutionId]);

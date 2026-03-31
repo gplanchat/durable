@@ -13,5 +13,10 @@ interface ChildWorkflowParentLinkStoreInterface
 
     public function getParentExecutionId(string $childExecutionId): ?string;
 
+    /**
+     * @return list<string> Enfants enregistrés pour ce parent (ordre non garanti).
+     */
+    public function getChildExecutionIdsForParent(string $parentExecutionId): array;
+
     public function unlink(string $childExecutionId): void;
 }

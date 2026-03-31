@@ -37,6 +37,17 @@ final class DbalChildWorkflowParentLinkStore implements ChildWorkflowParentLinkS
         return \is_string($v) ? $v : null;
     }
 
+    public function getChildExecutionIdsForParent(string $parentExecutionId): array
+    {
+        $rows = $this->connection->fetchFirstColumn(
+            'SELECT child_execution_id FROM '.$this->connection->quoteIdentifier($this->tableName)
+            .' WHERE parent_execution_id = ?',
+            [$parentExecutionId],
+        );
+
+        return array_map(static fn (mixed $v): string => (string) $v, $rows);
+    }
+
     public function unlink(string $childExecutionId): void
     {
         $this->connection->delete($this->tableName, ['child_execution_id' => $childExecutionId]);

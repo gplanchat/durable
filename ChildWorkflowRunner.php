@@ -38,6 +38,14 @@ final class ChildWorkflowRunner
     }
 
     /**
+     * Indique si le démarrage d’enfant passe par Messenger (pas d’exécution inline dans {@see runChild}).
+     */
+    public function defersChildStartToMessenger(): bool
+    {
+        return $this->asyncMessengerStart;
+    }
+
+    /**
      * @param array<string, mixed> $input
      *
      * @throws ChildWorkflowDeferredToMessenger si {@see $asyncMessengerStart} : pas d’append ChildWorkflowCompleted ici
