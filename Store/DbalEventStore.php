@@ -11,6 +11,9 @@ use Gplanchat\Durable\Event\Event;
 
 final class DbalEventStore implements EventStoreInterface
 {
+    /** @internal Borné pour éviter de charger tout le flux d'un coup côté client (requêtes bufferisées MySQL, etc.). */
+    private const READ_STREAM_PAGE_SIZE = 500;
+
     private bool $recordedAtColumnEnsured = false;
 
     public function __construct(
@@ -50,27 +53,36 @@ final class DbalEventStore implements EventStoreInterface
     public function readStreamWithRecordedAt(string $executionId): iterable
     {
         $this->ensureRecordedAtColumnOnce();
-        $sql = 'SELECT execution_id, event_type, payload, recorded_at FROM '.$this->connection->quoteIdentifier($this->tableName)
-            .' WHERE execution_id = ? ORDER BY id ASC';
-
-        $result = $this->connection->executeQuery(
-            $sql,
-            [$executionId],
-            [ParameterType::STRING],
-        );
-
-        foreach ($result->iterateAssociative() as $row) {
-            $event = EventSerializer::deserialize($row);
-            $recordedAt = null;
-            if (isset($row['recorded_at']) && '' !== (string) $row['recorded_at']) {
-                try {
-                    $recordedAt = new \DateTimeImmutable((string) $row['recorded_at'], new \DateTimeZone('UTC'));
-                } catch (\Exception) {
-                    $recordedAt = null;
+        $qTable = $this->connection->quoteIdentifier($this->tableName);
+        $lastId = 0;
+        while (true) {
+            $sql = 'SELECT id, execution_id, event_type, payload, recorded_at FROM '.$qTable
+                .' WHERE execution_id = ? AND id > ? ORDER BY id ASC LIMIT ?';
+            $result = $this->connection->executeQuery(
+                $sql,
+                [$executionId, $lastId, self::READ_STREAM_PAGE_SIZE],
+                [ParameterType::STRING, ParameterType::INTEGER, ParameterType::INTEGER],
+            );
+            $rowsInPage = 0;
+            foreach ($result->iterateAssociative() as $row) {
+                ++$rowsInPage;
+                $lastId = (int) $row['id'];
+                unset($row['id']);
+                $event = EventSerializer::deserialize($row);
+                $recordedAt = null;
+                if (isset($row['recorded_at']) && '' !== (string) $row['recorded_at']) {
+                    try {
+                        $recordedAt = new \DateTimeImmutable((string) $row['recorded_at'], new \DateTimeZone('UTC'));
+                    } catch (\Exception) {
+                        $recordedAt = null;
+                    }
                 }
-            }
 
-            yield ['event' => $event, 'recordedAt' => $recordedAt];
+                yield ['event' => $event, 'recordedAt' => $recordedAt];
+            }
+            if ($rowsInPage < self::READ_STREAM_PAGE_SIZE) {
+                break;
+            }
         }
     }
 
