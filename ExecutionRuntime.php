@@ -18,7 +18,6 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
-use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
@@ -49,13 +48,7 @@ final class ExecutionRuntime
     public function await(Awaitable $awaitable, ExecutionContext $context): mixed
     {
         if (!$awaitable->isSettled() && $this->distributed) {
-            throw new WorkflowSuspendedException(
-                \sprintf('Workflow %s suspended (distributed mode)', $context->executionId()),
-                0,
-                null,
-                $this->awaitableShouldDispatchResume($awaitable),
-                $awaitable instanceof TimerAwaitable,
-            );
+            throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), $awaitable instanceof TimerAwaitable);
         }
 
         while (!$awaitable->isSettled()) {

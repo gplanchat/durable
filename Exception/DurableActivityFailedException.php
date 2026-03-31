@@ -100,7 +100,7 @@ final class DurableActivityFailedException extends \Exception
                 } catch (\Throwable $e) {
                     // ADR018: échec de restauration déclarée → repli documenté sur fromActivityFailed (voir error_log).
                     error_log(\sprintf(
-                        '[Gplanchat\\Durable] restoreFromActivityFailureContext failed for %s: %s — using generic DurableActivityFailedException',
+                        '[Gplanchat\Durable] restoreFromActivityFailureContext failed for %s: %s — using generic DurableActivityFailedException',
                         $class,
                         $e->getMessage(),
                     ));

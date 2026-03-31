@@ -42,4 +42,3 @@ final class InMemoryEventStore implements EventStoreInterface
         return \count($this->streams[$executionId] ?? []);
     }
 }
-

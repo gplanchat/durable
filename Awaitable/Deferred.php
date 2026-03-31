@@ -100,7 +100,7 @@ final class Deferred
             } catch (\Throwable $e) {
                 // ADR018: journal minimal — un callback then() ne doit pas faire échouer les autres ; la cause reste traçable.
                 error_log(\sprintf(
-                    '[Gplanchat\\Durable\\Awaitable\\Deferred] callback in notify() threw %s: %s at %s:%d',
+                    '[Gplanchat\Durable\Awaitable\Deferred] callback in notify() threw %s: %s at %s:%d',
                     $e::class,
                     $e->getMessage(),
                     $e->getFile(),
