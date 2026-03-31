@@ -11,15 +11,19 @@ use Gplanchat\Durable\Event\Event;
 
 final class DbalEventStore implements EventStoreInterface
 {
-    /** @internal Borné pour éviter de charger tout le flux d'un coup côté client (requêtes bufferisées MySQL, etc.). */
-    private const READ_STREAM_PAGE_SIZE = 500;
-
     private bool $recordedAtColumnEnsured = false;
 
     public function __construct(
         private readonly Connection $connection,
         private readonly string $tableName = 'durable_events',
+        /**
+         * Taille max d'une page SQL keyset ({@see readStreamWithRecordedAt}). Défaut 500 ; tests peuvent baisser pour valider le multi-pages sans insérer des centaines d'événements.
+         */
+        private readonly int $readStreamPageSize = 500,
     ) {
+        if ($this->readStreamPageSize < 1) {
+            throw new \InvalidArgumentException('readStreamPageSize must be >= 1.');
+        }
     }
 
     public function append(Event $event): void
@@ -60,7 +64,7 @@ final class DbalEventStore implements EventStoreInterface
                 .' WHERE execution_id = ? AND id > ? ORDER BY id ASC LIMIT ?';
             $result = $this->connection->executeQuery(
                 $sql,
-                [$executionId, $lastId, self::READ_STREAM_PAGE_SIZE],
+                [$executionId, $lastId, $this->readStreamPageSize],
                 [ParameterType::STRING, ParameterType::INTEGER, ParameterType::INTEGER],
             );
             $rowsInPage = 0;
@@ -80,7 +84,7 @@ final class DbalEventStore implements EventStoreInterface
 
                 yield ['event' => $event, 'recordedAt' => $recordedAt];
             }
-            if ($rowsInPage < self::READ_STREAM_PAGE_SIZE) {
+            if ($rowsInPage < $this->readStreamPageSize) {
                 break;
             }
         }
