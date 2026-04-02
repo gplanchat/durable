@@ -7,7 +7,8 @@ namespace Gplanchat\Durable\Worker;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
-use Gplanchat\Durable\Event\ActivityCompleted;
+use Gplanchat\Durable\Event\ActivityTaskCompleted;
+use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
@@ -19,7 +20,7 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
  * Traite un {@see ActivityMessage} : timeouts, exécution, journal, reprise workflow, retry.
  *
  * Réutilisable par le bundle Symfony ({@see \Gplanchat\Durable\Bundle\Handler\ActivityRunHandler})
- * et par d’autres runtimes (ex. module Magento en mode DBAL).
+ * et par d’autres runtimes (workers consommant la même abstraction transport).
  */
 final class ActivityMessageProcessor
 {
@@ -69,6 +70,19 @@ final class ActivityMessageProcessor
                 set_time_limit(max(1, (int) ceil($stc)));
             }
             try {
+                if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
+                    $this->eventStore,
+                    $message->executionId,
+                    $message->activityId,
+                    $message->attempt(),
+                )) {
+                    $this->eventStore->append(new ActivityTaskStarted(
+                        $message->executionId,
+                        $message->activityId,
+                        $message->activityName,
+                        $message->attempt(),
+                    ));
+                }
                 $t0 = microtime(true);
                 $result = $this->activityExecutor->execute($message->activityName, $message->payload);
                 $duration = microtime(true) - $t0;
@@ -85,7 +99,7 @@ final class ActivityMessageProcessor
                     ini_restore('max_execution_time');
                 }
             }
-            $this->eventStore->append(new ActivityCompleted(
+            $this->eventStore->append(new ActivityTaskCompleted(
                 $message->executionId,
                 $message->activityId,
                 $result,
