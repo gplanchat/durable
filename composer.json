@@ -10,7 +10,6 @@
         "psr/log": "^3.0"
     },
     "suggest": {
-        "doctrine/dbal": "Required by the DBAL adapter classes (DbalEventStore, DbalActivityTransport); to be extracted to gplanchat/durable-dbal-adapter",
         "gplanchat/durable-phpstan": "Optional PHPStan extension (ActivityStub + Awaitable; see ADR012)",
         "gplanchat/durable-psalm-plugin": "Optional Psalm plugin entry point; prefer durable-phpstan for stubs (ADR012)"
     },
