@@ -49,7 +49,7 @@ final class WorkflowRegistry
      *
      * La factory reçoit le payload de démarrage et retourne un callable(WorkflowEnvironment): mixed.
      *
-     * @param callable(array<string, mixed>): callable(WorkflowEnvironment): mixed $factory
+     * @param callable(array<string, mixed>): (callable(WorkflowEnvironment): mixed) $factory
      */
     public function registerFactory(string $workflowType, callable $factory): void
     {
