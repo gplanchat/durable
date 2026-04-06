@@ -7,14 +7,18 @@ namespace Gplanchat\Durable\Worker;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
+use Gplanchat\Durable\Event\ActivityCancelled;
+use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
+use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Transport\NoopActivityTransport;
 
 /**
  * Traite un {@see ActivityMessage} : timeouts, exécution, journal, reprise workflow, retry.
@@ -29,6 +33,7 @@ final class ActivityMessageProcessor
         private readonly ActivityTransportInterface $activityTransport,
         private readonly ActivityExecutor $activityExecutor,
         private readonly WorkflowResumeDispatcher $resumeDispatcher,
+        private readonly ActivityHeartbeatSenderInterface $heartbeatSender,
         private readonly int $maxRetries = 0,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {
@@ -65,6 +70,12 @@ final class ActivityMessageProcessor
         }
 
         try {
+            if (true === $this->heartbeatSender->isCancellationRequested()) {
+                $this->appendActivityCancelled($message, 'cancellation_requested');
+
+                return;
+            }
+
             $stc = $options?->startToCloseTimeoutSeconds;
             if (null !== $stc && $stc > 0) {
                 set_time_limit(max(1, (int) ceil($stc)));
@@ -85,6 +96,20 @@ final class ActivityMessageProcessor
                 }
                 $t0 = microtime(true);
                 $result = $this->activityExecutor->execute($message->activityName, $message->payload);
+                if (true === $this->heartbeatSender->isCancellationRequested()) {
+                    $duration = microtime(true) - $t0;
+                    $this->workflowExecutionObserver?->onActivityExecuted(
+                        $message->executionId,
+                        $message->activityId,
+                        $message->activityName,
+                        $duration,
+                        false,
+                        null,
+                    );
+                    $this->appendActivityCancelled($message, 'cancellation_requested');
+
+                    return;
+                }
                 $duration = microtime(true) - $t0;
                 $this->workflowExecutionObserver?->onActivityExecuted(
                     $message->executionId,
@@ -100,6 +125,11 @@ final class ActivityMessageProcessor
                 }
             }
             $this->eventStore->append(new ActivityTaskCompleted(
+                $message->executionId,
+                $message->activityId,
+                $result,
+            ));
+            $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
                 $result,
@@ -122,6 +152,14 @@ final class ActivityMessageProcessor
                 : $this->maxRetries;
             $shouldRetry = $maxAttempts > 0 && $message->attempt() <= $maxAttempts
                 && (null === $options || !$options->isNonRetryable($e));
+
+            if ($shouldRetry && $this->activityTransport instanceof NoopActivityTransport) {
+                $this->appendActivityFailure($message, new \RuntimeException(
+                    'PHP-side activity retry is disabled with NoopActivityTransport (Temporal native worker / interpreter mirror); rely on Temporal retry policy.',
+                ));
+
+                return;
+            }
 
             if ($shouldRetry) {
                 $nextAttempt = $message->attempt() + 1;
@@ -152,6 +190,16 @@ final class ActivityMessageProcessor
             $message->activityName,
             $message->attempt(),
             $e,
+        ));
+        $this->resumeDispatcher->dispatchResume($message->executionId);
+    }
+
+    private function appendActivityCancelled(ActivityMessage $message, string $reason): void
+    {
+        $this->eventStore->append(new ActivityCancelled(
+            $message->executionId,
+            $message->activityId,
+            $reason,
         ));
         $this->resumeDispatcher->dispatchResume($message->executionId);
     }

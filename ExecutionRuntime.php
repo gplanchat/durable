@@ -47,10 +47,21 @@ final class ExecutionRuntime
      */
     public function await(Awaitable $awaitable, ExecutionContext $context): mixed
     {
-        if (!$awaitable->isSettled() && $this->distributed) {
+        if ($awaitable->isSettled()) {
+            return $awaitable->getResult();
+        }
+
+        if ($this->distributed) {
+            if (null !== \Fiber::getCurrent()) {
+                \Fiber::suspend($awaitable);
+                // Resumed by ExecutionEngine fiber loop after the awaitable was settled
+                return $awaitable->getResult();
+            }
+            // Called outside of a fiber (backward-compatibility path for non-fiber callers)
             throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), $awaitable instanceof TimerAwaitable);
         }
 
+        // Synchronous in-memory drain (distributed=false)
         while (!$awaitable->isSettled()) {
             $this->drainActivityQueueOnce($context);
             $this->checkTimers($context);
@@ -164,14 +175,19 @@ final class ExecutionRuntime
     }
 
     /**
-     * Activité / timer : un worker ou le temps peut faire progresser l’exécution sans nouveau message externe
-     * (reprise automatique). Signal / update : seuls {@see DeliverWorkflowSignalHandler} etc. doivent relancer.
+     * Timer : {@see ResumeWorkflowHandler} envoie {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (pas un resume direct).
+     * Activité : faux — {@see ActivityMessageProcessor} appelle {@see \Gplanchat\Durable\Port\WorkflowResumeDispatcher::dispatchResume}
+     * à la fin de l’activité ; un {@code dispatchResume} depuis le handler workflow avec transport **sync/in-memory** bouclerait à l’infini.
+     * Signal / update : seuls {@see DeliverWorkflowSignalHandler} etc. doivent relancer.
      *
      * @param Awaitable<mixed> $awaitable
      */
     private function awaitableShouldDispatchResume(Awaitable $awaitable): bool
     {
-        if ($awaitable instanceof ActivityAwaitable || $awaitable instanceof TimerAwaitable) {
+        if ($awaitable instanceof ActivityAwaitable) {
+            return false;
+        }
+        if ($awaitable instanceof TimerAwaitable) {
             return true;
         }
         if ($awaitable instanceof CancellingAnyAwaitable) {

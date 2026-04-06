@@ -8,29 +8,14 @@ use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
-use Gplanchat\Durable\Event\ActivityCancelled;
-use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
-use Gplanchat\Durable\Event\ActivityFailed;
-use Gplanchat\Durable\Event\ActivityScheduled;
-use Gplanchat\Durable\Event\ChildWorkflowCompleted;
-use Gplanchat\Durable\Event\ChildWorkflowFailed;
-use Gplanchat\Durable\Event\ChildWorkflowScheduled;
-use Gplanchat\Durable\Event\ExecutionCompleted;
-use Gplanchat\Durable\Event\SideEffectRecorded;
-use Gplanchat\Durable\Event\TimerCompleted;
-use Gplanchat\Durable\Event\TimerScheduled;
-use Gplanchat\Durable\Event\WorkflowSignalReceived;
-use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
-use Gplanchat\Durable\Exception\DurableActivityFailedException;
-use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
-use Gplanchat\Durable\Store\EventStoreInterface;
-use Gplanchat\Durable\Transport\ActivityMessage;
-use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
+use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
+use Gplanchat\Durable\WorkflowIdReusePolicy;
 use Symfony\Component\Uid\Uuid;
 
 final class ExecutionContext
@@ -55,8 +40,8 @@ final class ExecutionContext
 
     public function __construct(
         private readonly string $executionId,
-        private readonly EventStoreInterface $eventStore,
-        private readonly ActivityTransportInterface $activityTransport,
+        private readonly WorkflowHistorySourceInterface $historySource,
+        private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunner $childWorkflowRunner = null,
     ) {
     }
@@ -74,7 +59,7 @@ final class ExecutionContext
     public function activity(string $name, array $payload = [], ?ActivityOptions $options = null): Awaitable
     {
         $slotIndex = $this->activitySlotIndex++;
-        $replay = $this->findReplayResultForSlot($slotIndex);
+        $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
             if (null !== $replay['failed']) {
@@ -82,12 +67,12 @@ final class ExecutionContext
             } else {
                 $deferred->resolve($replay['result']);
             }
-            $replayActivityId = $this->findScheduledActivityIdForSlot($slotIndex) ?? '';
+            $replayActivityId = $this->historySource->findScheduledActivityId($slotIndex) ?? '';
 
             return new ActivityAwaitable($deferred->awaitable(), $replayActivityId);
         }
 
-        $scheduled = $this->findScheduledActivityIdForSlot($slotIndex);
+        $scheduled = $this->historySource->findScheduledActivityId($slotIndex);
         if (null !== $scheduled) {
             $activityId = $scheduled;
         } else {
@@ -102,32 +87,14 @@ final class ExecutionContext
             $now = microtime(true);
             $metadata['queued_at'] = $now;
             $metadata['first_queued_at'] = $now;
-        }
-
-        if (null === $scheduled) {
-            $event = new ActivityScheduled(
-                $this->executionId,
-                $activityId,
-                $name,
-                $payload,
-                $metadata,
-            );
-            $this->eventStore->append($event);
-            $this->activityTransport->enqueue(new ActivityMessage(
-                $this->executionId,
-                $activityId,
-                $name,
-                $payload,
-                $metadata,
-            ));
+            $this->commandBuffer->scheduleActivity($activityId, $name, $payload, $metadata);
         }
 
         return new ActivityAwaitable($deferred->awaitable(), $activityId);
     }
 
     /**
-     * Exécute une closure potentiellement non déterministe une seule fois ; au replay, réutilise le résultat
-     * enregistré dans le journal (équivalent Temporal {@link https://docs.temporal.io/develop/php/side-effects}).
+     * Executes a potentially non-deterministic closure once; on replay, reuses the result recorded in history.
      *
      * @param \Closure(): mixed $closure
      *
@@ -136,7 +103,7 @@ final class ExecutionContext
     public function sideEffect(\Closure $closure): Awaitable
     {
         $slotIndex = $this->sideEffectSlotIndex++;
-        $replayResult = $this->findReplaySideEffectResultForSlot($slotIndex);
+        $replayResult = $this->historySource->findSideEffectForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replayResult) {
             $deferred->resolve($replayResult);
@@ -145,19 +112,13 @@ final class ExecutionContext
         }
 
         $result = $closure();
-        $this->eventStore->append(new SideEffectRecorded(
-            $this->executionId,
-            (string) Uuid::v7(),
-            $result,
-        ));
+        $this->commandBuffer->recordSideEffect((string) Uuid::v7(), $result);
         $deferred->resolve($result);
 
         return $deferred->awaitable();
     }
 
     /**
-     * Timer durable : alias sémantique de {@see delay()} (Temporal {@link https://docs.temporal.io/develop/php/timers}).
-     *
      * @return Awaitable<mixed>
      */
     public function timer(float $seconds, string $timerSummary = ''): Awaitable
@@ -166,11 +127,9 @@ final class ExecutionContext
     }
 
     /**
-     * Enchaîne un nouveau run avec un historique vierge (Temporal continue-as-new).
-     *
      * @param array<string, mixed> $payload
      *
-     * @throws ContinueAsNewRequested toujours — le moteur append {@see Event\WorkflowContinuedAsNew}
+     * @throws ContinueAsNewRequested always
      */
     public function continueAsNew(string $workflowType, array $payload = [], ?ContinueAsNewOptions $options = null): never
     {
@@ -178,9 +137,6 @@ final class ExecutionContext
     }
 
     /**
-     * Exécute un workflow enfant enregistré dans {@see WorkflowRegistry} ; le journal parent reçoit
-     * {@see ChildWorkflowScheduled} puis {@see ChildWorkflowCompleted} ou {@see ChildWorkflowFailed}.
-     *
      * @param array<string, mixed> $input
      *
      * @return Awaitable<mixed>
@@ -194,7 +150,7 @@ final class ExecutionContext
         $options ??= ChildWorkflowOptions::defaults();
 
         $slotIndex = $this->childWorkflowSlotIndex++;
-        $replay = $this->findReplayChildWorkflowForSlot($slotIndex);
+        $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replay) {
             if (null !== $replay['failed']) {
@@ -206,7 +162,7 @@ final class ExecutionContext
             return $deferred->awaitable();
         }
 
-        $scheduledId = $this->findScheduledChildExecutionIdForSlot($slotIndex);
+        $scheduledId = $this->historySource->findScheduledChildExecutionId($slotIndex);
         $childExecutionId = $scheduledId ?? ($options->workflowId ?? (string) Uuid::v7());
 
         if (null === $scheduledId && null !== $options->workflowId) {
@@ -214,15 +170,15 @@ final class ExecutionContext
         }
 
         if (null === $scheduledId) {
-            $this->eventStore->append(new ChildWorkflowScheduled(
-                $this->executionId,
+            $this->commandBuffer->scheduleChildWorkflow(
                 $childExecutionId,
                 $childWorkflowType,
                 $input,
-                $options->parentClosePolicy,
-                $options->workflowId,
-                $options->toSchedulingMetadata(),
-            ));
+                array_merge(
+                    ['parentClosePolicy' => $options->parentClosePolicy, 'workflowId' => $options->workflowId],
+                    $options->toSchedulingMetadata(),
+                ),
+            );
         }
 
         if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStartToMessenger()) {
@@ -231,17 +187,12 @@ final class ExecutionContext
 
         try {
             $result = $this->childWorkflowRunner->runChild($childExecutionId, $childWorkflowType, $input, $this->executionId);
-            $this->eventStore->append(new ChildWorkflowCompleted($this->executionId, $childExecutionId, $result));
+            $this->commandBuffer->completeWorkflow($result);
             $deferred->resolve($result);
         } catch (ChildWorkflowDeferredToMessenger) {
             return $deferred->awaitable();
         } catch (\Throwable $e) {
-            $this->eventStore->append(new ChildWorkflowFailed(
-                $this->executionId,
-                $childExecutionId,
-                $e->getMessage(),
-                (int) $e->getCode(),
-            ));
+            $this->commandBuffer->failWorkflow($e);
             $deferred->reject(new DurableChildWorkflowFailedException(
                 $childExecutionId,
                 $e->getMessage(),
@@ -254,21 +205,18 @@ final class ExecutionContext
     }
 
     /**
-     * Attend le signal n° slot (ordre des {@see WorkflowSignalReceived} dans le journal).
-     * En mode distribué, suspend tant que le signal n’est pas présent dans l’historique.
+     * Waits for a signal at signal slot N (order of signals in history).
+     * In distributed mode, suspends until the signal is present in history.
      *
      * @return Awaitable<mixed>
      */
     public function waitSignal(string $signalName): Awaitable
     {
         $slot = $this->signalWaitSlotIndex++;
-        $evt = $this->findWorkflowSignalReceivedForSlot($slot);
+        $found = $this->historySource->findSignalForSlot($signalName, $slot);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $evt) {
-            if ($evt->signalName() !== $signalName) {
-                throw new DurableWorkflowAlgorithmFailureException(\sprintf('Signal replay mismatch: expected %s, history has %s', $signalName, $evt->signalName()));
-            }
-            $deferred->resolve($evt->signalPayload());
+        if (null !== $found) {
+            $deferred->resolve($found['payload']);
 
             return $deferred->awaitable();
         }
@@ -277,20 +225,17 @@ final class ExecutionContext
     }
 
     /**
-     * Attend la mise à jour n° slot (ordre des {@see WorkflowUpdateHandled} dans le journal).
+     * Waits for an update at update slot N (order of updates in history).
      *
-     * @return Awaitable<mixed> résultat enregistré dans l’historique pour cette update
+     * @return Awaitable<mixed>
      */
     public function waitUpdate(string $updateName): Awaitable
     {
         $slot = $this->updateWaitSlotIndex++;
-        $evt = $this->findWorkflowUpdateHandledForSlot($slot);
+        $found = $this->historySource->findUpdateForSlot($updateName, $slot);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $evt) {
-            if ($evt->updateName() !== $updateName) {
-                throw new DurableWorkflowAlgorithmFailureException(\sprintf('Update replay mismatch: expected %s, history has %s', $updateName, $evt->updateName()));
-            }
-            $deferred->resolve($evt->result());
+        if (null !== $found) {
+            $deferred->resolve($found['result']);
 
             return $deferred->awaitable();
         }
@@ -299,15 +244,15 @@ final class ExecutionContext
     }
 
     /**
-     * Retire l'activité de la file si elle n'a pas encore été dequeue (best effort).
+     * Cancels a pending activity (best effort).
      */
     public function cancelScheduledActivity(string $activityId, string $reason): bool
     {
-        if (!$this->activityTransport->removePendingFor($this->executionId, $activityId)) {
+        if (!isset($this->pendingActivities[$activityId])) {
             return false;
         }
 
-        $this->eventStore->append(new ActivityCancelled($this->executionId, $activityId, $reason));
+        $this->commandBuffer->cancelActivity($activityId, $reason);
         $this->rejectActivity($activityId, new ActivitySupersededException($activityId, $reason));
 
         return true;
@@ -319,7 +264,7 @@ final class ExecutionContext
     public function delay(float $seconds, string $timerSummary = ''): Awaitable
     {
         $slotIndex = $this->timerSlotIndex++;
-        $replay = $this->findReplayTimerForSlot($slotIndex);
+        $replay = $this->historySource->findTimerSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
             $deferred->resolve(null);
@@ -327,14 +272,14 @@ final class ExecutionContext
             return $deferred->awaitable();
         }
 
-        $scheduled = $this->findScheduledTimerIdForSlot($slotIndex);
+        $scheduled = $this->historySource->findScheduledTimerId($slotIndex);
         $timerId = $scheduled ?? (string) Uuid::v7();
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         $this->pendingTimers[$timerId] = $deferred;
 
         if (null === $scheduled) {
             $scheduledAt = microtime(true) + $seconds;
-            $this->eventStore->append(new TimerScheduled($this->executionId, $timerId, $scheduledAt, $timerSummary));
+            $this->commandBuffer->startTimer($timerId, $scheduledAt, $timerSummary);
         }
 
         return new TimerAwaitable($deferred->awaitable(), $timerId);
@@ -355,244 +300,6 @@ final class ExecutionContext
             $deferred->resolve(null);
             unset($this->pendingTimers[$timerId]);
         }
-    }
-
-    /**
-     * @return array{id: string, scheduledAt: float}|null
-     */
-    private function findReplaySideEffectResultForSlot(int $slotIndex): mixed
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof SideEffectRecorded) {
-                if ($index === $slotIndex) {
-                    return $event->result();
-                }
-                ++$index;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @return array{id: string, scheduledAt: float}|null
-     */
-    private function findReplayTimerForSlot(int $slotIndex): ?array
-    {
-        $scheduledIds = [];
-        $completedIds = [];
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof TimerScheduled) {
-                $scheduledIds[] = $event->timerId();
-            }
-            if ($event instanceof TimerCompleted) {
-                $completedIds[$event->timerId()] = true;
-            }
-        }
-
-        $timerId = $scheduledIds[$slotIndex] ?? null;
-        if (null === $timerId || !isset($completedIds[$timerId])) {
-            return null;
-        }
-
-        return ['id' => $timerId, 'scheduledAt' => 0.0];
-    }
-
-    private function findScheduledTimerIdForSlot(int $slotIndex): ?string
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof TimerScheduled) {
-                if ($index === $slotIndex) {
-                    return $event->timerId();
-                }
-                ++$index;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @return array{result: mixed, failed: \Throwable|null}|null Null when neither completed nor failed
-     */
-    private function findReplayResultForSlot(int $slotIndex): ?array
-    {
-        $scheduledIds = [];
-        $completedResults = [];
-        $failedByActivityId = [];
-        $catastrophicByActivityId = [];
-        $cancelledReasonByActivityId = [];
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof ActivityScheduled) {
-                $scheduledIds[] = $event->activityId();
-            }
-            if ($event instanceof Event\ActivityCompleted) {
-                $completedResults[$event->activityId()] = $event->result();
-            }
-            if ($event instanceof ActivityFailed) {
-                $failedByActivityId[$event->activityId()] = DurableActivityFailedException::toThrowable($event);
-            }
-            if ($event instanceof ActivityCatastrophicFailure) {
-                $catastrophicByActivityId[$event->activityId()] = new DurableCatastrophicActivityFailureException($event);
-            }
-            if ($event instanceof ActivityCancelled) {
-                $cancelledReasonByActivityId[$event->activityId()] = $event->reason();
-            }
-        }
-
-        $activityId = $scheduledIds[$slotIndex] ?? null;
-        if (null === $activityId) {
-            return null;
-        }
-
-        if (isset($catastrophicByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => $catastrophicByActivityId[$activityId]];
-        }
-
-        if (isset($failedByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => $failedByActivityId[$activityId]];
-        }
-
-        if (isset($cancelledReasonByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => new ActivitySupersededException($activityId, $cancelledReasonByActivityId[$activityId])];
-        }
-
-        if (\array_key_exists($activityId, $completedResults)) {
-            return ['result' => $completedResults[$activityId], 'failed' => null];
-        }
-
-        return null;
-    }
-
-    private function findScheduledActivityIdForSlot(int $slotIndex): ?string
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof ActivityScheduled) {
-                if ($index === $slotIndex) {
-                    return $event->activityId();
-                }
-                ++$index;
-            }
-        }
-
-        return null;
-    }
-
-    private function assertChildWorkflowIdAllowed(ChildWorkflowOptions $options, string $childExecutionId): void
-    {
-        if (WorkflowIdReusePolicy::AllowDuplicate === $options->workflowIdReusePolicy) {
-            return;
-        }
-
-        $hasAnyEvent = false;
-        $hasSuccessfulCompletion = false;
-        foreach ($this->eventStore->readStream($childExecutionId) as $event) {
-            $hasAnyEvent = true;
-            if ($event instanceof ExecutionCompleted) {
-                $hasSuccessfulCompletion = true;
-            }
-        }
-
-        if (!$hasAnyEvent) {
-            return;
-        }
-
-        if (WorkflowIdReusePolicy::RejectDuplicate === $options->workflowIdReusePolicy) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s is already used in the event store.', $childExecutionId));
-        }
-
-        // AllowDuplicateFailedOnly : autoriser seulement si aucune exécution **réussie** enregistrée sur cet id.
-        if ($hasSuccessfulCompletion) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s already completed successfully; reuse is not allowed with AllowDuplicateFailedOnly.', $childExecutionId));
-        }
-    }
-
-    /**
-     * @return array{result: mixed, failed: \Throwable|null}|null
-     */
-    private function findReplayChildWorkflowForSlot(int $slotIndex): ?array
-    {
-        $scheduledIds = [];
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof ChildWorkflowScheduled) {
-                $scheduledIds[] = $event->childExecutionId();
-            }
-        }
-
-        $childId = $scheduledIds[$slotIndex] ?? null;
-        if (null === $childId) {
-            return null;
-        }
-
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId() === $childId) {
-                return ['result' => $event->result(), 'failed' => null];
-            }
-            if ($event instanceof ChildWorkflowFailed && $event->childExecutionId() === $childId) {
-                return [
-                    'result' => null,
-                    'failed' => new DurableChildWorkflowFailedException(
-                        $childId,
-                        $event->failureMessage(),
-                        $event->failureCode(),
-                        null,
-                        $event->workflowFailureKind(),
-                        $event->workflowFailureClass(),
-                        $event->workflowFailureContext(),
-                    ),
-                ];
-            }
-        }
-
-        return null;
-    }
-
-    private function findScheduledChildExecutionIdForSlot(int $slotIndex): ?string
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof ChildWorkflowScheduled) {
-                if ($index === $slotIndex) {
-                    return $event->childExecutionId();
-                }
-                ++$index;
-            }
-        }
-
-        return null;
-    }
-
-    private function findWorkflowSignalReceivedForSlot(int $slot): ?WorkflowSignalReceived
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof WorkflowSignalReceived) {
-                if ($index === $slot) {
-                    return $event;
-                }
-                ++$index;
-            }
-        }
-
-        return null;
-    }
-
-    private function findWorkflowUpdateHandledForSlot(int $slot): ?WorkflowUpdateHandled
-    {
-        $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof WorkflowUpdateHandled) {
-                if ($index === $slot) {
-                    return $event;
-                }
-                ++$index;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -618,6 +325,25 @@ final class ExecutionContext
         if (null !== $deferred) {
             $deferred->reject($reason);
             unset($this->pendingActivities[$activityId]);
+        }
+    }
+
+    private function assertChildWorkflowIdAllowed(ChildWorkflowOptions $options, string $childExecutionId): void
+    {
+        if (WorkflowIdReusePolicy::AllowDuplicate === $options->workflowIdReusePolicy) {
+            return;
+        }
+
+        if (!$this->historySource->hasChildExecutionId($childExecutionId)) {
+            return;
+        }
+
+        if (WorkflowIdReusePolicy::RejectDuplicate === $options->workflowIdReusePolicy) {
+            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s is already used in the event store.', $childExecutionId));
+        }
+
+        if ($this->historySource->hasChildExecutionCompletedSuccessfully($childExecutionId)) {
+            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s already completed successfully; reuse is not allowed with AllowDuplicateFailedOnly.', $childExecutionId));
         }
     }
 }

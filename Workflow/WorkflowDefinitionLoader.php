@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Workflow;
 
+use Gplanchat\Durable\Attribute\QueryMethod;
 use Gplanchat\Durable\Attribute\Workflow;
 use Gplanchat\Durable\Attribute\WorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
@@ -33,6 +34,30 @@ final class WorkflowDefinitionLoader
     }
 
     /**
+     * Nom enregistré dans {@see WorkflowRegistry} : valeur de {@see Workflow} (1er argument) si présente, sinon {@see \ReflectionClass::getShortName()}.
+     *
+     * @param class-string $workflowClass
+     */
+    public function workflowTypeForClass(string $workflowClass): string
+    {
+        return $this->resolveWorkflowType(new \ReflectionClass($workflowClass));
+    }
+
+    /**
+     * Nom à l’usage de Temporal (type de workflow côté serveur) et du journal : **jamais le FQCN**.
+     * Si la chaîne est un {@code class-string} existant, résout comme {@see workflowTypeForClass} ;
+     * sinon la valeur est déjà un alias et est renvoyée telle quelle.
+     */
+    public function aliasForTemporalInterop(string $workflowTypeOrFqcn): string
+    {
+        if (class_exists($workflowTypeOrFqcn)) {
+            return $this->workflowTypeForClass($workflowTypeOrFqcn);
+        }
+
+        return $workflowTypeOrFqcn;
+    }
+
+    /**
      * Produit workflowType et factory pour une classe workflow.
      *
      * @param class-string $workflowClass
@@ -48,6 +73,7 @@ final class WorkflowDefinitionLoader
         $factory = function (array $input) use ($workflowClass, $method): callable {
             return function (WorkflowEnvironment $env) use ($workflowClass, $method, $input): mixed {
                 $instance = $this->instantiate($workflowClass, $env);
+                $this->registerQueryHandlers($workflowClass, $instance, $env);
 
                 return $method->invokeArgs($instance, $this->mapInputToArguments($method, $input));
             };
@@ -147,5 +173,24 @@ final class WorkflowDefinitionLoader
         }
 
         return $args;
+    }
+
+    /**
+     * Scans the workflow class for #[QueryMethod] attributes and registers them on WorkflowEnvironment.
+     *
+     * @param class-string $workflowClass
+     */
+    private function registerQueryHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
+    {
+        $reflection = new \ReflectionClass($workflowClass);
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $attrs = $method->getAttributes(QueryMethod::class);
+            if ($attrs === []) {
+                continue;
+            }
+            $attr = $attrs[0]->newInstance();
+            $queryType = $attr->name;
+            $env->registerQueryHandler($queryType, static fn (mixed ...$args) => $method->invoke($instance, ...$args));
+        }
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\Store\EventStoreCommandBuffer;
+use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
@@ -64,8 +66,8 @@ final class InMemoryWorkflowRunner
     {
         $context = new ExecutionContext(
             $executionId,
-            $this->eventStore,
-            $this->activityTransport,
+            new EventStoreHistorySource($this->eventStore, $executionId),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId),
             null,
         );
         $runtime->runUntilIdle($context);

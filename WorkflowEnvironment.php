@@ -26,6 +26,9 @@ final class WorkflowEnvironment
 
     private ?WorkflowDefinitionLoader $workflowLoader = null;
 
+    /** @var array<string, callable> query type → handler */
+    private array $queryHandlers = [];
+
     public function __construct(
         private readonly ExecutionContext $context,
         private readonly ExecutionRuntime $runtime,
@@ -39,6 +42,37 @@ final class WorkflowEnvironment
     public static function wrap(ExecutionContext $context, ExecutionRuntime $runtime): self
     {
         return new self($context, $runtime);
+    }
+
+    /**
+     * Registers a query handler callable for the given query type name.
+     * Called by WorkflowDefinitionLoader after instantiating the workflow.
+     */
+    public function registerQueryHandler(string $queryType, callable $handler): void
+    {
+        $this->queryHandlers[$queryType] = $handler;
+    }
+
+    /**
+     * Calls a registered query handler and returns its result.
+     *
+     * @param array<mixed> $args
+     *
+     * @throws \InvalidArgumentException if no handler is registered for the query type
+     */
+    public function callQueryHandler(string $queryType, array $args = []): mixed
+    {
+        $handler = $this->queryHandlers[$queryType] ?? null;
+        if (null === $handler) {
+            throw new \InvalidArgumentException(\sprintf('No query handler registered for query type: %s', $queryType));
+        }
+
+        return $handler(...$args);
+    }
+
+    public function hasQueryHandler(string $queryType): bool
+    {
+        return isset($this->queryHandlers[$queryType]);
     }
 
     /**
