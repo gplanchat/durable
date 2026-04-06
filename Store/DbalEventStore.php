@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Gplanchat\Durable\Event\Event;
+use Gplanchat\Durable\Mapping\EventDataMapper;
 
 final class DbalEventStore implements EventStoreInterface
 {
@@ -29,7 +30,7 @@ final class DbalEventStore implements EventStoreInterface
     public function append(Event $event): void
     {
         $this->ensureRecordedAtColumnOnce();
-        $row = EventSerializer::serialize($event);
+        $row = EventDataMapper::fromDomainEvent($event);
         $recordedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $this->connection->insert($this->tableName, [
             'execution_id' => $row['execution_id'],
@@ -72,7 +73,7 @@ final class DbalEventStore implements EventStoreInterface
                 ++$rowsInPage;
                 $lastId = (int) $row['id'];
                 unset($row['id']);
-                $event = EventSerializer::deserialize($row);
+                $event = EventDataMapper::toDomainEvent($row);
                 $recordedAt = null;
                 if (isset($row['recorded_at']) && '' !== (string) $row['recorded_at']) {
                     try {
