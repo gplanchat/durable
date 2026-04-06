@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Query;
 
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -67,5 +69,23 @@ final class WorkflowQueryEvaluator
         }
 
         return $out;
+    }
+
+    /**
+     * Returns true if the execution has at least one TimerScheduled without a corresponding
+     * TimerCompleted (i.e., the workflow is suspended waiting for a timer to fire).
+     */
+    public static function hasPendingTimer(EventStoreInterface $store, string $executionId): bool
+    {
+        $scheduled = [];
+        foreach ($store->readStream($executionId) as $event) {
+            if ($event instanceof TimerScheduled) {
+                $scheduled[$event->timerId()] = true;
+            } elseif ($event instanceof TimerCompleted) {
+                unset($scheduled[$event->timerId()]);
+            }
+        }
+
+        return [] !== $scheduled;
     }
 }
