@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Symfony\Component\Uid\Uuid;
+use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
 
 /**
  * Identifiant d'exécution de workflow (value object).
@@ -23,7 +23,7 @@ final readonly class ExecutionId implements \Stringable
 
     public static function generate(): self
     {
-        return new self((string) Uuid::v7());
+        return new self((new NativeUuidV7Generator())->generate());
     }
 
     public function toString(): string
