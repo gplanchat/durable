@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 use Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger;
+use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -17,7 +18,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  * le parent reprend via {@see Bundle\Handler\WorkflowRunHandler} qui append
  * {@see Event\ChildWorkflowCompleted} / {@see Event\ChildWorkflowFailed}.
  */
-final class ChildWorkflowRunner
+final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
 {
     private readonly bool $asyncMessengerStart;
 

@@ -13,10 +13,12 @@ use Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
+use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
+use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 use Gplanchat\Durable\WorkflowIdReusePolicy;
-use Symfony\Component\Uid\Uuid;
 
 final class ExecutionContext
 {
@@ -42,7 +44,8 @@ final class ExecutionContext
         private readonly string $executionId,
         private readonly WorkflowHistorySourceInterface $historySource,
         private readonly WorkflowCommandBufferInterface $commandBuffer,
-        private readonly ?ChildWorkflowRunner $childWorkflowRunner = null,
+        private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
+        private readonly ?UuidGeneratorInterface $uuidGenerator = null,
     ) {
     }
 
@@ -77,7 +80,7 @@ final class ExecutionContext
             $activityId = $scheduled;
         } else {
             $optId = $options?->activityId;
-            $activityId = (null !== $optId && '' !== $optId) ? $optId : (string) Uuid::v7();
+            $activityId = (null !== $optId && '' !== $optId) ? $optId : $this->uuid();
         }
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         $this->pendingActivities[$activityId] = $deferred;
@@ -112,7 +115,7 @@ final class ExecutionContext
         }
 
         $result = $closure();
-        $this->commandBuffer->recordSideEffect((string) Uuid::v7(), $result);
+        $this->commandBuffer->recordSideEffect($this->uuid(), $result);
         $deferred->resolve($result);
 
         return $deferred->awaitable();
@@ -163,7 +166,7 @@ final class ExecutionContext
         }
 
         $scheduledId = $this->historySource->findScheduledChildExecutionId($slotIndex);
-        $childExecutionId = $scheduledId ?? ($options->workflowId ?? (string) Uuid::v7());
+        $childExecutionId = $scheduledId ?? ($options->workflowId ?? $this->uuid());
 
         if (null === $scheduledId && null !== $options->workflowId) {
             $this->assertChildWorkflowIdAllowed($options, $childExecutionId);
@@ -273,7 +276,7 @@ final class ExecutionContext
         }
 
         $scheduled = $this->historySource->findScheduledTimerId($slotIndex);
-        $timerId = $scheduled ?? (string) Uuid::v7();
+        $timerId = $scheduled ?? $this->uuid();
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         $this->pendingTimers[$timerId] = $deferred;
 
@@ -345,5 +348,10 @@ final class ExecutionContext
         if ($this->historySource->hasChildExecutionCompletedSuccessfully($childExecutionId)) {
             throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s already completed successfully; reuse is not allowed with AllowDuplicateFailedOnly.', $childExecutionId));
         }
+    }
+
+    private function uuid(): string
+    {
+        return ($this->uuidGenerator ?? new NativeUuidV7Generator())->generate();
     }
 }

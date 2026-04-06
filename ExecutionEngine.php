@@ -17,11 +17,13 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
 final class ExecutionEngine
@@ -29,11 +31,12 @@ final class ExecutionEngine
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ExecutionRuntime $runtime,
-        private readonly ?ChildWorkflowRunner $childWorkflowRunner = null,
+        private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
         private readonly ?ParentChildWorkflowCoordinatorInterface $parentChildCoordinator = null,
         private readonly ?ActivityContractResolver $activityContractResolver = null,
         private readonly ?WorkflowDefinitionLoader $workflowDefinitionLoader = null,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
+        private readonly ?UuidGeneratorInterface $uuidGenerator = null,
     ) {
     }
 
@@ -49,6 +52,7 @@ final class ExecutionEngine
             new EventStoreHistorySource($this->eventStore, $executionId),
             new EventStoreCommandBuffer($this->eventStore, $this->runtime->getActivityTransport(), $executionId),
             $this->childWorkflowRunner,
+            $this->uuidGenerator,
         );
 
         if (0 === $this->eventStore->countEventsInStream($executionId)) {
@@ -78,6 +82,7 @@ final class ExecutionEngine
             new EventStoreHistorySource($this->eventStore, $executionId),
             new EventStoreCommandBuffer($this->eventStore, $this->runtime->getActivityTransport(), $executionId),
             $this->childWorkflowRunner,
+            $this->uuidGenerator,
         );
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler);
