@@ -16,7 +16,7 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  *
  * Les factories reçoivent le payload et retournent un callable(WorkflowEnvironment): mixed.
  *
- * @see ADR009 Modèle distribué et re-dispatch
+ * @see DUR021 Symfony Messenger integration (distributed resume)
  */
 final class WorkflowRegistry
 {

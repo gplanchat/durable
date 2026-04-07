@@ -11,7 +11,7 @@ namespace Gplanchat\Durable\Port;
  * pour des implémentations alternatives (ex. driver Temporal) sans modifier
  * le noyau du composant.
  *
- * @see ADR004 Ports et Adapters
+ * @see DUR002 (CQRS repositories, ports around the event journal)
  * @see OST001 Opportunités futures - Temporal driver
  */
 interface WorkflowBackendInterface

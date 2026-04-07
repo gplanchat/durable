@@ -9,7 +9,7 @@ use Gplanchat\Durable\Event\Event;
 /**
  * Port de persistance des événements de workflow (event sourcing).
  *
- * @see ADR004 Ports et Adapters
+ * @see DUR002 (CQRS repositories, ports around the event journal)
  */
 interface EventStoreInterface
 {

@@ -7,7 +7,7 @@ namespace Gplanchat\Durable\Transport;
 /**
  * Port de transport des messages d'activité.
  *
- * @see ADR004 Ports et Adapters
+ * @see DUR002 (CQRS repositories, ports around the event journal)
  */
 interface ActivityTransportInterface
 {

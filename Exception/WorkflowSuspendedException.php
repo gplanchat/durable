@@ -12,7 +12,7 @@ namespace Gplanchat\Durable\Exception;
  * {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowSignalHandler} (etc.) doivent
  * relancer ; sinon transport Messenger **sync** boucle à l’infini.
  *
- * @see ADR009 Modèle distribué et re-dispatch
+ * @see DUR021 Symfony Messenger integration (distributed resume)
  */
 final class WorkflowSuspendedException extends \RuntimeException
 {

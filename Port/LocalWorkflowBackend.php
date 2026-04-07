@@ -13,7 +13,7 @@ use Gplanchat\Durable\ExecutionEngine;
  * Pas de dépendance à RoadRunner ou Temporal.
  *
  * @see WorkflowBackendInterface
- * @see ADR005 Intégration Messenger
+ * @see DUR021 Symfony Messenger integration
  */
 final class LocalWorkflowBackend implements WorkflowBackendInterface
 {

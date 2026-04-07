@@ -10,7 +10,7 @@ namespace Gplanchat\Durable\Store;
  * Après succès, la ligne est conservée avec {@see markCompleted} pour que le type reste consultable
  * (profiler, observabilité) ; les reprises {@see WorkflowRunHandler} ignorent les lignes terminées.
  *
- * @see ADR009 Modèle distribué et re-dispatch
+ * @see DUR021 Symfony Messenger integration (distributed resume)
  */
 interface WorkflowMetadataStore
 {

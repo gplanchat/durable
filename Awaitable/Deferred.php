@@ -98,7 +98,7 @@ final class Deferred
                     }
                 }
             } catch (\Throwable $e) {
-                // ADR018: journal minimal — un callback then() ne doit pas faire échouer les autres ; la cause reste traçable.
+                // DUR011: isolate callback failures — a then() callback must not break other waiters; cause remains in logs.
                 error_log(\sprintf(
                     '[Gplanchat\Durable\Awaitable\Deferred] callback in notify() threw %s: %s at %s:%d',
                     $e::class,

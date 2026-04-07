@@ -48,7 +48,7 @@ final class InMemoryWorkflowRunner
         try {
             return $engine->start($executionId, $handler);
         } catch (WorkflowSuspendedException) {
-            // ADR018: suspension attendue (contrôle de flux), pas une erreur — la boucle while exécute le worker puis resume().
+            // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
         }
 
         while (true) {
@@ -57,7 +57,7 @@ final class InMemoryWorkflowRunner
             try {
                 return $engine->resume($executionId, $handler);
             } catch (WorkflowSuspendedException) {
-                // ADR018: idem — suspension attendue jusqu’à ce que les activités aient produit les événements nécessaires au replay.
+                // DUR003: same — suspension until activities have produced the events needed for replay.
             }
         }
     }
