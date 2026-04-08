@@ -25,3 +25,7 @@ composer require gplanchat/durable
 ```
 
 Use **`gplanchat/durable-bundle`** for Symfony applications.
+
+## License
+
+**MIT** — see [`LICENSE`](LICENSE) in this directory and [WA004](../../documentation/wa/WA004-mit-license-distribution.md).
