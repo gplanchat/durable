@@ -9,20 +9,21 @@ namespace Gplanchat\Durable\Port;
  *
  * Concrete implementations:
  * - {@see \Gplanchat\Durable\ChildWorkflowRunner} – in-memory / async-messenger runner
+ * - {@see \Gplanchat\Bridge\Temporal\Worker\TemporalChildWorkflowRunner} – Temporal server-driven
  */
 interface ChildWorkflowRunnerInterface
 {
     /**
-     * Returns true when starting a child dispatches a Messenger message instead of running inline.
+     * Returns true when starting a child is handed to the backend instead of running inline.
      */
-    public function defersChildStartToMessenger(): bool;
+    public function defersChildStart(): bool;
 
     /**
      * Run (or defer) a child workflow and return its result.
      *
      * @param array<string, mixed> $input
      *
-     * @throws \Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger when deferred
+     * @throws \Gplanchat\Durable\Exception\ChildWorkflowStartDeferred when deferred
      */
     public function runChild(string $childExecutionId, string $workflowType, array $input, ?string $parentExecutionId = null): mixed;
 }

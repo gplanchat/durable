@@ -9,7 +9,7 @@ use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
-use Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger;
+use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
@@ -184,7 +184,7 @@ final class ExecutionContext
             );
         }
 
-        if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStartToMessenger()) {
+        if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStart()) {
             return $deferred->awaitable();
         }
 
@@ -196,7 +196,7 @@ final class ExecutionContext
             // était donc réexécuté à chaque reprise du parent.
             $this->commandBuffer->completeChildWorkflow($childExecutionId, $result);
             $deferred->resolve($result);
-        } catch (ChildWorkflowDeferredToMessenger) {
+        } catch (ChildWorkflowStartDeferred) {
             return $deferred->awaitable();
         } catch (\Throwable $e) {
             $this->commandBuffer->failChildWorkflow($childExecutionId, $e);

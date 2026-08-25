@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Exception\ChildWorkflowDeferredToMessenger;
+use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
@@ -41,7 +41,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     /**
      * Indique si le démarrage d’enfant passe par Messenger (pas d’exécution inline dans {@see runChild}).
      */
-    public function defersChildStartToMessenger(): bool
+    public function defersChildStart(): bool
     {
         return $this->asyncMessengerStart;
     }
@@ -49,7 +49,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     /**
      * @param array<string, mixed> $input
      *
-     * @throws ChildWorkflowDeferredToMessenger si {@see $asyncMessengerStart} : pas d’append ChildWorkflowCompleted ici
+     * @throws ChildWorkflowStartDeferred si {@see $asyncMessengerStart} : pas d’append ChildWorkflowCompleted ici
      */
     public function runChild(string $childExecutionId, string $workflowType, array $input, ?string $parentExecutionId = null): mixed
     {
@@ -59,7 +59,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             }
             $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
             $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
-            throw new ChildWorkflowDeferredToMessenger();
+            throw new ChildWorkflowStartDeferred();
         }
 
         // Le registre est repassé pour que l'enfant puisse lui-même démarrer des petits-enfants.
