@@ -13,7 +13,9 @@ use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
+use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
@@ -22,6 +24,7 @@ use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
@@ -121,6 +124,21 @@ final class ExecutionRuntime
 
         $t0 = microtime(true);
         try {
+            // Même trio de marqueurs worker que le chemin Messenger : sans eux le journal
+            // produit par le harness de test n'a pas la forme de celui de la production.
+            if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
+                $this->eventStore,
+                $message->executionId,
+                $message->activityId,
+                $message->attempt(),
+            )) {
+                $this->eventStore->append(new ActivityTaskStarted(
+                    $message->executionId,
+                    $message->activityId,
+                    $message->activityName,
+                    $message->attempt(),
+                ));
+            }
             $result = $this->activityExecutor->execute($message->activityName, $message->payload);
             $duration = microtime(true) - $t0;
             $this->workflowExecutionObserver?->onActivityExecuted(
@@ -131,6 +149,11 @@ final class ExecutionRuntime
                 true,
                 null,
             );
+            $this->eventStore->append(new ActivityTaskCompleted(
+                $message->executionId,
+                $message->activityId,
+                $result,
+            ));
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
