@@ -21,7 +21,7 @@ final readonly class ChildWorkflowOptions
          */
         public ?string $workflowId = null,
         public ParentClosePolicy $parentClosePolicy = ParentClosePolicy::Terminate,
-        public ?string $namespace = null,
+        public ?WorkflowNamespace $namespace = null,
         public ?TaskQueue $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
         public ?CronSchedule $cronSchedule = null,
@@ -47,8 +47,8 @@ final readonly class ChildWorkflowOptions
     public function toSchedulingMetadata(): array
     {
         $m = [];
-        if (null !== $this->namespace && '' !== $this->namespace) {
-            $m['namespace'] = $this->namespace;
+        if (null !== $this->namespace) {
+            $m['namespace'] = $this->namespace->name();
         }
         if (null !== $this->taskQueue) {
             $m['task_queue'] = $this->taskQueue->name();
