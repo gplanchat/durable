@@ -37,7 +37,7 @@ final class WorkflowTestEnvironment
     private readonly WorkflowRegistry $workflowRegistry;
     private readonly InMemoryWorkflowRunner $runner;
 
-    private function __construct(int $maxActivityRetries = 0)
+    private function __construct(int $maxActivityRetries = 0, float $budgetSeconds = InMemoryWorkflowRunner::DEFAULT_BUDGET_SECONDS)
     {
         $this->eventStore = new InMemoryEventStore();
         $this->activityTransport = new InMemoryActivityTransport();
@@ -49,6 +49,7 @@ final class WorkflowTestEnvironment
             $this->activityExecutor,
             $maxActivityRetries,
             $this->workflowRegistry,
+            $budgetSeconds,
         );
     }
 
@@ -56,11 +57,17 @@ final class WorkflowTestEnvironment
      * Crée un environnement de test in-memory avec des handlers d'activités optionnels.
      *
      * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers Map nomActivité → callable
-     * @param int $maxActivityRetries Nombre de tentatives max par activité (0 = aucun retry)
+     * @param int   $maxActivityRetries Plafond de retentatives quand l'activité n'en fixe pas
+     *                                  (0 = pas de plafond ; les ActivityOptions restent maîtres)
+     * @param float $budgetSeconds      Durée max d'une exécution : les tentatives d'activité étant
+     *                                  illimitées par défaut, un harnais en ligne a besoin d'une borne
      */
-    public static function inMemory(array $activityHandlers = [], int $maxActivityRetries = 0): self
-    {
-        $env = new self($maxActivityRetries);
+    public static function inMemory(
+        array $activityHandlers = [],
+        int $maxActivityRetries = 0,
+        float $budgetSeconds = InMemoryWorkflowRunner::DEFAULT_BUDGET_SECONDS,
+    ): self {
+        $env = new self($maxActivityRetries, $budgetSeconds);
         foreach ($activityHandlers as $activityName => $handler) {
             $env->activityExecutor->register($activityName, $handler);
         }

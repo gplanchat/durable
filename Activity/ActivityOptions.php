@@ -12,17 +12,27 @@ namespace Gplanchat\Durable\Activity;
  */
 final readonly class ActivityOptions
 {
+    /** Défaut Temporal du plafond d'intervalle, exprimé en multiples de l'intervalle initial. */
+    public const DEFAULT_MAXIMUM_INTERVAL_FACTOR = 100.0;
+
     /**
      * @param list<class-string<\Throwable>> $nonRetryableExceptions
      */
     public function __construct(
-        /** Nombre max de tentatives (0 = illimité côté worker, avec plafond bundle). */
+        /**
+         * Nombre **total** de tentatives. 0 = illimité, comme la RetryPolicy Temporal : seule
+         * une exception non-retryable, un timeout ou l'annulation arrêtent alors les tentatives.
+         */
         public int $maxAttempts = 0,
         /** Délai avant la première retentative après un échec (secondes). */
         public float $initialIntervalSeconds = 1.0,
         /** Coefficient d’exponential backoff entre retentatives. */
         public float $backoffCoefficient = 2.0,
-        /** Plafond du délai entre deux retentatives (secondes). */
+        /**
+         * Plafond du délai entre deux retentatives (secondes). Null applique le défaut Temporal,
+         * {@see DEFAULT_MAXIMUM_INTERVAL_FACTOR} × l'intervalle initial — indispensable dès lors
+         * que les tentatives sont illimitées, sans quoi le backoff exponentiel diverge.
+         */
         public ?float $maximumIntervalSeconds = null,
         /** Exceptions qui ne déclenchent pas de retry (class-string[]). */
         public array $nonRetryableExceptions = [],
@@ -56,11 +66,28 @@ final readonly class ActivityOptions
         }
         $exponent = $nextAttempt - 2;
         $delay = $this->initialIntervalSeconds * ($this->backoffCoefficient ** $exponent);
+
+        return min($delay, $this->effectiveMaximumIntervalSeconds());
+    }
+
+    /**
+     * Plafond d'intervalle réellement appliqué, défaut Temporal compris.
+     */
+    public function effectiveMaximumIntervalSeconds(): float
+    {
         if (null !== $this->maximumIntervalSeconds && $this->maximumIntervalSeconds > 0) {
-            $delay = min($delay, $this->maximumIntervalSeconds);
+            return $this->maximumIntervalSeconds;
         }
 
-        return $delay;
+        return $this->initialIntervalSeconds * self::DEFAULT_MAXIMUM_INTERVAL_FACTOR;
+    }
+
+    /**
+     * Vrai lorsque les tentatives ne sont pas bornées ({@see $maxAttempts} à 0).
+     */
+    public function hasUnlimitedAttempts(): bool
+    {
+        return $this->maxAttempts <= 0;
     }
 
     public function withMaxAttempts(int $maxAttempts): self

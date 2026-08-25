@@ -40,6 +40,12 @@ final class ExecutionRuntime
 
     private ?ActivityMessageProcessor $activityMessageProcessor = null;
 
+    /**
+     * Budget de temps du drain synchrone : c'est un harnais en ligne, pas un worker — il ne peut
+     * pas dormir indéfiniment sur le backoff d'une activité qui échoue toujours.
+     */
+    public const DEFAULT_DRAIN_BUDGET_SECONDS = 5.0;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -189,9 +195,19 @@ final class ExecutionRuntime
      * ponytail: le backoff est attendu pour de vrai — ce drain est synchrone et dans le même
      * processus. Une horloge virtuelle partagée avec le transport permettrait de l'avancer.
      */
-    public function runUntilIdle(ExecutionContext $context): void
+    public function runUntilIdle(ExecutionContext $context, ?float $budgetSeconds = null): void
     {
+        $deadline = microtime(true) + ($budgetSeconds ?? self::DEFAULT_DRAIN_BUDGET_SECONDS);
+
         while (null !== ($dueAt = $this->activityTransport->nextDueAt())) {
+            // Les tentatives sont illimitées par défaut (sémantique Temporal) : une activité
+            // durablement en échec ferait tourner ce drain sans fin. En production le transport
+            // Messenger rend la main entre deux tentatives ; ici on s'arrête, et l'appelant
+            // signale une exécution qui n'avance plus.
+            if ($dueAt > $deadline || microtime(true) >= $deadline) {
+                return;
+            }
+
             $wait = $dueAt - microtime(true);
             if ($wait > 0) {
                 usleep((int) ceil($wait * 1_000_000));

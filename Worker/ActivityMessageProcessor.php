@@ -30,6 +30,9 @@ use Gplanchat\Durable\Transport\NoopActivityTransport;
  */
 final class ActivityMessageProcessor
 {
+    /** Aucune borne au nombre de tentatives (défaut Temporal). */
+    private const UNLIMITED_ATTEMPTS = 0;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -149,15 +152,18 @@ final class ActivityMessageProcessor
                     $e::class,
                 );
             }
-            // `maxRetries` (défaut bundle `max_activity_retries`) compte les *retentatives* ;
-            // `ActivityOptions::maxAttempts` compte les *tentatives* au total (sémantique Temporal).
-            // Tout est normalisé en nombre total de tentatives avant comparaison.
+            // Sémantique Temporal : `ActivityOptions::maxAttempts` compte les tentatives au
+            // total et **0 signifie illimité** — comme une RetryPolicy sans maximum_attempts,
+            // ou une activité planifiée sans options. Le défaut bundle `max_activity_retries`
+            // compte des *retentatives* et sert de plafond quand l'activité n'en fixe pas ;
+            // à 0 il ne plafonne rien.
             $maxAttempts = null !== $options && $options->maxAttempts > 0
                 ? $options->maxAttempts
-                : ($this->maxRetries > 0 ? $this->maxRetries + 1 : 0);
+                : ($this->maxRetries > 0 ? $this->maxRetries + 1 : self::UNLIMITED_ATTEMPTS);
 
             $nonRetryable = null !== $options && $options->isNonRetryable($e);
-            $shouldRetry = !$nonRetryable && $maxAttempts > 0 && $message->attempt() < $maxAttempts;
+            $shouldRetry = !$nonRetryable
+                && (self::UNLIMITED_ATTEMPTS === $maxAttempts || $message->attempt() < $maxAttempts);
 
             // Le transport ne retente pas côté PHP (worker Temporal natif) : l'autorité sur les
             // retentatives appartient entièrement au serveur, donc le décompte de tentatives PHP
@@ -170,8 +176,7 @@ final class ActivityMessageProcessor
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
                 // (l'ordre compte : `InProgress` l'emporte sur le décompte local)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
-                $maxAttempts > 0 => ActivityRetryState::MaximumAttemptsReached,
-                default => ActivityRetryState::RetryPolicyNotSet,
+                default => ActivityRetryState::MaximumAttemptsReached,
             };
 
             $this->eventStore->append(ActivityTaskFailed::forThrowable(

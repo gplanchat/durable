@@ -21,6 +21,8 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
  */
 final class InMemoryWorkflowRunner
 {
+    public const DEFAULT_BUDGET_SECONDS = 10.0;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -31,6 +33,12 @@ final class InMemoryWorkflowRunner
          * résoluble et {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} lève.
          */
         private readonly ?WorkflowRegistry $workflowRegistry = null,
+        /**
+         * Budget total d'une exécution. Les tentatives d'activité étant illimitées par défaut
+         * (sémantique Temporal), un harnais en ligne a besoin d'une borne : sans elle, une
+         * activité durablement en échec ferait tourner ce runner sans fin.
+         */
+        private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
     ) {
     }
 
@@ -73,9 +81,15 @@ final class InMemoryWorkflowRunner
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
         }
 
+        $deadline = microtime(true) + $this->budgetSeconds;
+
         while (true) {
+            if (microtime(true) >= $deadline) {
+                throw WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds);
+            }
+
             $before = $this->eventStore->countEventsInStream($executionId);
-            $this->runActivityWorker($executionId, $runtime);
+            $this->runActivityWorker($executionId, $runtime, max(0.0, $deadline - microtime(true)));
 
             try {
                 return $engine->resume($executionId, $handler);
@@ -90,12 +104,16 @@ final class InMemoryWorkflowRunner
             // ponytail: détection par absence de progrès ; un vrai ordonnanceur de minuteurs
             // demanderait une horloge virtuelle.
             if ($this->eventStore->countEventsInStream($executionId) === $before) {
-                throw new WorkflowStuckException($executionId);
+                // Une tentative encore en file distingue les deux causes : le workflow retente
+                // toujours (budget épuisé), plutôt qu'il attend un événement qui ne viendra pas.
+                throw null !== $this->activityTransport->nextDueAt()
+                    ? WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds)
+                    : WorkflowStuckException::noProgress($executionId);
             }
         }
     }
 
-    private function runActivityWorker(string $executionId, ExecutionRuntime $runtime): void
+    private function runActivityWorker(string $executionId, ExecutionRuntime $runtime, float $budgetSeconds): void
     {
         $context = new ExecutionContext(
             $executionId,
@@ -103,6 +121,6 @@ final class InMemoryWorkflowRunner
             new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId),
             null,
         );
-        $runtime->runUntilIdle($context);
+        $runtime->runUntilIdle($context, $budgetSeconds);
     }
 }
