@@ -159,13 +159,16 @@ final class ActivityMessageProcessor
             $nonRetryable = null !== $options && $options->isNonRetryable($e);
             $shouldRetry = !$nonRetryable && $maxAttempts > 0 && $message->attempt() < $maxAttempts;
 
-            // Le transport ne retente pas côté PHP (worker Temporal natif) : le serveur Temporal
-            // applique sa RetryPolicy. On journalise le VRAI échec en `InProgress` — un échec
-            // synthétique masquerait le type d'exception attendu par `nonRetryableErrorTypes`.
-            $delegatedToTransport = $shouldRetry && $this->activityTransport instanceof NoopActivityTransport;
+            // Le transport ne retente pas côté PHP (worker Temporal natif) : l'autorité sur les
+            // retentatives appartient entièrement au serveur, donc le décompte de tentatives PHP
+            // n'y veut rien dire — seule la non-retryabilité, sur laquelle le serveur s'aligne via
+            // nonRetryableErrorTypes, reste terminale. On journalise le VRAI échec en `InProgress` :
+            // un échec terminal court-circuiterait la tentative suivante côté worker.
+            $delegatedToTransport = !$nonRetryable && $this->activityTransport instanceof NoopActivityTransport;
 
             $retryState = match (true) {
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
+                // (l'ordre compte : `InProgress` l'emporte sur le décompte local)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
                 $maxAttempts > 0 => ActivityRetryState::MaximumAttemptsReached,
                 default => ActivityRetryState::RetryPolicyNotSet,

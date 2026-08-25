@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
@@ -12,6 +13,7 @@ use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
@@ -145,15 +147,28 @@ final class ExecutionRuntime
                 false,
                 $e::class,
             );
-            // `maxActivityRetries` compte les retentatives : 1re tentative + N retentatives.
-            $shouldRetry = $message->attempt() <= $this->maxActivityRetries;
-            $this->eventStore->append(\Gplanchat\Durable\Event\ActivityTaskFailed::forThrowable(
+            // Le drain synchrone lisait `maxActivityRetries` seul : une exception déclarée
+            // non-retryable y était retentée quand même, et un maxAttempts par activité était
+            // ignoré — alors que le chemin Messenger les honore tous les deux.
+            $options = ActivityOptions::fromMetadata($message->metadata);
+            $maxAttempts = null !== $options && $options->maxAttempts > 0
+                ? $options->maxAttempts
+                : ($this->maxActivityRetries > 0 ? $this->maxActivityRetries + 1 : 0);
+            $nonRetryable = null !== $options && $options->isNonRetryable($e);
+            $shouldRetry = !$nonRetryable && $maxAttempts > 0 && $message->attempt() < $maxAttempts;
+            $retryState = match (true) {
+                $shouldRetry => ActivityRetryState::InProgress,
+                $nonRetryable => ActivityRetryState::NonRetryableFailure,
+                $maxAttempts > 0 => ActivityRetryState::MaximumAttemptsReached,
+                default => ActivityRetryState::RetryPolicyNotSet,
+            };
+            $this->eventStore->append(ActivityTaskFailed::forThrowable(
                 $message->executionId,
                 $message->activityId,
                 $message->activityName,
                 $message->attempt(),
                 $e,
-                $shouldRetry ? ActivityRetryState::InProgress : ActivityRetryState::MaximumAttemptsReached,
+                $retryState,
             ));
             if ($shouldRetry) {
                 $this->activityTransport->enqueue($message->withAttempt($message->attempt() + 1));
@@ -164,9 +179,7 @@ final class ExecutionRuntime
                     $message->activityName,
                     $message->attempt(),
                     $e,
-                    $this->maxActivityRetries > 0
-                        ? ActivityRetryState::MaximumAttemptsReached
-                        : ActivityRetryState::RetryPolicyNotSet,
+                    $retryState,
                 );
                 $this->eventStore->append($failureEvent);
                 if ($failureEvent instanceof ActivityFailed) {
