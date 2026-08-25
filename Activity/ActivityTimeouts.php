@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Activity;
 
+use Gplanchat\Durable\Duration;
+
 /**
  * Les bornes temporelles d'une activité, prises ensemble.
  *

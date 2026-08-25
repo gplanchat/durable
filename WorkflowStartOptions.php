@@ -14,6 +14,9 @@ namespace Gplanchat\Durable;
  */
 final readonly class WorkflowStartOptions
 {
+    /** Les bornes temporelles de l'exécution, prises ensemble. */
+    public WorkflowTimeouts $timeouts;
+
     public function __construct(
         /**
          * Expression cron (5 champs, ou `@every 1h`). Le serveur relance une exécution à chaque
@@ -21,11 +24,10 @@ final readonly class WorkflowStartOptions
          */
         public ?string $cronSchedule = null,
         public ?string $taskQueue = null,
-        public ?float $workflowExecutionTimeoutSeconds = null,
-        public ?float $workflowRunTimeoutSeconds = null,
-        public ?float $workflowTaskTimeoutSeconds = null,
+        ?WorkflowTimeouts $timeouts = null,
         public WorkflowIdReusePolicy $workflowIdReusePolicy = WorkflowIdReusePolicy::AllowDuplicateFailedOnly,
     ) {
+        $this->timeouts = $timeouts ?? WorkflowTimeouts::none();
     }
 
     public static function defaults(): self
@@ -50,15 +52,7 @@ final readonly class WorkflowStartOptions
         if (null !== $this->taskQueue && '' !== $this->taskQueue) {
             $m['task_queue'] = $this->taskQueue;
         }
-        if (null !== $this->workflowExecutionTimeoutSeconds) {
-            $m['workflow_execution_timeout_seconds'] = $this->workflowExecutionTimeoutSeconds;
-        }
-        if (null !== $this->workflowRunTimeoutSeconds) {
-            $m['workflow_run_timeout_seconds'] = $this->workflowRunTimeoutSeconds;
-        }
-        if (null !== $this->workflowTaskTimeoutSeconds) {
-            $m['workflow_task_timeout_seconds'] = $this->workflowTaskTimeoutSeconds;
-        }
+        $m += $this->timeouts->toMetadata();
         $m['workflow_id_reuse_policy'] = $this->workflowIdReusePolicy->value;
 
         return $m;

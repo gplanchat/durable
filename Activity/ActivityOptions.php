@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Activity;
 
+use Gplanchat\Durable\Duration;
+
 /**
  * Options de planification d’activité (équivalent {@see \Temporal\Activity\ActivityOptions}).
  *

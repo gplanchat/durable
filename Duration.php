@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Gplanchat\Durable\Activity;
+namespace Gplanchat\Durable;
 
 /**
  * Une longueur de temps.
+ *
+ * Vit à la racine du domaine : activités, workflows et minuteurs bornent tous le temps, et ils
+ * doivent en parler de la même façon.
  *
  * Remplace les `?float …Seconds` : l'unité vivait dans le nom du champ, jamais dans le type, et
  * chaque lecteur devait redire `null !== $x && $x > 0` avant de s'en servir. Les comparaisons du

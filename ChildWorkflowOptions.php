@@ -7,11 +7,14 @@ namespace Gplanchat\Durable;
 /**
  * Options pour {@see ExecutionContext::executeChildWorkflow()} (équivalent {@see \Temporal\Workflow\ChildWorkflowOptions}).
  *
- * Les timeouts sont en secondes. Les champs supplémentaires sont journalisés pour observabilité ;
- * le moteur inline n’applique pas encore tous les timeouts côté exécution.
+ * Les champs supplémentaires sont journalisés pour observabilité ; le moteur inline n’applique
+ * pas encore tous les timeouts côté exécution.
  */
 final readonly class ChildWorkflowOptions
 {
+    /** Les bornes temporelles de l'enfant, prises ensemble. */
+    public WorkflowTimeouts $timeouts;
+
     public function __construct(
         /**
          * Identifiant d’exécution enfant (clé du journal enfant). Si null, un UUID est généré.
@@ -20,9 +23,7 @@ final readonly class ChildWorkflowOptions
         public ParentClosePolicy $parentClosePolicy = ParentClosePolicy::Terminate,
         public ?string $namespace = null,
         public ?string $taskQueue = null,
-        public ?float $workflowExecutionTimeoutSeconds = null,
-        public ?float $workflowRunTimeoutSeconds = null,
-        public ?float $workflowTaskTimeoutSeconds = null,
+        ?WorkflowTimeouts $timeouts = null,
         public ?string $cronSchedule = null,
         /** @var array<string, mixed>|null */
         public ?array $memo = null,
@@ -32,6 +33,7 @@ final readonly class ChildWorkflowOptions
         public ?string $staticSummary = null,
         public ?string $staticDetails = null,
     ) {
+        $this->timeouts = $timeouts ?? WorkflowTimeouts::none();
     }
 
     public static function defaults(): self
@@ -51,15 +53,7 @@ final readonly class ChildWorkflowOptions
         if (null !== $this->taskQueue && '' !== $this->taskQueue) {
             $m['task_queue'] = $this->taskQueue;
         }
-        if (null !== $this->workflowExecutionTimeoutSeconds) {
-            $m['workflow_execution_timeout_seconds'] = $this->workflowExecutionTimeoutSeconds;
-        }
-        if (null !== $this->workflowRunTimeoutSeconds) {
-            $m['workflow_run_timeout_seconds'] = $this->workflowRunTimeoutSeconds;
-        }
-        if (null !== $this->workflowTaskTimeoutSeconds) {
-            $m['workflow_task_timeout_seconds'] = $this->workflowTaskTimeoutSeconds;
-        }
+        $m += $this->timeouts->toMetadata();
         if (null !== $this->cronSchedule && '' !== $this->cronSchedule) {
             $m['cron_schedule'] = $this->cronSchedule;
         }
