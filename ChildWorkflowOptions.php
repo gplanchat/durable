@@ -24,7 +24,7 @@ final readonly class ChildWorkflowOptions
         public ?string $namespace = null,
         public ?string $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
-        public ?string $cronSchedule = null,
+        public ?CronSchedule $cronSchedule = null,
         /** @var array<string, mixed>|null */
         public ?array $memo = null,
         /** @var array<string, mixed>|null */
@@ -54,8 +54,8 @@ final readonly class ChildWorkflowOptions
             $m['task_queue'] = $this->taskQueue;
         }
         $m += $this->timeouts->toMetadata();
-        if (null !== $this->cronSchedule && '' !== $this->cronSchedule) {
-            $m['cron_schedule'] = $this->cronSchedule;
+        if (null !== $this->cronSchedule) {
+            $m['cron_schedule'] = $this->cronSchedule->toExpression();
         }
         if (null !== $this->memo) {
             $m['memo'] = $this->memo;

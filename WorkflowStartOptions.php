@@ -19,10 +19,10 @@ final readonly class WorkflowStartOptions
 
     public function __construct(
         /**
-         * Expression cron (5 champs, ou `@every 1h`). Le serveur relance une exécution à chaque
-         * échéance ; la précédente doit être terminée, sinon l'échéance est sautée.
+         * Récurrence. Le serveur relance une exécution à chaque échéance ; la précédente doit
+         * être terminée, sinon l'échéance est sautée.
          */
-        public ?string $cronSchedule = null,
+        public ?CronSchedule $cronSchedule = null,
         public ?string $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
         public WorkflowIdReusePolicy $workflowIdReusePolicy = WorkflowIdReusePolicy::AllowDuplicateFailedOnly,
@@ -35,9 +35,9 @@ final readonly class WorkflowStartOptions
         return new self();
     }
 
-    public static function cron(string $expression): self
+    public static function cron(CronSchedule|string $schedule): self
     {
-        return new self(cronSchedule: $expression);
+        return new self(cronSchedule: CronSchedule::from($schedule));
     }
 
     /**
@@ -46,8 +46,8 @@ final readonly class WorkflowStartOptions
     public function toStartMetadata(): array
     {
         $m = [];
-        if (null !== $this->cronSchedule && '' !== $this->cronSchedule) {
-            $m['cron_schedule'] = $this->cronSchedule;
+        if (null !== $this->cronSchedule) {
+            $m['cron_schedule'] = $this->cronSchedule->toExpression();
         }
         if (null !== $this->taskQueue && '' !== $this->taskQueue) {
             $m['task_queue'] = $this->taskQueue;
