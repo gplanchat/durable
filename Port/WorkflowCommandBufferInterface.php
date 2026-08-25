@@ -49,6 +49,19 @@ interface WorkflowCommandBufferInterface
     public function completeWorkflow(mixed $result): void;
 
     /**
+     * Records the outcome of a child workflow executed **inline** (backend in-memory sans
+     * démarrage différé Messenger), dans le journal du parent.
+     *
+     * Sans équivalent Temporal : le serveur écrit lui-même CHILD_WORKFLOW_EXECUTION_COMPLETED.
+     */
+    public function completeChildWorkflow(string $childExecutionId, mixed $result): void;
+
+    /**
+     * Pendant en échec de {@see completeChildWorkflow()}.
+     */
+    public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
+
+    /**
      * Records workflow failure (COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION for Temporal).
      */
     public function failWorkflow(\Throwable $reason): void;

@@ -6,6 +6,8 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityScheduled;
+use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
@@ -92,6 +94,25 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         $this->eventStore->append(new ExecutionCompleted(
             $this->executionId,
             $result,
+        ));
+    }
+
+    public function completeChildWorkflow(string $childExecutionId, mixed $result): void
+    {
+        $this->eventStore->append(new ChildWorkflowCompleted(
+            $this->executionId,
+            $childExecutionId,
+            $result,
+        ));
+    }
+
+    public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void
+    {
+        $this->eventStore->append(new ChildWorkflowFailed(
+            $this->executionId,
+            $childExecutionId,
+            $reason->getMessage(),
+            (int) $reason->getCode(),
         ));
     }
 

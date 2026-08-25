@@ -190,12 +190,16 @@ final class ExecutionContext
 
         try {
             $result = $this->childWorkflowRunner->runChild($childExecutionId, $childWorkflowType, $input, $this->executionId);
-            $this->commandBuffer->completeWorkflow($result);
+            // L'issue de l'ENFANT, pas celle du run courant : completeWorkflow() ici clôturait le
+            // journal du parent avec le résultat de l'enfant, et n'écrivait jamais le
+            // ChildWorkflowCompleted que findChildWorkflowForSlot() cherche au replay — l'enfant
+            // était donc réexécuté à chaque reprise du parent.
+            $this->commandBuffer->completeChildWorkflow($childExecutionId, $result);
             $deferred->resolve($result);
         } catch (ChildWorkflowDeferredToMessenger) {
             return $deferred->awaitable();
         } catch (\Throwable $e) {
-            $this->commandBuffer->failWorkflow($e);
+            $this->commandBuffer->failChildWorkflow($childExecutionId, $e);
             $deferred->reject(new DurableChildWorkflowFailedException(
                 $childExecutionId,
                 $e->getMessage(),
