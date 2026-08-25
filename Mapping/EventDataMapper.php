@@ -24,6 +24,7 @@ use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
@@ -155,6 +156,11 @@ final class EventDataMapper
                 $payload['result'] ?? null,
             ),
             WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($executionId, $payload),
+            WorkflowExecutionCancelled::class => new WorkflowExecutionCancelled(
+                $executionId,
+                (string) ($payload['reason'] ?? ''),
+                isset($payload['sourceParentExecutionId']) ? (string) $payload['sourceParentExecutionId'] : null,
+            ),
             default => throw new \InvalidArgumentException(\sprintf('Unknown event type: %s', $eventType)),
         };
     }

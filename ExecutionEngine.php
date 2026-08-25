@@ -10,16 +10,20 @@ use Gplanchat\Durable\Activity\ActivityContractResolver;use Gplanchat\Durable\De
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowCancellationRequested;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
+use Gplanchat\Durable\Failure\WorkflowFailureClassifier;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -100,33 +104,30 @@ final class ExecutionEngine
 
     private function runHandler(ExecutionContext $context, WorkflowEnvironment $environment, callable $handler): mixed
     {
+        $this->honorPendingCancellation($context);
+
         $fiber = new \Fiber(static fn () => $handler($environment));
 
         try {
             $suspended = $fiber->start();
         } catch (DurableCatastrophicActivityFailureException $e) {
-            $this->appendFiberException($context, WorkflowExecutionFailed::unhandledCatastrophicActivity($context->executionId(), $e));
-            $this->notifyParentFailed($context);
+            $this->failFromFiber($context, $e);
             throw new DurableWorkflowAlgorithmFailureException('Workflow did not handle catastrophic activity failure: '.$e->getMessage(), 0, $e);
         } catch (DurableActivityFailedException $e) {
-            $this->appendFiberException($context, WorkflowExecutionFailed::unhandledActivityFailure($context->executionId(), $e->activityId(), $e->activityName(), $e));
-            $this->notifyParentFailed($context);
+            $this->failFromFiber($context, $e);
             throw new DurableWorkflowAlgorithmFailureException('Workflow did not handle activity failure: '.$e->getMessage(), 0, $e);
         } catch (ActivitySupersededException $e) {
-            $this->appendFiberException($context, WorkflowExecutionFailed::unhandledActivitySuperseded($context->executionId(), $e));
-            $this->notifyParentFailed($context);
+            $this->failFromFiber($context, $e);
             throw new DurableWorkflowAlgorithmFailureException('Workflow did not handle superseded activity: '.$e->getMessage(), 0, $e);
         } catch (DeclaredActivityFailureInterface $e) {
-            $this->appendFiberException($context, WorkflowExecutionFailed::unhandledDeclaredActivityFailure($context->executionId(), $e));
-            $this->notifyParentFailed($context);
+            $this->failFromFiber($context, $e);
             throw new DurableWorkflowAlgorithmFailureException('Workflow did not handle declared activity failure: '.$e->getMessage(), 0, $e);
         } catch (ContinueAsNewRequested $e) {
             $continuation = null !== $e->options ? $e->options->toMetadata() : [];
             $this->eventStore->append(new WorkflowContinuedAsNew($context->executionId(), $e->workflowType, $e->payload, $continuation));
             throw $e;
         } catch (\Throwable $e) {
-            $this->eventStore->append(WorkflowExecutionFailed::workflowHandlerFailure($context->executionId(), $e));
-            $this->notifyParentFailed($context);
+            $this->failFromFiber($context, $e);
             throw $e;
         }
 
@@ -168,32 +169,56 @@ final class ExecutionEngine
         return null;
     }
 
-    private function appendFiberException(ExecutionContext $context, \Gplanchat\Durable\Event\Event $event): void
-    {
-        $this->eventStore->append($event);
-    }
-
     private function handleFiberThrowable(ExecutionContext $context, \Throwable $e): void
     {
-        if ($e instanceof DurableCatastrophicActivityFailureException) {
-            $this->eventStore->append(WorkflowExecutionFailed::unhandledCatastrophicActivity($context->executionId(), $e));
-            $this->notifyParentFailed($context);
-        } elseif ($e instanceof DurableActivityFailedException) {
-            $this->eventStore->append(WorkflowExecutionFailed::unhandledActivityFailure($context->executionId(), $e->activityId(), $e->activityName(), $e));
-            $this->notifyParentFailed($context);
-        } elseif ($e instanceof ActivitySupersededException) {
-            $this->eventStore->append(WorkflowExecutionFailed::unhandledActivitySuperseded($context->executionId(), $e));
-            $this->notifyParentFailed($context);
-        } elseif ($e instanceof DeclaredActivityFailureInterface) {
-            $this->eventStore->append(WorkflowExecutionFailed::unhandledDeclaredActivityFailure($context->executionId(), $e));
-            $this->notifyParentFailed($context);
-        } elseif ($e instanceof ContinueAsNewRequested) {
+        if ($e instanceof ContinueAsNewRequested) {
             $continuation = null !== $e->options ? $e->options->toMetadata() : [];
             $this->eventStore->append(new WorkflowContinuedAsNew($context->executionId(), $e->workflowType, $e->payload, $continuation));
-        } else {
-            $this->eventStore->append(WorkflowExecutionFailed::workflowHandlerFailure($context->executionId(), $e));
-            $this->notifyParentFailed($context);
+
+            return;
         }
+
+        $this->failFromFiber($context, $e);
+    }
+
+    /**
+     * Une annulation demandée est honorée au point de reprise suivant : le run ne redémarre pas,
+     * le journal reçoit sa contrepartie terminale et les enfants sont clôturés.
+     *
+     * @throws WorkflowCancelledException
+     */
+    private function honorPendingCancellation(ExecutionContext $context): void
+    {
+        $pendingReason = null;
+        $pendingSource = null;
+        foreach ($this->eventStore->readStream($context->executionId()) as $event) {
+            if ($event instanceof WorkflowCancellationRequested) {
+                $pendingReason = $event->reason();
+                $pendingSource = $event->sourceParentExecutionId();
+            }
+            if ($event instanceof ExecutionCompleted
+                || $event instanceof WorkflowExecutionFailed
+                || $event instanceof WorkflowExecutionCancelled
+            ) {
+                $pendingReason = null;
+                $pendingSource = null;
+            }
+        }
+
+        if (null === $pendingReason) {
+            return;
+        }
+
+        $this->eventStore->append(new WorkflowExecutionCancelled($context->executionId(), $pendingReason, $pendingSource));
+        $this->parentChildCoordinator?->onParentClosed($context->executionId(), ParentClosureReason::Cancelled);
+
+        throw new WorkflowCancelledException($context->executionId(), $pendingReason);
+    }
+
+    private function failFromFiber(ExecutionContext $context, \Throwable $e): void
+    {
+        $this->eventStore->append(WorkflowFailureClassifier::classify($context->executionId(), $e));
+        $this->notifyParentFailed($context);
     }
 
     private function notifyParentFailed(ExecutionContext $context): void

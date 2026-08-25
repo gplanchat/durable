@@ -11,4 +11,5 @@ enum ParentClosureReason
 {
     case CompletedSuccessfully;
     case Failed;
+    case Cancelled;
 }

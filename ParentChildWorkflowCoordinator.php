@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -46,7 +47,10 @@ final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordin
             if ($event instanceof ExecutionStarted) {
                 $started = true;
             }
-            if ($event instanceof ExecutionCompleted || $event instanceof WorkflowExecutionFailed) {
+            if ($event instanceof ExecutionCompleted
+                || $event instanceof WorkflowExecutionFailed
+                || $event instanceof WorkflowExecutionCancelled
+            ) {
                 return false;
             }
         }
