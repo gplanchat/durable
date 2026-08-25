@@ -24,7 +24,11 @@ enum ActivityRetryState: string
     /** Toutes les tentatives autorisées ont été consommées — « ActivityStalled ». */
     case MaximumAttemptsReached = 'maximum_attempts_reached';
 
-    /** Aucune politique de retry active (maxAttempts = 0 et pas de défaut bundle) : échec dès la 1re tentative. */
+    /**
+     * Aucune politique de retry active côté serveur. Plus produit localement depuis que
+     * {@see \Gplanchat\Durable\Activity\RetryLimit::unlimited()} est le défaut ; reste relu
+     * depuis l'historique Temporal (`RETRY_STATE_RETRY_POLICY_NOT_SET`).
+     */
     case RetryPolicyNotSet = 'retry_policy_not_set';
 
     /**

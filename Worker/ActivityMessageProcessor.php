@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Worker;
 
 use Gplanchat\Durable\Activity\ActivityOptions;
+use Gplanchat\Durable\Activity\RetryLimit;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
@@ -30,9 +31,6 @@ use Gplanchat\Durable\Transport\NoopActivityTransport;
  */
 final class ActivityMessageProcessor
 {
-    /** Aucune borne au nombre de tentatives (défaut Temporal). */
-    private const UNLIMITED_ATTEMPTS = 0;
-
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -152,18 +150,13 @@ final class ActivityMessageProcessor
                     $e::class,
                 );
             }
-            // Sémantique Temporal : `ActivityOptions::maxAttempts` compte les tentatives au
-            // total et **0 signifie illimité** — comme une RetryPolicy sans maximum_attempts,
-            // ou une activité planifiée sans options. Le défaut bundle `max_activity_retries`
-            // compte des *retentatives* et sert de plafond quand l'activité n'en fixe pas ;
-            // à 0 il ne plafonne rien.
-            $maxAttempts = null !== $options && $options->maxAttempts > 0
-                ? $options->maxAttempts
-                : ($this->maxRetries > 0 ? $this->maxRetries + 1 : self::UNLIMITED_ATTEMPTS);
+            // La borne de l'activité et le plafond de l'application se composent : la plus
+            // stricte des deux l'emporte.
+            $retryLimit = (null !== $options ? $options->retryLimit : RetryLimit::unlimited())
+                ->narrowedTo(RetryLimit::ofRetries($this->maxRetries));
 
             $nonRetryable = null !== $options && $options->isNonRetryable($e);
-            $shouldRetry = !$nonRetryable
-                && (self::UNLIMITED_ATTEMPTS === $maxAttempts || $message->attempt() < $maxAttempts);
+            $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt() + 1);
 
             // Le transport ne retente pas côté PHP (worker Temporal natif) : l'autorité sur les
             // retentatives appartient entièrement au serveur, donc le décompte de tentatives PHP

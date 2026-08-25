@@ -39,8 +39,8 @@ final class WorkflowStuckException extends \RuntimeException
     {
         return new self($executionId, \sprintf(
             'Workflow %s did not finish within %.1fs. Activities retry indefinitely by default '
-            .'(ActivityOptions::$maxAttempts = 0, Temporal semantics): set a bounded maxAttempts, '
-            .'declare the exception non-retryable, or raise the runner budget.',
+            .'(RetryLimit::unlimited(), Temporal semantics): pass RetryLimit::ofAttempts(n) or '
+            .'RetryLimit::once(), declare the exception non-retryable, or raise the runner budget.',
             $executionId,
             $budgetSeconds,
         ));

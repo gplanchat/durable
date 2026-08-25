@@ -15,15 +15,14 @@ final readonly class ActivityOptions
     /** Défaut Temporal du plafond d'intervalle, exprimé en multiples de l'intervalle initial. */
     public const DEFAULT_MAXIMUM_INTERVAL_FACTOR = 100.0;
 
+    /** Jusqu'où l'on est prêt à réessayer ; illimité par défaut, comme Temporal. */
+    public RetryLimit $retryLimit;
+
     /**
      * @param list<class-string<\Throwable>> $nonRetryableExceptions
      */
     public function __construct(
-        /**
-         * Nombre **total** de tentatives. 0 = illimité, comme la RetryPolicy Temporal : seule
-         * une exception non-retryable, un timeout ou l'annulation arrêtent alors les tentatives.
-         */
-        public int $maxAttempts = 0,
+        ?RetryLimit $retryLimit = null,
         /** Délai avant la première retentative après un échec (secondes). */
         public float $initialIntervalSeconds = 1.0,
         /** Coefficient d’exponential backoff entre retentatives. */
@@ -48,6 +47,7 @@ final readonly class ActivityOptions
         /** Résumé affichage UI (champ « summary » côté Temporal). */
         public ?string $summary = null,
     ) {
+        $this->retryLimit = $retryLimit ?? RetryLimit::unlimited();
     }
 
     public static function default(): self
@@ -82,18 +82,10 @@ final readonly class ActivityOptions
         return $this->initialIntervalSeconds * self::DEFAULT_MAXIMUM_INTERVAL_FACTOR;
     }
 
-    /**
-     * Vrai lorsque les tentatives ne sont pas bornées ({@see $maxAttempts} à 0).
-     */
-    public function hasUnlimitedAttempts(): bool
-    {
-        return $this->maxAttempts <= 0;
-    }
-
-    public function withMaxAttempts(int $maxAttempts): self
+    public function withRetryLimit(RetryLimit $retryLimit): self
     {
         return new self(
-            $maxAttempts,
+            $retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -112,7 +104,7 @@ final readonly class ActivityOptions
     public function withInitialInterval(float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $seconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -131,7 +123,7 @@ final readonly class ActivityOptions
     public function withBackoffCoefficient(float $coefficient): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $coefficient,
             $this->maximumIntervalSeconds,
@@ -150,7 +142,7 @@ final readonly class ActivityOptions
     public function withMaximumInterval(?float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $seconds,
@@ -172,7 +164,7 @@ final readonly class ActivityOptions
     public function withNonRetryableExceptions(array $exceptions): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -191,7 +183,7 @@ final readonly class ActivityOptions
     public function withTaskQueue(?string $taskQueue): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -210,7 +202,7 @@ final readonly class ActivityOptions
     public function withActivityId(?string $activityId): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -229,7 +221,7 @@ final readonly class ActivityOptions
     public function withScheduleToCloseTimeoutSeconds(?float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -248,7 +240,7 @@ final readonly class ActivityOptions
     public function withScheduleToStartTimeoutSeconds(?float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -267,7 +259,7 @@ final readonly class ActivityOptions
     public function withStartToCloseTimeoutSeconds(?float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -286,7 +278,7 @@ final readonly class ActivityOptions
     public function withHeartbeatTimeoutSeconds(?float $seconds): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -305,7 +297,7 @@ final readonly class ActivityOptions
     public function withCancellationType(ActivityCancellationType $type): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -324,7 +316,7 @@ final readonly class ActivityOptions
     public function withSummary(?string $summary): self
     {
         return new self(
-            $this->maxAttempts,
+            $this->retryLimit,
             $this->initialIntervalSeconds,
             $this->backoffCoefficient,
             $this->maximumIntervalSeconds,
@@ -346,7 +338,7 @@ final readonly class ActivityOptions
     public function toMetadata(): array
     {
         $activityOptions = [
-            'max_attempts' => $this->maxAttempts,
+            'max_attempts' => $this->retryLimit->toWireValue(),
             'initial_interval_seconds' => $this->initialIntervalSeconds,
             'backoff_coefficient' => $this->backoffCoefficient,
             'non_retryable_exceptions' => $this->nonRetryableExceptions,
@@ -397,7 +389,7 @@ final readonly class ActivityOptions
         }
 
         return new self(
-            (int) ($opts['max_attempts'] ?? 0),
+            RetryLimit::fromWireValue((int) ($opts['max_attempts'] ?? 0)),
             (float) ($opts['initial_interval_seconds'] ?? 1.0),
             (float) ($opts['backoff_coefficient'] ?? 2.0),
             isset($opts['maximum_interval_seconds']) ? (float) $opts['maximum_interval_seconds'] : null,
