@@ -23,7 +23,7 @@ final readonly class WorkflowStartOptions
          * être terminée, sinon l'échéance est sautée.
          */
         public ?CronSchedule $cronSchedule = null,
-        public ?string $taskQueue = null,
+        public ?TaskQueue $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
         public WorkflowIdReusePolicy $workflowIdReusePolicy = WorkflowIdReusePolicy::AllowDuplicateFailedOnly,
     ) {
@@ -49,8 +49,8 @@ final readonly class WorkflowStartOptions
         if (null !== $this->cronSchedule) {
             $m['cron_schedule'] = $this->cronSchedule->toExpression();
         }
-        if (null !== $this->taskQueue && '' !== $this->taskQueue) {
-            $m['task_queue'] = $this->taskQueue;
+        if (null !== $this->taskQueue) {
+            $m['task_queue'] = $this->taskQueue->name();
         }
         $m += $this->timeouts->toMetadata();
         $m['workflow_id_reuse_policy'] = $this->workflowIdReusePolicy->value;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\TaskQueue;
 
 /**
  * Options de planification d’activité (équivalent {@see \Temporal\Activity\ActivityOptions}).
@@ -49,7 +50,7 @@ final readonly class ActivityOptions
         /** Exceptions qui ne déclenchent pas de retry (class-string[]). */
         public array $nonRetryableExceptions = [],
         /** File d’attente cible (routage applicatif ; non utilisée par tous les transports). */
-        public ?string $taskQueue = null,
+        public ?TaskQueue $taskQueue = null,
         /** ID métier d’activité (sinon UUID). */
         public ?string $activityId = null,
         ?ActivityTimeouts $timeouts = null,
@@ -149,8 +150,8 @@ final readonly class ActivityOptions
         if (null !== $this->maximumInterval) {
             $activityOptions['maximum_interval_seconds'] = $this->maximumInterval->toSeconds();
         }
-        if (null !== $this->taskQueue && '' !== $this->taskQueue) {
-            $activityOptions['task_queue'] = $this->taskQueue;
+        if (null !== $this->taskQueue) {
+            $activityOptions['task_queue'] = $this->taskQueue->name();
         }
         if (null !== $this->activityId && '' !== $this->activityId) {
             $activityOptions['activity_id'] = $this->activityId;
@@ -184,7 +185,7 @@ final readonly class ActivityOptions
             (float) ($opts['backoff_coefficient'] ?? 2.0),
             Duration::fromWireValue($opts['maximum_interval_seconds'] ?? null),
             \is_array($opts['non_retryable_exceptions'] ?? null) ? $opts['non_retryable_exceptions'] : [],
-            isset($opts['task_queue']) ? (string) $opts['task_queue'] : null,
+            TaskQueue::fromNullable(isset($opts['task_queue']) ? (string) $opts['task_queue'] : null),
             isset($opts['activity_id']) ? (string) $opts['activity_id'] : null,
             ActivityTimeouts::fromMetadata($opts),
             $cancellation,

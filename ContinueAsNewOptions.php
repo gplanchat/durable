@@ -16,7 +16,7 @@ final readonly class ContinueAsNewOptions
     public WorkflowTimeouts $timeouts;
 
     public function __construct(
-        public ?string $taskQueue = null,
+        public ?TaskQueue $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
     ) {
         $timeouts ??= WorkflowTimeouts::none();
@@ -35,9 +35,9 @@ final readonly class ContinueAsNewOptions
         return new self();
     }
 
-    public function withTaskQueue(?string $taskQueue): self
+    public function withTaskQueue(TaskQueue|string|null $taskQueue): self
     {
-        return new self($taskQueue, $this->timeouts);
+        return new self(TaskQueue::fromNullable($taskQueue), $this->timeouts);
     }
 
     public function withTimeouts(WorkflowTimeouts $timeouts): self
@@ -51,8 +51,8 @@ final readonly class ContinueAsNewOptions
     public function toMetadata(): array
     {
         $m = [];
-        if (null !== $this->taskQueue && '' !== $this->taskQueue) {
-            $m['task_queue'] = $this->taskQueue;
+        if (null !== $this->taskQueue) {
+            $m['task_queue'] = $this->taskQueue->name();
         }
 
         return $m + $this->timeouts->toMetadata();
@@ -64,7 +64,7 @@ final readonly class ContinueAsNewOptions
     public static function fromMetadata(array $metadata): self
     {
         return new self(
-            isset($metadata['task_queue']) ? (string) $metadata['task_queue'] : null,
+            TaskQueue::fromNullable(isset($metadata['task_queue']) ? (string) $metadata['task_queue'] : null),
             WorkflowTimeouts::fromMetadata($metadata)->withoutExecutionBound(),
         );
     }
