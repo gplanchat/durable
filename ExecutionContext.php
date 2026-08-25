@@ -9,6 +9,7 @@ use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
@@ -260,7 +261,9 @@ final class ExecutionContext
         }
 
         $this->commandBuffer->cancelActivity($activityId, $reason);
-        $this->rejectActivity($activityId, new ActivitySupersededException($activityId, $reason));
+        $this->rejectActivity($activityId, ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
+            ? new WorkflowCancelledFailure($this->executionId, $reason)
+            : new ActivitySupersededException($activityId, $reason));
 
         return true;
     }
@@ -278,8 +281,15 @@ final class ExecutionContext
             return false;
         }
 
+        $deferred = $this->pendingTimers[$timerId];
         unset($this->pendingTimers[$timerId]);
         $this->commandBuffer->cancelTimer($timerId, $reason);
+
+        // Un perdant de course reste simplement non résolu ; une annulation de workflow doit
+        // au contraire relever, pour que le workflow puisse compenser.
+        if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
+            $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
+        }
 
         return true;
     }
@@ -293,9 +303,13 @@ final class ExecutionContext
         $replay = $this->historySource->findTimerSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            $deferred->resolve(null);
+            if (null !== ($replay['failed'] ?? null)) {
+                $deferred->reject($replay['failed']);
+            } else {
+                $deferred->resolve(null);
+            }
 
-            return $deferred->awaitable();
+            return new TimerAwaitable($deferred->awaitable(), $replay['id']);
         }
 
         $scheduled = $this->historySource->findScheduledTimerId($slotIndex);

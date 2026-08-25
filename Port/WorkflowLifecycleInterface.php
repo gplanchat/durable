@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Port;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 
 /**
  * Issues du cycle de vie d'un run, telles que le backend les enregistre.
@@ -23,11 +24,27 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 interface WorkflowLifecycleInterface
 {
     /**
-     * Avant tout démarrage de fiber (ex. honorer une annulation déjà demandée).
+     * Avant tout démarrage de fiber.
      *
      * @throws \Throwable pour empêcher le run de démarrer
      */
     public function onBeforeRun(string $executionId): void;
+
+    /**
+     * Une annulation a-t-elle été demandée et **pas encore livrée** au workflow ?
+     *
+     * La livraison doit être unique par exécution : le fiber étant rejoué depuis le début à
+     * chaque tâche, un « oui » permanent ferait relever l'annulation dans les attentes de
+     * compensation elles-mêmes, et le workflow ne pourrait jamais compenser.
+     */
+    public function isCancellationPending(string $executionId): bool;
+
+    /**
+     * L'annulation a traversé le handler sans être avalée : l'exécution se termine annulée.
+     *
+     * @throws \Throwable pour propager la fin à l'appelant
+     */
+    public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void;
 
     /**
      * Le handler est allé au bout.

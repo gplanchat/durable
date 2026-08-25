@@ -26,9 +26,13 @@ interface WorkflowHistorySourceInterface
     public function findScheduledActivityId(int $slot): ?string;
 
     /**
-     * Returns the recorded result for timer slot N, or null if not yet fired.
+     * Returns the recorded outcome for timer slot N, or null if it is still pending.
      *
-     * @return array{id: string, scheduledAt: float}|null
+     * `failed` porte l'annulation du minuteur ({@see \Gplanchat\Durable\Event\TimerCancelled}) :
+     * sans ce canal, un minuteur annulé par l'annulation du workflow ne pouvait pas relever la
+     * même exception au replay.
+     *
+     * @return array{id: string, scheduledAt: float, failed: \Throwable|null}|null
      */
     public function findTimerSlotResult(int $slot): ?array;
 

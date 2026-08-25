@@ -6,7 +6,10 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
+use Gplanchat\Durable\ActivityCancellationReason;
+use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -17,6 +20,7 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\WorkflowFailureClassifier;
 use Gplanchat\Durable\ParentClosureReason;
@@ -36,36 +40,53 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     ) {
     }
 
-    /**
-     * Une annulation demandée est honorée au point de reprise suivant : le run ne redémarre pas,
-     * le journal reçoit sa contrepartie terminale et les enfants sont clôturés.
-     */
     public function onBeforeRun(string $executionId): void
     {
-        $pendingReason = null;
-        $pendingSource = null;
+        // Rien à pré-empter : l'annulation est livrée dans le fiber, au point d'attente, pour
+        // laisser le workflow compenser.
+    }
+
+    /**
+     * Demandée, et pas encore livrée : la livraison se trace par l'annulation d'une opération
+     * avec la raison workflow_cancelled — sans cette borne, chaque replay relèverait de nouveau
+     * l'annulation, y compris dans les attentes de compensation.
+     */
+    public function isCancellationPending(string $executionId): bool
+    {
+        $requested = false;
         foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
-                $pendingReason = $event->reason();
-                $pendingSource = $event->sourceParentExecutionId();
+                $requested = true;
             }
             if ($event instanceof ExecutionCompleted
                 || $event instanceof WorkflowExecutionFailed
                 || $event instanceof WorkflowExecutionCancelled
             ) {
-                $pendingReason = null;
-                $pendingSource = null;
+                $requested = false;
+            }
+            if (($event instanceof ActivityCancelled || $event instanceof TimerCancelled)
+                && ActivityCancellationReason::WORKFLOW_CANCELLED === $event->reason()
+            ) {
+                return false;
             }
         }
 
-        if (null === $pendingReason) {
-            return;
+        return $requested;
+    }
+
+    public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void
+    {
+        $source = null;
+        foreach ($this->eventStore->readStream($executionId) as $event) {
+            if ($event instanceof WorkflowCancellationRequested) {
+                $source = $event->sourceParentExecutionId();
+            }
         }
 
-        $this->eventStore->append(new WorkflowExecutionCancelled($executionId, $pendingReason, $pendingSource));
+        $this->eventStore->append(new WorkflowExecutionCancelled($executionId, $failure->reason, $source));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Cancelled);
 
-        throw new WorkflowCancelledException($executionId, $pendingReason);
+        throw new WorkflowCancelledException($executionId, $failure->reason);
     }
 
     public function onCompleted(string $executionId, mixed $result): void

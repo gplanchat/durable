@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Worker;
 
+use Gplanchat\Durable\ActivityCancellationReason;
+use Gplanchat\Durable\Awaitable\ActivityAwaitable;
+use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
+use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\Port\WorkflowLifecycleInterface;
 use Gplanchat\Durable\WorkflowEnvironment;
 
@@ -29,11 +36,20 @@ final class WorkflowFiberDriver
      * @return mixed Résultat du handler s'il est allé au bout, null sinon (suspension, issue levée
      *               par le port)
      */
-    public function run(string $executionId, WorkflowEnvironment $environment, callable $handler): mixed
-    {
+    public function run(
+        string $executionId,
+        ExecutionContext $context,
+        WorkflowEnvironment $environment,
+        callable $handler,
+    ): mixed {
         $this->lifecycle->onBeforeRun($executionId);
 
         $fiber = new \Fiber(static fn () => $handler($environment));
+
+        // Au plus une livraison par exécution du pilote : après avoir relevé l'annulation, le
+        // handler peut compenser en attendant de nouvelles opérations, et celles-ci ne doivent
+        // pas être annulées à leur tour.
+        $cancellationDelivered = false;
 
         try {
             $suspended = $fiber->start();
@@ -49,6 +65,26 @@ final class WorkflowFiberDriver
             }
 
             if (!$suspended->isSettled()) {
+                // Annulation demandée alors que le fiber attend : la livrer ICI, comme Temporal
+                // livre un CanceledFailure, pour que le workflow puisse compenser. L'opération en
+                // attente est annulée avec la raison workflow_cancelled, qui sert aussi de trace
+                // de livraison — au replay, l'awaitable est rejeté par le journal au même endroit.
+                if (!$cancellationDelivered && $this->lifecycle->isCancellationPending($executionId)) {
+                    $cancellationDelivered = true;
+                    $failure = new WorkflowCancelledFailure($executionId, ActivityCancellationReason::WORKFLOW_CANCELLED);
+                    self::cancelPending($context, $suspended);
+
+                    try {
+                        $suspended = $fiber->throw($failure);
+                    } catch (\Throwable $e) {
+                        $this->dispatchThrowable($executionId, $e);
+
+                        return null;
+                    }
+
+                    continue;
+                }
+
                 // Commande nouvelle : déjà empilée dans le WorkflowCommandBufferInterface.
                 $this->lifecycle->onSuspended($executionId, $suspended);
 
@@ -83,6 +119,46 @@ final class WorkflowFiberDriver
             return;
         }
 
+        if ($e instanceof WorkflowCancelledFailure) {
+            // Le workflow ne l'a pas avalée : l'exécution se termine annulée, pas en échec.
+            $this->lifecycle->onCancelled($executionId, $e);
+
+            return;
+        }
+
         $this->lifecycle->onFailed($executionId, $e);
+    }
+
+    /**
+     * Retire de la file l'opération sur laquelle le fiber attend. Un `any()` en enveloppe
+     * plusieurs : toutes les branches encore en attente sont annulées.
+     *
+     * @param Awaitable<mixed> $pending
+     */
+    private static function cancelPending(ExecutionContext $context, Awaitable $pending): void
+    {
+        if ($pending instanceof CancellingAnyAwaitable) {
+            self::cancelPending($context, $pending->innerAny());
+
+            return;
+        }
+
+        if ($pending instanceof AnyAwaitable) {
+            foreach ($pending->members() as $member) {
+                self::cancelPending($context, $member);
+            }
+
+            return;
+        }
+
+        if ($pending->isSettled()) {
+            return;
+        }
+
+        if ($pending instanceof ActivityAwaitable) {
+            $context->cancelScheduledActivity($pending->activityId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
+        } elseif ($pending instanceof TimerAwaitable) {
+            $context->cancelScheduledTimer($pending->timerId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
+        }
     }
 }

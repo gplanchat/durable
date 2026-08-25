@@ -96,7 +96,7 @@ final class ExecutionEngine
             $this->parentChildCoordinator,
         ));
 
-        return $driver->run($context->executionId(), $environment, $handler);
+        return $driver->run($context->executionId(), $context, $environment, $handler);
     }
 
     public function getRuntime(): ExecutionRuntime

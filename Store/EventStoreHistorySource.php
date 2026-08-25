@@ -14,11 +14,14 @@ use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
+use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
@@ -80,7 +83,14 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             return ['result' => null, 'failed' => $failedByActivityId[$activityId]];
         }
         if (isset($cancelledReasonByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => new ActivitySupersededException($activityId, $cancelledReasonByActivityId[$activityId])];
+            $reason = $cancelledReasonByActivityId[$activityId];
+
+            return [
+                'result' => null,
+                'failed' => ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
+                    ? new WorkflowCancelledFailure($this->executionId, $reason)
+                    : new ActivitySupersededException($activityId, $reason),
+            ];
         }
         if (\array_key_exists($activityId, $completedResults)) {
             return ['result' => $completedResults[$activityId], 'failed' => null];
@@ -108,6 +118,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     {
         $scheduledIds = [];
         $completedIds = [];
+        $cancelledReasons = [];
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
             if ($event instanceof TimerScheduled) {
                 $scheduledIds[] = $event->timerId();
@@ -115,14 +126,30 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             if ($event instanceof TimerCompleted) {
                 $completedIds[$event->timerId()] = true;
             }
+            if ($event instanceof TimerCancelled) {
+                $cancelledReasons[$event->timerId()] = $event->reason();
+            }
         }
 
         $timerId = $scheduledIds[$slot] ?? null;
-        if (null === $timerId || !isset($completedIds[$timerId])) {
+        if (null === $timerId) {
             return null;
         }
 
-        return ['id' => $timerId, 'scheduledAt' => 0.0];
+        if (ActivityCancellationReason::WORKFLOW_CANCELLED === ($cancelledReasons[$timerId] ?? null)) {
+            return [
+                'id' => $timerId,
+                'scheduledAt' => 0.0,
+                'failed' => new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED),
+            ];
+        }
+
+        // Un perdant de course reste simplement non réglé : il n'a jamais eu de gagnant à annoncer.
+        if (!isset($completedIds[$timerId])) {
+            return null;
+        }
+
+        return ['id' => $timerId, 'scheduledAt' => 0.0, 'failed' => null];
     }
 
     public function findScheduledTimerId(int $slot): ?string
