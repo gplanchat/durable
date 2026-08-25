@@ -10,6 +10,7 @@ use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\SideEffectRecorded;
+use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
@@ -100,6 +101,19 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $this->executionId,
             $reason,
         ));
+    }
+
+    public function cancelTimer(string $timerId, string $reason): void
+    {
+        // Le replay repasse par cancelLosers() à chaque reprise : sans ce garde le journal
+        // accumulerait un TimerCancelled par replay.
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof TimerCancelled && $event->timerId() === $timerId) {
+                return;
+            }
+        }
+
+        $this->eventStore->append(new TimerCancelled($this->executionId, $timerId, $reason));
     }
 
     public function cancelActivity(string $activityId, string $reason): void

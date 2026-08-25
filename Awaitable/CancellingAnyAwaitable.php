@@ -8,8 +8,9 @@ use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Après résolution d'un {@see AnyAwaitable}, retire de la file les activités encore en attente
- * (best effort : si le transport ne le permet pas ou l'activité a déjà été consommée, ignorer).
+ * Après résolution d'un {@see AnyAwaitable}, retire de la file les activités et les minuteurs
+ * encore en attente (best effort : si le transport ne le permet pas ou l'activité a déjà été
+ * consommée, ignorer).
  *
  * @implements Awaitable<mixed>
  */
@@ -65,13 +66,14 @@ final class CancellingAnyAwaitable implements Awaitable
             if ($i === $winnerIndex) {
                 continue;
             }
-            if (!$a instanceof ActivityAwaitable) {
-                continue;
-            }
             if ($a->isSettled()) {
                 continue;
             }
-            $this->context->cancelScheduledActivity($a->activityId(), ActivityCancellationReason::RACE_SUPERSEDED);
+            if ($a instanceof ActivityAwaitable) {
+                $this->context->cancelScheduledActivity($a->activityId(), ActivityCancellationReason::RACE_SUPERSEDED);
+            } elseif ($a instanceof TimerAwaitable) {
+                $this->context->cancelScheduledTimer($a->timerId(), ActivityCancellationReason::RACE_SUPERSEDED);
+            }
         }
     }
 }

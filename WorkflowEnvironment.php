@@ -11,6 +11,7 @@ use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
+use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Awaitable\Deferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
@@ -116,7 +117,9 @@ final class WorkflowEnvironment
         $inner = new AnyAwaitable($awaitables);
         $composite = $inner;
         foreach ($awaitables as $a) {
-            if ($a instanceof ActivityAwaitable) {
+            // Activités ET minuteurs perdants sont annulables : sans le minuteur, un
+            // `any(timer, timer)` laissait une échéance morte réveiller l'exécution.
+            if ($a instanceof ActivityAwaitable || $a instanceof TimerAwaitable) {
                 $composite = new CancellingAnyAwaitable($this->context, $inner, $awaitables);
                 break;
             }
@@ -141,6 +144,21 @@ final class WorkflowEnvironment
     public function timer(float $seconds, string $timerSummary = ''): void
     {
         $this->await($this->context->timer($seconds, $timerSummary));
+    }
+
+    /**
+     * Minuteur non bloquant, à composer avec {@see any()} / {@see parallel()}.
+     *
+     * {@see timer()} attend l'échéance et ne rend donc rien de composable ; c'est cette
+     * variante qui permet le motif « activité avec timeout ». Le minuteur perdant d'un
+     * {@see any()} est annulé ({@see \Gplanchat\Durable\Event\TimerCancelled}) pour ne pas
+     * réveiller l'exécution sur une échéance morte.
+     *
+     * @return Awaitable<mixed>
+     */
+    public function timerAwaitable(float $seconds, string $timerSummary = ''): Awaitable
+    {
+        return $this->context->timer($seconds, $timerSummary);
     }
 
     /**

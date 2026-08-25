@@ -57,4 +57,9 @@ interface WorkflowCommandBufferInterface
      * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
      */
     public function cancelActivity(string $activityId, string $reason): void;
+
+    /**
+     * Records a timer cancellation (COMMAND_TYPE_CANCEL_TIMER for Temporal).
+     */
+    public function cancelTimer(string $timerId, string $reason): void;
 }

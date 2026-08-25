@@ -262,6 +262,25 @@ final class ExecutionContext
     }
 
     /**
+     * Annule un minuteur encore en attente (best effort).
+     *
+     * Le minuteur ne sera jamais résolu : il est retiré des pending pour que
+     * {@see resolveTimer()} devienne un no-op, et le journal reçoit un
+     * {@see \Gplanchat\Durable\Event\TimerCancelled}.
+     */
+    public function cancelScheduledTimer(string $timerId, string $reason): bool
+    {
+        if (!isset($this->pendingTimers[$timerId])) {
+            return false;
+        }
+
+        unset($this->pendingTimers[$timerId]);
+        $this->commandBuffer->cancelTimer($timerId, $reason);
+
+        return true;
+    }
+
+    /**
      * @return Awaitable<mixed>
      */
     public function delay(float $seconds, string $timerSummary = ''): Awaitable

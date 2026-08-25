@@ -12,6 +12,7 @@ use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
@@ -76,6 +77,7 @@ final class ExecutionRuntime
         $now = ($this->clock)();
         $scheduledIds = [];
         $completedIds = [];
+        $cancelledIds = [];
         foreach ($this->eventStore->readStream($context->executionId()) as $event) {
             if ($event instanceof TimerScheduled) {
                 $scheduledIds[] = ['id' => $event->timerId(), 'at' => $event->scheduledAt()];
@@ -83,10 +85,13 @@ final class ExecutionRuntime
             if ($event instanceof TimerCompleted) {
                 $completedIds[$event->timerId()] = true;
             }
+            if ($event instanceof TimerCancelled) {
+                $cancelledIds[$event->timerId()] = true;
+            }
         }
 
         foreach ($scheduledIds as $info) {
-            if (isset($completedIds[$info['id']])) {
+            if (isset($completedIds[$info['id']]) || isset($cancelledIds[$info['id']])) {
                 continue;
             }
             if ($now >= $info['at']) {

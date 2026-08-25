@@ -22,6 +22,7 @@ use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
+use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 
 /**
@@ -53,7 +54,11 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
                 $completedResults[$event->activityId()] = $event->result();
             }
             if ($event instanceof ActivityFailed) {
-                $failedByActivityId[$event->activityId()] = DurableActivityFailedException::toThrowable($event);
+                // Un échec `InProgress` (retry délégué au serveur Temporal) n'est pas terminal :
+                // il ne doit pas régler le slot d'activité au replay.
+                if (ActivityRetryState::InProgress !== $event->retryState()) {
+                    $failedByActivityId[$event->activityId()] = DurableActivityFailedException::toThrowable($event);
+                }
             }
             if ($event instanceof ActivityCatastrophicFailure) {
                 $catastrophicByActivityId[$event->activityId()] = new DurableCatastrophicActivityFailureException($event);

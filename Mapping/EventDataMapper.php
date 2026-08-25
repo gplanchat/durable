@@ -19,6 +19,7 @@ use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
+use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
@@ -131,6 +132,7 @@ final class EventDataMapper
                 isset($payload['summary']) ? (string) $payload['summary'] : '',
             ),
             TimerCompleted::class => new TimerCompleted($executionId, (string) $payload['timerId']),
+            TimerCancelled::class => new TimerCancelled($executionId, (string) $payload['timerId'], (string) ($payload['reason'] ?? '')),
             SideEffectRecorded::class => new SideEffectRecorded($executionId, (string) $payload['sideEffectId'], $payload['result'] ?? null),
             ChildWorkflowScheduled::class => self::toDomainEventChildWorkflowScheduled($executionId, $payload),
             ChildWorkflowCompleted::class => new ChildWorkflowCompleted($executionId, (string) $payload['childExecutionId'], $payload['result'] ?? null),
