@@ -7,8 +7,12 @@ namespace Gplanchat\Durable\Activity;
 /**
  * Options de planification d’activité (équivalent {@see \Temporal\Activity\ActivityOptions}).
  *
- * Les timeouts sont exprimés en secondes (fractionnaires). La politique de retry reprend
- * {@see \Temporal\Common\RetryOptions} (champs aplatis pour la sérialisation journal / message).
+ * Trois concepts, pas quatorze champs : jusqu'où réessayer ({@see RetryLimit}), à quel rythme
+ * ({@see $initialInterval} / {@see $backoffCoefficient} / {@see $maximumInterval}), et dans
+ * quelles bornes temporelles ({@see ActivityTimeouts}).
+ *
+ * La sérialisation reste plate et en secondes : c'est ce que porte l'historique des exécutions
+ * en cours, côté journal comme côté Temporal.
  */
 final readonly class ActivityOptions
 {
@@ -18,36 +22,43 @@ final readonly class ActivityOptions
     /** Jusqu'où l'on est prêt à réessayer ; illimité par défaut, comme Temporal. */
     public RetryLimit $retryLimit;
 
+    /** Délai avant la première retentative après un échec. */
+    public Duration $initialInterval;
+
+    /**
+     * Plafond du délai entre deux retentatives. Null applique le défaut Temporal,
+     * {@see DEFAULT_MAXIMUM_INTERVAL_FACTOR} × l'intervalle initial — indispensable dès lors que
+     * les tentatives sont illimitées, sans quoi le backoff exponentiel diverge.
+     */
+    public ?Duration $maximumInterval;
+
+    /** Les bornes temporelles de l'activité, prises ensemble. */
+    public ActivityTimeouts $timeouts;
+
     /**
      * @param list<class-string<\Throwable>> $nonRetryableExceptions
      */
     public function __construct(
         ?RetryLimit $retryLimit = null,
-        /** Délai avant la première retentative après un échec (secondes). */
-        public float $initialIntervalSeconds = 1.0,
+        ?Duration $initialInterval = null,
         /** Coefficient d’exponential backoff entre retentatives. */
         public float $backoffCoefficient = 2.0,
-        /**
-         * Plafond du délai entre deux retentatives (secondes). Null applique le défaut Temporal,
-         * {@see DEFAULT_MAXIMUM_INTERVAL_FACTOR} × l'intervalle initial — indispensable dès lors
-         * que les tentatives sont illimitées, sans quoi le backoff exponentiel diverge.
-         */
-        public ?float $maximumIntervalSeconds = null,
+        ?Duration $maximumInterval = null,
         /** Exceptions qui ne déclenchent pas de retry (class-string[]). */
         public array $nonRetryableExceptions = [],
         /** File d’attente cible (routage applicatif ; non utilisée par tous les transports). */
         public ?string $taskQueue = null,
         /** ID métier d’activité (sinon UUID). */
         public ?string $activityId = null,
-        public ?float $scheduleToCloseTimeoutSeconds = null,
-        public ?float $scheduleToStartTimeoutSeconds = null,
-        public ?float $startToCloseTimeoutSeconds = null,
-        public ?float $heartbeatTimeoutSeconds = null,
+        ?ActivityTimeouts $timeouts = null,
         public ActivityCancellationType $cancellationType = ActivityCancellationType::TryCancel,
         /** Résumé affichage UI (champ « summary » côté Temporal). */
         public ?string $summary = null,
     ) {
         $this->retryLimit = $retryLimit ?? RetryLimit::unlimited();
+        $this->initialInterval = $initialInterval ?? Duration::seconds(1.0);
+        $this->maximumInterval = $maximumInterval;
+        $this->timeouts = $timeouts ?? ActivityTimeouts::none();
     }
 
     public static function default(): self
@@ -56,296 +67,85 @@ final readonly class ActivityOptions
     }
 
     /**
-     * Délai à appliquer **avant** la tentative n° {@code $nextAttempt} (1-based), après l’échec de la tentative précédente.
-     * Pour {@code $nextAttempt} &lt;= 1, retourne 0.
+     * Délai à appliquer **avant** la tentative n° {@code $nextAttempt} (1-based), après l’échec
+     * de la tentative précédente. Nul pour la première tentative.
      */
-    public function retryDelayBeforeAttempt(int $nextAttempt): float
+    public function retryDelayBeforeAttempt(int $nextAttempt): Duration
     {
         if ($nextAttempt <= 1) {
-            return 0.0;
+            return Duration::zero();
         }
-        $exponent = $nextAttempt - 2;
-        $delay = $this->initialIntervalSeconds * ($this->backoffCoefficient ** $exponent);
 
-        return min($delay, $this->effectiveMaximumIntervalSeconds());
+        return $this->initialInterval
+            ->multipliedBy($this->backoffCoefficient ** ($nextAttempt - 2))
+            ->shortest($this->effectiveMaximumInterval());
     }
 
     /**
      * Plafond d'intervalle réellement appliqué, défaut Temporal compris.
      */
-    public function effectiveMaximumIntervalSeconds(): float
+    public function effectiveMaximumInterval(): Duration
     {
-        if (null !== $this->maximumIntervalSeconds && $this->maximumIntervalSeconds > 0) {
-            return $this->maximumIntervalSeconds;
-        }
-
-        return $this->initialIntervalSeconds * self::DEFAULT_MAXIMUM_INTERVAL_FACTOR;
+        return $this->maximumInterval ?? $this->initialInterval->multipliedBy(self::DEFAULT_MAXIMUM_INTERVAL_FACTOR);
     }
 
     public function withRetryLimit(RetryLimit $retryLimit): self
     {
         return new self(
             $retryLimit,
-            $this->initialIntervalSeconds,
+            $this->initialInterval,
             $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
+            $this->maximumInterval,
             $this->nonRetryableExceptions,
             $this->taskQueue,
             $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
+            $this->timeouts,
             $this->cancellationType,
             $this->summary,
         );
     }
 
-    public function withInitialInterval(float $seconds): self
+    public function withTimeouts(ActivityTimeouts $timeouts): self
     {
         return new self(
             $this->retryLimit,
-            $seconds,
+            $this->initialInterval,
             $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
+            $this->maximumInterval,
             $this->nonRetryableExceptions,
             $this->taskQueue,
             $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
+            $timeouts,
             $this->cancellationType,
             $this->summary,
         );
     }
 
-    public function withBackoffCoefficient(float $coefficient): self
+    public function isNonRetryable(\Throwable $e): bool
     {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $coefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
+        foreach ($this->nonRetryableExceptions as $exceptionClass) {
+            if (is_a($e, $exceptionClass)) {
+                return true;
+            }
+        }
 
-    public function withMaximumInterval(?float $seconds): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $seconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
+        return false;
     }
 
     /**
-     * @param class-string[] $exceptions
-     */
-    public function withNonRetryableExceptions(array $exceptions): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $exceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withTaskQueue(?string $taskQueue): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withActivityId(?string $activityId): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withScheduleToCloseTimeoutSeconds(?float $seconds): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $seconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withScheduleToStartTimeoutSeconds(?float $seconds): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $seconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withStartToCloseTimeoutSeconds(?float $seconds): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $seconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withHeartbeatTimeoutSeconds(?float $seconds): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $seconds,
-            $this->cancellationType,
-            $this->summary,
-        );
-    }
-
-    public function withCancellationType(ActivityCancellationType $type): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $type,
-            $this->summary,
-        );
-    }
-
-    public function withSummary(?string $summary): self
-    {
-        return new self(
-            $this->retryLimit,
-            $this->initialIntervalSeconds,
-            $this->backoffCoefficient,
-            $this->maximumIntervalSeconds,
-            $this->nonRetryableExceptions,
-            $this->taskQueue,
-            $this->activityId,
-            $this->scheduleToCloseTimeoutSeconds,
-            $this->scheduleToStartTimeoutSeconds,
-            $this->startToCloseTimeoutSeconds,
-            $this->heartbeatTimeoutSeconds,
-            $this->cancellationType,
-            $summary,
-        );
-    }
-
-    /**
-     * @return array<string, mixed> Métadonnées pour ActivityScheduled / ActivityMessage
+     * @return array{activity_options: array<string, mixed>}
      */
     public function toMetadata(): array
     {
         $activityOptions = [
             'max_attempts' => $this->retryLimit->toWireValue(),
-            'initial_interval_seconds' => $this->initialIntervalSeconds,
+            'initial_interval_seconds' => $this->initialInterval->toSeconds(),
             'backoff_coefficient' => $this->backoffCoefficient,
             'non_retryable_exceptions' => $this->nonRetryableExceptions,
             'cancellation_type' => $this->cancellationType->value,
         ];
-        if (null !== $this->maximumIntervalSeconds) {
-            $activityOptions['maximum_interval_seconds'] = $this->maximumIntervalSeconds;
+        if (null !== $this->maximumInterval) {
+            $activityOptions['maximum_interval_seconds'] = $this->maximumInterval->toSeconds();
         }
         if (null !== $this->taskQueue && '' !== $this->taskQueue) {
             $activityOptions['task_queue'] = $this->taskQueue;
@@ -353,18 +153,7 @@ final readonly class ActivityOptions
         if (null !== $this->activityId && '' !== $this->activityId) {
             $activityOptions['activity_id'] = $this->activityId;
         }
-        if (null !== $this->scheduleToCloseTimeoutSeconds) {
-            $activityOptions['schedule_to_close_timeout_seconds'] = $this->scheduleToCloseTimeoutSeconds;
-        }
-        if (null !== $this->scheduleToStartTimeoutSeconds) {
-            $activityOptions['schedule_to_start_timeout_seconds'] = $this->scheduleToStartTimeoutSeconds;
-        }
-        if (null !== $this->startToCloseTimeoutSeconds) {
-            $activityOptions['start_to_close_timeout_seconds'] = $this->startToCloseTimeoutSeconds;
-        }
-        if (null !== $this->heartbeatTimeoutSeconds) {
-            $activityOptions['heartbeat_timeout_seconds'] = $this->heartbeatTimeoutSeconds;
-        }
+        $activityOptions += $this->timeouts->toMetadata();
         if (null !== $this->summary && '' !== $this->summary) {
             $activityOptions['summary'] = $this->summary;
         }
@@ -384,35 +173,20 @@ final readonly class ActivityOptions
 
         $cancellation = ActivityCancellationType::TryCancel;
         if (isset($opts['cancellation_type'])) {
-            $v = (int) $opts['cancellation_type'];
-            $cancellation = ActivityCancellationType::tryFrom($v) ?? ActivityCancellationType::TryCancel;
+            $cancellation = ActivityCancellationType::tryFrom((int) $opts['cancellation_type']) ?? ActivityCancellationType::TryCancel;
         }
 
         return new self(
             RetryLimit::fromWireValue((int) ($opts['max_attempts'] ?? 0)),
-            (float) ($opts['initial_interval_seconds'] ?? 1.0),
+            Duration::seconds((float) ($opts['initial_interval_seconds'] ?? 1.0)),
             (float) ($opts['backoff_coefficient'] ?? 2.0),
-            isset($opts['maximum_interval_seconds']) ? (float) $opts['maximum_interval_seconds'] : null,
+            Duration::fromWireValue($opts['maximum_interval_seconds'] ?? null),
             \is_array($opts['non_retryable_exceptions'] ?? null) ? $opts['non_retryable_exceptions'] : [],
             isset($opts['task_queue']) ? (string) $opts['task_queue'] : null,
             isset($opts['activity_id']) ? (string) $opts['activity_id'] : null,
-            isset($opts['schedule_to_close_timeout_seconds']) ? (float) $opts['schedule_to_close_timeout_seconds'] : null,
-            isset($opts['schedule_to_start_timeout_seconds']) ? (float) $opts['schedule_to_start_timeout_seconds'] : null,
-            isset($opts['start_to_close_timeout_seconds']) ? (float) $opts['start_to_close_timeout_seconds'] : null,
-            isset($opts['heartbeat_timeout_seconds']) ? (float) $opts['heartbeat_timeout_seconds'] : null,
+            ActivityTimeouts::fromMetadata($opts),
             $cancellation,
             isset($opts['summary']) ? (string) $opts['summary'] : null,
         );
-    }
-
-    public function isNonRetryable(\Throwable $e): bool
-    {
-        foreach ($this->nonRetryableExceptions as $exceptionClass) {
-            if (is_a($e, $exceptionClass)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

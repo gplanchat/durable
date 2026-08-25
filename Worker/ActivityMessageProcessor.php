@@ -57,15 +57,13 @@ final class ActivityMessageProcessor
         $firstQueued = isset($message->metadata['first_queued_at']) ? (float) $message->metadata['first_queued_at'] : null;
 
         if (null !== $options && null !== $firstQueued) {
-            if (null !== $options->scheduleToCloseTimeoutSeconds && $options->scheduleToCloseTimeoutSeconds > 0
-                && ($now - $firstQueued) > $options->scheduleToCloseTimeoutSeconds) {
+            $timeouts = $options->timeouts;
+            if ($timeouts->scheduleToClose?->hasElapsedSince($firstQueued, $now)) {
                 $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-close timeout exceeded.'), ActivityRetryState::Timeout);
 
                 return;
             }
-            if ($message->attempt() <= 1
-                && null !== $options->scheduleToStartTimeoutSeconds && $options->scheduleToStartTimeoutSeconds > 0
-                && ($now - $firstQueued) > $options->scheduleToStartTimeoutSeconds) {
+            if ($message->attempt() <= 1 && $timeouts->scheduleToStart?->hasElapsedSince($firstQueued, $now)) {
                 $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-start timeout exceeded.'), ActivityRetryState::Timeout);
 
                 return;
@@ -79,9 +77,9 @@ final class ActivityMessageProcessor
                 return;
             }
 
-            $stc = $options?->startToCloseTimeoutSeconds;
-            if (null !== $stc && $stc > 0) {
-                set_time_limit(max(1, (int) ceil($stc)));
+            $startToClose = $options?->timeouts->startToClose;
+            if (null !== $startToClose) {
+                set_time_limit(max(1, (int) ceil($startToClose->toSeconds())));
             }
             try {
                 if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
@@ -123,7 +121,7 @@ final class ActivityMessageProcessor
                     null,
                 );
             } finally {
-                if (null !== $stc && $stc > 0) {
+                if (null !== $startToClose) {
                     ini_restore('max_execution_time');
                 }
             }
@@ -191,9 +189,9 @@ final class ActivityMessageProcessor
                 $nextAttempt = $message->attempt() + 1;
                 $meta = $message->metadata;
                 $meta['attempt'] = $nextAttempt;
-                $delay = null !== $options ? $options->retryDelayBeforeAttempt($nextAttempt) : 0.0;
-                if ($delay > 0) {
-                    $meta['retry_delay_seconds'] = $delay;
+                $delay = $options?->retryDelayBeforeAttempt($nextAttempt);
+                if (null !== $delay && !$delay->isZero()) {
+                    $meta['retry_delay_seconds'] = $delay->toSeconds();
                 }
                 $this->activityTransport->enqueue(new ActivityMessage(
                     $message->executionId,
