@@ -20,6 +20,7 @@ final class ActivityFailureEventFactory
         string $activityName,
         int $attempt,
         \Throwable $e,
+        ActivityRetryState $retryState = ActivityRetryState::RetryPolicyNotSet,
     ): ActivityFailed|ActivityCatastrophicFailure {
         if ($e instanceof DeclaredActivityFailureInterface) {
             try {
@@ -44,6 +45,7 @@ final class ActivityFailureEventFactory
             $envelope,
             $activityName,
             $attempt,
+            $retryState,
         );
 
         if (!self::isPayloadJsonSerializable($failed)) {

@@ -10,6 +10,7 @@ use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
+use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
@@ -25,6 +26,7 @@ use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\ParentClosePolicy;
 
 /**
@@ -109,6 +111,16 @@ final class EventDataMapper
                 \is_array($payload['failurePrevious'] ?? null) ? $payload['failurePrevious'] : [],
                 (string) ($payload['activityName'] ?? ''),
                 (int) ($payload['failureAttempt'] ?? 0),
+                isset($payload['retryState']) ? ActivityRetryState::tryFrom((string) $payload['retryState']) : null,
+            ),
+            ActivityTaskFailed::class => new ActivityTaskFailed(
+                $executionId,
+                (string) $payload['activityId'],
+                (string) ($payload['activityName'] ?? ''),
+                (int) ($payload['attempt'] ?? 1),
+                (string) ($payload['failureClass'] ?? ''),
+                (string) ($payload['failureMessage'] ?? ''),
+                ActivityRetryState::tryFrom((string) ($payload['retryState'] ?? '')) ?? ActivityRetryState::InProgress,
             ),
             ActivityCatastrophicFailure::class => ActivityCatastrophicFailure::fromStoredPayload($executionId, $payload),
             WorkflowExecutionFailed::class => WorkflowExecutionFailed::fromStoredPayload($executionId, $payload),

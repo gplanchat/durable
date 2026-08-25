@@ -18,6 +18,7 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
+use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
@@ -139,7 +140,17 @@ final class ExecutionRuntime
                 false,
                 $e::class,
             );
-            if ($message->attempt() <= $this->maxActivityRetries) {
+            // `maxActivityRetries` compte les retentatives : 1re tentative + N retentatives.
+            $shouldRetry = $message->attempt() <= $this->maxActivityRetries;
+            $this->eventStore->append(\Gplanchat\Durable\Event\ActivityTaskFailed::forThrowable(
+                $message->executionId,
+                $message->activityId,
+                $message->activityName,
+                $message->attempt(),
+                $e,
+                $shouldRetry ? ActivityRetryState::InProgress : ActivityRetryState::MaximumAttemptsReached,
+            ));
+            if ($shouldRetry) {
                 $this->activityTransport->enqueue($message->withAttempt($message->attempt() + 1));
             } else {
                 $failureEvent = ActivityFailureEventFactory::fromActivityThrowable(
@@ -148,6 +159,9 @@ final class ExecutionRuntime
                     $message->activityName,
                     $message->attempt(),
                     $e,
+                    $this->maxActivityRetries > 0
+                        ? ActivityRetryState::MaximumAttemptsReached
+                        : ActivityRetryState::RetryPolicyNotSet,
                 );
                 $this->eventStore->append($failureEvent);
                 if ($failureEvent instanceof ActivityFailed) {

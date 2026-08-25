@@ -10,8 +10,10 @@ use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
+use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
+use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
@@ -56,14 +58,14 @@ final class ActivityMessageProcessor
         if (null !== $options && null !== $firstQueued) {
             if (null !== $options->scheduleToCloseTimeoutSeconds && $options->scheduleToCloseTimeoutSeconds > 0
                 && ($now - $firstQueued) > $options->scheduleToCloseTimeoutSeconds) {
-                $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-close timeout exceeded.'));
+                $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-close timeout exceeded.'), ActivityRetryState::Timeout);
 
                 return;
             }
             if ($message->attempt() <= 1
                 && null !== $options->scheduleToStartTimeoutSeconds && $options->scheduleToStartTimeoutSeconds > 0
                 && ($now - $firstQueued) > $options->scheduleToStartTimeoutSeconds) {
-                $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-start timeout exceeded.'));
+                $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-start timeout exceeded.'), ActivityRetryState::Timeout);
 
                 return;
             }
@@ -147,16 +149,39 @@ final class ActivityMessageProcessor
                     $e::class,
                 );
             }
+            // `maxRetries` (défaut bundle `max_activity_retries`) compte les *retentatives* ;
+            // `ActivityOptions::maxAttempts` compte les *tentatives* au total (sémantique Temporal).
+            // Tout est normalisé en nombre total de tentatives avant comparaison.
             $maxAttempts = null !== $options && $options->maxAttempts > 0
                 ? $options->maxAttempts
-                : $this->maxRetries;
-            $shouldRetry = $maxAttempts > 0 && $message->attempt() <= $maxAttempts
-                && (null === $options || !$options->isNonRetryable($e));
+                : ($this->maxRetries > 0 ? $this->maxRetries + 1 : 0);
 
-            if ($shouldRetry && $this->activityTransport instanceof NoopActivityTransport) {
-                $this->appendActivityFailure($message, new \RuntimeException(
-                    'PHP-side activity retry is disabled with NoopActivityTransport (Temporal native worker / interpreter mirror); rely on Temporal retry policy.',
-                ));
+            $nonRetryable = null !== $options && $options->isNonRetryable($e);
+            $shouldRetry = !$nonRetryable && $maxAttempts > 0 && $message->attempt() < $maxAttempts;
+
+            // Le transport ne retente pas côté PHP (worker Temporal natif) : le serveur Temporal
+            // applique sa RetryPolicy. On journalise le VRAI échec en `InProgress` — un échec
+            // synthétique masquerait le type d'exception attendu par `nonRetryableErrorTypes`.
+            $delegatedToTransport = $shouldRetry && $this->activityTransport instanceof NoopActivityTransport;
+
+            $retryState = match (true) {
+                $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
+                $nonRetryable => ActivityRetryState::NonRetryableFailure,
+                $maxAttempts > 0 => ActivityRetryState::MaximumAttemptsReached,
+                default => ActivityRetryState::RetryPolicyNotSet,
+            };
+
+            $this->eventStore->append(ActivityTaskFailed::forThrowable(
+                $message->executionId,
+                $message->activityId,
+                $message->activityName,
+                $message->attempt(),
+                $e,
+                $retryState,
+            ));
+
+            if ($delegatedToTransport) {
+                $this->appendActivityFailure($message, $e, ActivityRetryState::InProgress);
 
                 return;
             }
@@ -177,12 +202,12 @@ final class ActivityMessageProcessor
                     $meta,
                 ));
             } else {
-                $this->appendActivityFailure($message, $e);
+                $this->appendActivityFailure($message, $e, $retryState);
             }
         }
     }
 
-    private function appendActivityFailure(ActivityMessage $message, \Throwable $e): void
+    private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
     {
         $this->eventStore->append(ActivityFailureEventFactory::fromActivityThrowable(
             $message->executionId,
@@ -190,6 +215,7 @@ final class ActivityMessageProcessor
             $message->activityName,
             $message->attempt(),
             $e,
+            $retryState,
         ));
         $this->resumeDispatcher->dispatchResume($message->executionId);
     }

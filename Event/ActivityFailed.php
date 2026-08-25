@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
 final readonly class ActivityFailed implements Event
@@ -23,6 +24,8 @@ final readonly class ActivityFailed implements Event
         private array $failurePrevious = [],
         private string $activityName = '',
         private int $failureAttempt = 0,
+        /** Pourquoi les tentatives se sont arrêtées ; null = journal antérieur au discriminant. */
+        private ?ActivityRetryState $retryState = null,
     ) {
     }
 
@@ -32,6 +35,7 @@ final readonly class ActivityFailed implements Event
         FailureEnvelope $envelope,
         string $activityName = '',
         int $attempt = 0,
+        ?ActivityRetryState $retryState = null,
     ): self {
         return new self(
             $executionId,
@@ -44,6 +48,7 @@ final readonly class ActivityFailed implements Event
             $envelope->previousChain,
             $activityName,
             $attempt,
+            $retryState,
         );
     }
 
@@ -65,6 +70,19 @@ final readonly class ActivityFailed implements Event
     public function failureAttempt(): int
     {
         return $this->failureAttempt;
+    }
+
+    public function retryState(): ?ActivityRetryState
+    {
+        return $this->retryState;
+    }
+
+    /**
+     * Vrai lorsque l'échec est dû à l'épuisement des retentatives (« ActivityStalled »).
+     */
+    public function isStalled(): bool
+    {
+        return ActivityRetryState::MaximumAttemptsReached === $this->retryState;
     }
 
     public function failureClass(): string
@@ -115,6 +133,7 @@ final readonly class ActivityFailed implements Event
             'failureContext' => $this->failureContext,
             'failureTrace' => $this->failureTrace,
             'failurePrevious' => $this->failurePrevious,
+            'retryState' => $this->retryState?->value,
         ];
     }
 }
