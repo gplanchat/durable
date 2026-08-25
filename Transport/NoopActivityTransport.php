@@ -18,6 +18,11 @@ final class NoopActivityTransport implements ActivityTransportInterface
         return null;
     }
 
+    public function nextDueAt(): ?float
+    {
+        return null;
+    }
+
     public function isEmpty(): bool
     {
         return true;

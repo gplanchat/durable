@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\Awaitable\TimerAwaitable;
+use Gplanchat\Durable\Awaitable\AwaitableInspector;
 use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
@@ -97,7 +97,8 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onSuspended(string $executionId, Awaitable $pending): void
     {
-        $waitingOnTimer = $pending instanceof TimerAwaitable;
+        // Doit traverser les composites : un any(activity, timer) attend bien une échéance.
+        $waitingOnTimer = AwaitableInspector::waitsOnTimer($pending);
 
         throw new WorkflowSuspendedException(
             \sprintf('Workflow %s suspended (fiber mode)', $executionId),

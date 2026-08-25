@@ -72,6 +72,18 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
         return null === $this->peek();
     }
 
+    public function nextDueAt(): ?float
+    {
+        $next = null;
+        foreach ($this->pending as $row) {
+            if (null === $next || $row['at'] < $next) {
+                $next = $row['at'];
+            }
+        }
+
+        return $next;
+    }
+
     public function removePendingFor(string $executionId, string $activityId): bool
     {
         $removed = false;

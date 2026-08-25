@@ -6,6 +6,7 @@ namespace Gplanchat\Durable;
 
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
+use Gplanchat\Durable\Awaitable\AwaitableInspector;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
@@ -67,7 +68,7 @@ final class ExecutionRuntime
                 return $awaitable->getResult();
             }
             // Called outside of a fiber (backward-compatibility path for non-fiber callers)
-            throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), $awaitable instanceof TimerAwaitable);
+            throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), AwaitableInspector::waitsOnTimer($awaitable));
         }
 
         // Synchronous in-memory drain (distributed=false)
@@ -126,12 +127,14 @@ final class ExecutionRuntime
      * ({@see \Gplanchat\Durable\Testing\WorkflowTestEnvironment}) ne reproduisait pas le
      * comportement de production. Seule la résolution de l'awaitable reste ici : elle n'existe
      * que dans le drain en ligne, où le fiber du workflow vit dans le même processus.
+     *
+     * @return bool false si la file n'avait aucun message prêt
      */
-    public function drainActivityQueueOnce(ExecutionContext $context): void
+    public function drainActivityQueueOnce(ExecutionContext $context): bool
     {
         $message = $this->activityTransport->dequeue();
         if (null === $message) {
-            return;
+            return false;
         }
 
         $this->activityMessageProcessor()->process($message);
@@ -159,6 +162,8 @@ final class ExecutionRuntime
                 // Aucune issue terminale : une retentative est en file, on la traitera au tour suivant.
                 break;
         }
+
+        return true;
     }
 
     private function activityMessageProcessor(): ActivityMessageProcessor
@@ -174,10 +179,26 @@ final class ExecutionRuntime
         );
     }
 
+    /**
+     * Draine la file jusqu'à épuisement, **retentatives différées comprises**.
+     *
+     * `isEmpty()` ne signale que l'absence de message *prêt* : boucler dessus concluait « plus
+     * rien à faire » alors qu'une retentative était planifiée quelques secondes plus tard, si
+     * bien que la politique de retry ne s'appliquait pas du tout dans le harness de test.
+     *
+     * ponytail: le backoff est attendu pour de vrai — ce drain est synchrone et dans le même
+     * processus. Une horloge virtuelle partagée avec le transport permettrait de l'avancer.
+     */
     public function runUntilIdle(ExecutionContext $context): void
     {
-        while (!$this->activityTransport->isEmpty()) {
-            $this->drainActivityQueueOnce($context);
+        while (null !== ($dueAt = $this->activityTransport->nextDueAt())) {
+            $wait = $dueAt - microtime(true);
+            if ($wait > 0) {
+                usleep((int) ceil($wait * 1_000_000));
+            }
+            if (!$this->drainActivityQueueOnce($context)) {
+                return;
+            }
         }
     }
 
@@ -196,25 +217,6 @@ final class ExecutionRuntime
      */
     private function awaitableShouldDispatchResume(Awaitable $awaitable): bool
     {
-        if ($awaitable instanceof ActivityAwaitable) {
-            return false;
-        }
-        if ($awaitable instanceof TimerAwaitable) {
-            return true;
-        }
-        if ($awaitable instanceof CancellingAnyAwaitable) {
-            return $this->awaitableShouldDispatchResume($awaitable->innerAny());
-        }
-        if ($awaitable instanceof AnyAwaitable) {
-            foreach ($awaitable->members() as $member) {
-                if ($this->awaitableShouldDispatchResume($member)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        return false;
+        return AwaitableInspector::waitsOnTimer($awaitable);
     }
 }
