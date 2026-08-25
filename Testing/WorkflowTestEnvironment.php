@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
+use Gplanchat\Durable\WorkflowRegistry;
 use Gplanchat\Durable\Store\InMemoryEventStore;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 
@@ -33,6 +34,7 @@ final class WorkflowTestEnvironment
     private readonly InMemoryEventStore $eventStore;
     private readonly InMemoryActivityTransport $activityTransport;
     private readonly RegistryActivityExecutor $activityExecutor;
+    private readonly WorkflowRegistry $workflowRegistry;
     private readonly InMemoryWorkflowRunner $runner;
 
     private function __construct(int $maxActivityRetries = 0)
@@ -40,11 +42,13 @@ final class WorkflowTestEnvironment
         $this->eventStore = new InMemoryEventStore();
         $this->activityTransport = new InMemoryActivityTransport();
         $this->activityExecutor = new RegistryActivityExecutor();
+        $this->workflowRegistry = new WorkflowRegistry();
         $this->runner = new InMemoryWorkflowRunner(
             $this->eventStore,
             $this->activityTransport,
             $this->activityExecutor,
             $maxActivityRetries,
+            $this->workflowRegistry,
         );
     }
 
@@ -105,6 +109,32 @@ final class WorkflowTestEnvironment
      * }
      * ```
      */
+    /**
+     * Enregistre un type de workflow, pour qu'il soit démarrable comme **enfant**
+     * ({@see \Gplanchat\Durable\WorkflowEnvironment::executeChildWorkflow()}).
+     *
+     * @param callable(array<string, mixed>): callable $factory Reçoit l'input, retourne le handler
+     */
+    public function registerWorkflow(string $workflowType, callable $factory): void
+    {
+        $this->workflowRegistry->registerFactory($workflowType, $factory);
+    }
+
+    /**
+     * Enregistre un workflow défini par attributs / classe.
+     *
+     * @param class-string $workflowClass
+     */
+    public function registerWorkflowClass(string $workflowClass): void
+    {
+        $this->workflowRegistry->registerClass($workflowClass);
+    }
+
+    public function getWorkflowRegistry(): WorkflowRegistry
+    {
+        return $this->workflowRegistry;
+    }
+
     public function getEventStore(): InMemoryEventStore
     {
         return $this->eventStore;

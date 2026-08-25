@@ -62,11 +62,13 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             throw new ChildWorkflowDeferredToMessenger();
         }
 
+        // Le registre est repassé pour que l'enfant puisse lui-même démarrer des petits-enfants.
         $runner = new InMemoryWorkflowRunner(
             $this->eventStore,
             $this->runtime->getActivityTransport(),
             $this->activityExecutor,
             $this->maxActivityRetries,
+            $this->workflowRegistry,
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 

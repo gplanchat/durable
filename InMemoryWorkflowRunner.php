@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\WorkflowStuckException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
@@ -25,6 +26,11 @@ final class InMemoryWorkflowRunner
         private readonly ActivityTransportInterface $activityTransport,
         private readonly ActivityExecutor $activityExecutor,
         private readonly int $maxActivityRetries = 0,
+        /**
+         * Requis pour exécuter des workflows enfants : sans registre, aucun type enfant n'est
+         * résoluble et {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} lève.
+         */
+        private readonly ?WorkflowRegistry $workflowRegistry = null,
     ) {
     }
 
@@ -43,7 +49,23 @@ final class InMemoryWorkflowRunner
             null,
             true, // distributed = true => suspension
         );
-        $engine = new ExecutionEngine($this->eventStore, $runtime);
+        // Le moteur était construit sans runner d'enfant ni coordinateur parent/enfant :
+        // un workflow à enfants levait une LogicException et ParentClosePolicy ne cascadait
+        // jamais — deux comportements de production absents du harness de test.
+        $engine = new ExecutionEngine(
+            $this->eventStore,
+            $runtime,
+            null !== $this->workflowRegistry
+                ? new ChildWorkflowRunner(
+                    $this->eventStore,
+                    $runtime,
+                    $this->workflowRegistry,
+                    $this->activityExecutor,
+                    $this->maxActivityRetries,
+                )
+                : null,
+            new ParentChildWorkflowCoordinator($this->eventStore),
+        );
 
         try {
             return $engine->start($executionId, $handler);
@@ -52,12 +74,23 @@ final class InMemoryWorkflowRunner
         }
 
         while (true) {
+            $before = $this->eventStore->countEventsInStream($executionId);
             $this->runActivityWorker($executionId, $runtime);
 
             try {
                 return $engine->resume($executionId, $handler);
             } catch (WorkflowSuspendedException) {
                 // DUR003: same — suspension until activities have produced the events needed for replay.
+            }
+
+            // Un tour qui n'ajoute rien au journal ne peut pas en ajouter au suivant : le
+            // workflow attend quelque chose que ce runner ne produira jamais (signal non
+            // délivré, update, minuteur lointain). Sans ce garde, la boucle tournait à vide
+            // indéfiniment — un test qui oublie de délivrer son signal gelait la suite.
+            // ponytail: détection par absence de progrès ; un vrai ordonnanceur de minuteurs
+            // demanderait une horloge virtuelle.
+            if ($this->eventStore->countEventsInStream($executionId) === $before) {
+                throw new WorkflowStuckException($executionId);
             }
         }
     }

@@ -52,6 +52,34 @@ final class ActivityEventJournal
     }
 
     /**
+     * Dernière issue terminale journalisée pour une activité, ou null si elle en attend encore une.
+     *
+     * Prend la **dernière** correspondance : un échec en {@see ActivityRetryState::InProgress} laissé
+     * par une tentative précédente est ainsi supplanté par le succès de la suivante.
+     */
+    public static function lastTerminalOutcome(
+        EventStoreInterface $eventStore,
+        string $executionId,
+        string $activityId,
+    ): ActivityCompleted|ActivityFailed|ActivityCatastrophicFailure|ActivityCancelled|null {
+        $last = null;
+        foreach ($eventStore->readStream($executionId) as $event) {
+            if (!$event instanceof ActivityCompleted
+                && !$event instanceof ActivityFailed
+                && !$event instanceof ActivityCatastrophicFailure
+                && !$event instanceof ActivityCancelled
+            ) {
+                continue;
+            }
+            if ($event->activityId() === $activityId) {
+                $last = $event;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
      * Returns true if an ActivityTaskStarted event for the given attempt already exists in the
      * journal. Used by ActivityMessageProcessor to avoid recording duplicate task-start events
      * on re-delivery.

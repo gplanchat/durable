@@ -4,29 +4,29 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
+use Gplanchat\Durable\Activity\NullActivityHeartbeatSender;
+use Gplanchat\Durable\Event\ActivityCancelled;
+use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
-use Gplanchat\Durable\Event\ActivityTaskCompleted;
-use Gplanchat\Durable\Event\ActivityTaskFailed;
-use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
-use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
-use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Store\ActivityEventJournal;
+use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Worker\ActivityMessageProcessor;
 
 /**
  * Le bundle Symfony enregistre toujours la suspension sur await non résolu (6ᵉ argument à true).
@@ -36,6 +36,8 @@ final class ExecutionRuntime
 {
     /** @var callable(): float */
     private $clock;
+
+    private ?ActivityMessageProcessor $activityMessageProcessor = null;
 
     public function __construct(
         private readonly EventStoreInterface $eventStore,
@@ -115,6 +117,16 @@ final class ExecutionRuntime
         return ($this->clock)();
     }
 
+    /**
+     * Exécute **une** tentative d'activité en ligne, puis règle l'awaitable du contexte.
+     *
+     * Le travail lui-même est délégué à {@see ActivityMessageProcessor}, le même que le worker
+     * Messenger : timeouts, marqueurs worker, politique de retry et annulation par heartbeat
+     * étaient auparavant absents de ce chemin, si bien que le harness de test public
+     * ({@see \Gplanchat\Durable\Testing\WorkflowTestEnvironment}) ne reproduisait pas le
+     * comportement de production. Seule la résolution de l'awaitable reste ici : elle n'existe
+     * que dans le drain en ligne, où le fiber du workflow vit dans le même processus.
+     */
     public function drainActivityQueueOnce(ExecutionContext $context): void
     {
         $message = $this->activityTransport->dequeue();
@@ -122,99 +134,44 @@ final class ExecutionRuntime
             return;
         }
 
-        $t0 = microtime(true);
-        try {
-            // Même trio de marqueurs worker que le chemin Messenger : sans eux le journal
-            // produit par le harness de test n'a pas la forme de celui de la production.
-            if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
-                $this->eventStore,
-                $message->executionId,
-                $message->activityId,
-                $message->attempt(),
-            )) {
-                $this->eventStore->append(new ActivityTaskStarted(
-                    $message->executionId,
-                    $message->activityId,
-                    $message->activityName,
-                    $message->attempt(),
-                ));
-            }
-            $result = $this->activityExecutor->execute($message->activityName, $message->payload);
-            $duration = microtime(true) - $t0;
-            $this->workflowExecutionObserver?->onActivityExecuted(
-                $message->executionId,
-                $message->activityId,
-                $message->activityName,
-                $duration,
-                true,
-                null,
-            );
-            $this->eventStore->append(new ActivityTaskCompleted(
-                $message->executionId,
-                $message->activityId,
-                $result,
-            ));
-            $this->eventStore->append(new ActivityCompleted(
-                $message->executionId,
-                $message->activityId,
-                $result,
-            ));
-            $context->resolveActivity($message->activityId, $result);
-        } catch (\Throwable $e) {
-            $duration = microtime(true) - $t0;
-            $this->workflowExecutionObserver?->onActivityExecuted(
-                $message->executionId,
-                $message->activityId,
-                $message->activityName,
-                $duration,
-                false,
-                $e::class,
-            );
-            // Le drain synchrone lisait `maxActivityRetries` seul : une exception déclarée
-            // non-retryable y était retentée quand même, et un maxAttempts par activité était
-            // ignoré — alors que le chemin Messenger les honore tous les deux.
-            $options = ActivityOptions::fromMetadata($message->metadata);
-            $maxAttempts = null !== $options && $options->maxAttempts > 0
-                ? $options->maxAttempts
-                : ($this->maxActivityRetries > 0 ? $this->maxActivityRetries + 1 : 0);
-            $nonRetryable = null !== $options && $options->isNonRetryable($e);
-            $shouldRetry = !$nonRetryable && $maxAttempts > 0 && $message->attempt() < $maxAttempts;
-            $retryState = match (true) {
-                $shouldRetry => ActivityRetryState::InProgress,
-                $nonRetryable => ActivityRetryState::NonRetryableFailure,
-                $maxAttempts > 0 => ActivityRetryState::MaximumAttemptsReached,
-                default => ActivityRetryState::RetryPolicyNotSet,
-            };
-            $this->eventStore->append(ActivityTaskFailed::forThrowable(
-                $message->executionId,
-                $message->activityId,
-                $message->activityName,
-                $message->attempt(),
-                $e,
-                $retryState,
-            ));
-            if ($shouldRetry) {
-                $this->activityTransport->enqueue($message->withAttempt($message->attempt() + 1));
-            } else {
-                $failureEvent = ActivityFailureEventFactory::fromActivityThrowable(
-                    $message->executionId,
-                    $message->activityId,
-                    $message->activityName,
-                    $message->attempt(),
-                    $e,
-                    $retryState,
-                );
-                $this->eventStore->append($failureEvent);
-                if ($failureEvent instanceof ActivityFailed) {
-                    $context->rejectActivity($message->activityId, DurableActivityFailedException::toThrowable($failureEvent));
-                } else {
-                    $context->rejectActivity(
-                        $message->activityId,
-                        new DurableCatastrophicActivityFailureException($failureEvent, $e),
-                    );
-                }
-            }
+        $this->activityMessageProcessor()->process($message);
+
+        $outcome = ActivityEventJournal::lastTerminalOutcome(
+            $this->eventStore,
+            $message->executionId,
+            $message->activityId,
+        );
+
+        switch (true) {
+            case $outcome instanceof ActivityCompleted:
+                $context->resolveActivity($message->activityId, $outcome->result());
+                break;
+            case $outcome instanceof ActivityFailed:
+                $context->rejectActivity($message->activityId, DurableActivityFailedException::toThrowable($outcome));
+                break;
+            case $outcome instanceof ActivityCatastrophicFailure:
+                $context->rejectActivity($message->activityId, new DurableCatastrophicActivityFailureException($outcome));
+                break;
+            case $outcome instanceof ActivityCancelled:
+                $context->rejectActivity($message->activityId, new ActivitySupersededException($message->activityId, $outcome->reason()));
+                break;
+            default:
+                // Aucune issue terminale : une retentative est en file, on la traitera au tour suivant.
+                break;
         }
+    }
+
+    private function activityMessageProcessor(): ActivityMessageProcessor
+    {
+        return $this->activityMessageProcessor ??= new ActivityMessageProcessor(
+            $this->eventStore,
+            $this->activityTransport,
+            $this->activityExecutor,
+            new NullWorkflowResumeDispatcher(),
+            new NullActivityHeartbeatSender(),
+            $this->maxActivityRetries,
+            $this->workflowExecutionObserver,
+        );
     }
 
     public function runUntilIdle(ExecutionContext $context): void
