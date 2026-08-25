@@ -15,6 +15,9 @@ final readonly class ChildWorkflowOptions
     /** Les bornes temporelles de l'enfant, prises ensemble. */
     public WorkflowTimeouts $timeouts;
 
+    /** Ce sur quoi l'enfant pourra être retrouvé. */
+    public SearchAttributes $searchAttributes;
+
     public function __construct(
         /**
          * Identifiant d’exécution enfant (clé du journal enfant). Si null, un UUID est généré.
@@ -27,13 +30,13 @@ final readonly class ChildWorkflowOptions
         public ?CronSchedule $cronSchedule = null,
         /** @var array<string, mixed>|null */
         public ?array $memo = null,
-        /** @var array<string, mixed>|null */
-        public ?array $searchAttributes = null,
+        ?SearchAttributes $searchAttributes = null,
         public WorkflowIdReusePolicy $workflowIdReusePolicy = WorkflowIdReusePolicy::AllowDuplicateFailedOnly,
         public ?string $staticSummary = null,
         public ?string $staticDetails = null,
     ) {
         $this->timeouts = $timeouts ?? WorkflowTimeouts::none();
+        $this->searchAttributes = $searchAttributes ?? SearchAttributes::none();
     }
 
     public static function defaults(): self
@@ -60,8 +63,8 @@ final readonly class ChildWorkflowOptions
         if (null !== $this->memo) {
             $m['memo'] = $this->memo;
         }
-        if (null !== $this->searchAttributes) {
-            $m['search_attributes'] = $this->searchAttributes;
+        if (!$this->searchAttributes->isEmpty()) {
+            $m['search_attributes'] = $this->searchAttributes->toMetadata();
         }
         $m['workflow_id_reuse_policy'] = $this->workflowIdReusePolicy->value;
         if (null !== $this->staticSummary && '' !== $this->staticSummary) {

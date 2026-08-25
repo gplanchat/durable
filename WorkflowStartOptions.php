@@ -17,6 +17,9 @@ final readonly class WorkflowStartOptions
     /** Les bornes temporelles de l'exécution, prises ensemble. */
     public WorkflowTimeouts $timeouts;
 
+    /** Ce sur quoi l'exécution pourra être retrouvée. */
+    public SearchAttributes $searchAttributes;
+
     public function __construct(
         /**
          * Récurrence. Le serveur relance une exécution à chaque échéance ; la précédente doit
@@ -26,8 +29,10 @@ final readonly class WorkflowStartOptions
         public ?TaskQueue $taskQueue = null,
         ?WorkflowTimeouts $timeouts = null,
         public WorkflowIdReusePolicy $workflowIdReusePolicy = WorkflowIdReusePolicy::AllowDuplicateFailedOnly,
+        ?SearchAttributes $searchAttributes = null,
     ) {
         $this->timeouts = $timeouts ?? WorkflowTimeouts::none();
+        $this->searchAttributes = $searchAttributes ?? SearchAttributes::none();
     }
 
     public static function defaults(): self
@@ -54,6 +59,9 @@ final readonly class WorkflowStartOptions
         }
         $m += $this->timeouts->toMetadata();
         $m['workflow_id_reuse_policy'] = $this->workflowIdReusePolicy->value;
+        if (!$this->searchAttributes->isEmpty()) {
+            $m['search_attributes'] = $this->searchAttributes->toMetadata();
+        }
 
         return $m;
     }
