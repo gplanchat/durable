@@ -74,6 +74,13 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         return $requested;
     }
 
+    public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void
+    {
+        // Rien à ajouter : ActivityCancelled / TimerCancelled portent déjà la raison
+        // workflow_cancelled, qui sert à la fois de trace de livraison et de source du rejet
+        // au rejeu.
+    }
+
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void
     {
         $source = null;

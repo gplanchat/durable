@@ -44,6 +44,18 @@ interface WorkflowLifecycleInterface
      *
      * @throws \Throwable pour propager la fin à l'appelant
      */
+    /**
+     * L'annulation vient d'être relevée dans le fiber ; `$cancelledOperationIds` liste les
+     * opérations retirées à cette occasion.
+     *
+     * Le backend doit pouvoir, au rejeu, rejeter **ces mêmes** opérations avec la même
+     * exception : sans quoi le `catch` du workflow ne matcherait plus et la compensation
+     * divergerait d'une tâche à l'autre.
+     *
+     * @param list<string> $cancelledOperationIds
+     */
+    public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void;
+
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void;
 
     /**

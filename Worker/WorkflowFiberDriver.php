@@ -72,7 +72,7 @@ final class WorkflowFiberDriver
                 if (!$cancellationDelivered && $this->lifecycle->isCancellationPending($executionId)) {
                     $cancellationDelivered = true;
                     $failure = new WorkflowCancelledFailure($executionId, ActivityCancellationReason::WORKFLOW_CANCELLED);
-                    self::cancelPending($context, $suspended);
+                    $this->lifecycle->onCancellationDelivered($executionId, self::cancelPending($context, $suspended));
 
                     try {
                         $suspended = $fiber->throw($failure);
@@ -134,31 +134,42 @@ final class WorkflowFiberDriver
      * plusieurs : toutes les branches encore en attente sont annulées.
      *
      * @param Awaitable<mixed> $pending
+     *
+     * @return list<string> identifiants des opérations retirées
      */
-    private static function cancelPending(ExecutionContext $context, Awaitable $pending): void
+    private static function cancelPending(ExecutionContext $context, Awaitable $pending): array
     {
         if ($pending instanceof CancellingAnyAwaitable) {
-            self::cancelPending($context, $pending->innerAny());
-
-            return;
+            return self::cancelPending($context, $pending->innerAny());
         }
 
         if ($pending instanceof AnyAwaitable) {
+            $cancelled = [];
             foreach ($pending->members() as $member) {
-                self::cancelPending($context, $member);
+                foreach (self::cancelPending($context, $member) as $id) {
+                    $cancelled[] = $id;
+                }
             }
 
-            return;
+            return $cancelled;
         }
 
         if ($pending->isSettled()) {
-            return;
+            return [];
         }
 
         if ($pending instanceof ActivityAwaitable) {
             $context->cancelScheduledActivity($pending->activityId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
-        } elseif ($pending instanceof TimerAwaitable) {
-            $context->cancelScheduledTimer($pending->timerId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
+
+            return [$pending->activityId()];
         }
+
+        if ($pending instanceof TimerAwaitable) {
+            $context->cancelScheduledTimer($pending->timerId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
+
+            return [$pending->timerId()];
+        }
+
+        return [];
     }
 }
