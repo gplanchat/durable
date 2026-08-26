@@ -30,6 +30,18 @@ interface WorkflowHistorySourceInterface
     public function findScheduledActivityId(int $slot): ?string;
 
     /**
+     * Returns the recorded result for Nexus operation slot N, or null if not yet recorded.
+     *
+     * @return array{result: mixed, failed: \Throwable|null}|null
+     */
+    public function findNexusOperationSlotResult(int $slot): ?array;
+
+    /**
+     * Returns the operation id scheduled at Nexus slot N (first-occurrence order), or null.
+     */
+    public function findScheduledNexusOperation(int $slot): ?string;
+
+    /**
      * Returns the recorded outcome for timer slot N, or null if it is still pending.
      *
      * `failed` porte l'annulation du minuteur ({@see \Gplanchat\Durable\Event\TimerCancelled}) :
