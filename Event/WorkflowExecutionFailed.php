@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 use Gplanchat\Durable\Exception\DeadlineExceededException;
+use Gplanchat\Durable\Exception\DurableNexusOperationFailedException;
 
 /**
  * Le handler de workflow n'a pas géré une erreur (ex. échec d'activité non attrapé) :
@@ -18,6 +19,7 @@ final readonly class WorkflowExecutionFailed implements Event
     public const KIND_UNHANDLED_CATASTROPHIC_ACTIVITY = 'unhandled_catastrophic_activity_failure';
     public const KIND_DEADLINE_EXCEEDED = 'deadline_exceeded';
     public const KIND_WORKFLOW_HANDLER = 'workflow_handler_failure';
+    public const KIND_UNHANDLED_NEXUS_OPERATION = 'unhandled_nexus_operation_failure';
     public const KIND_TERMINATED_BY_PARENT = 'terminated_by_parent';
 
     /**
@@ -44,6 +46,30 @@ final readonly class WorkflowExecutionFailed implements Event
             (string) $p['failureMessage'],
             (int) ($p['failureCode'] ?? 0),
             \is_array($p['context'] ?? null) ? $p['context'] : [],
+        );
+    }
+
+    /**
+     * Une opération Nexus non rattrapée, avec le site d'appel qui l'a émise.
+     *
+     * Le triplet est dans le contexte plutôt que fondu dans le message : un échec qui ne nomme pas
+     * son endpoint laisse chercher lequel des trois a lâché.
+     */
+    public static function unhandledNexusOperationFailure(string $executionId, DurableNexusOperationFailedException $cause): self
+    {
+        return new self(
+            $executionId,
+            self::KIND_UNHANDLED_NEXUS_OPERATION,
+            $cause::class,
+            $cause->getMessage(),
+            $cause->getCode(),
+            [
+                'endpoint' => $cause->endpoint(),
+                'service' => $cause->service(),
+                'operation' => $cause->operation(),
+                'nexusKind' => $cause->kind()->value,
+                'retryBehaviour' => $cause->retryBehaviour(),
+            ],
         );
     }
 
