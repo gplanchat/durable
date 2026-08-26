@@ -11,12 +11,17 @@ namespace Gplanchat\Durable\Transport;
  */
 final readonly class DeliverWorkflowSignalMessage
 {
+    /** Le nom tel qu'il voyage : le message est sérialisé par Messenger, pas une enum. */
+    public string $signalName;
+
     /**
      * @param array<string, mixed> $payload
      */
     public function __construct(
         public string $executionId,
-        public string $signalName,
+        \BackedEnum|string $signalName,
         public array $payload = [],
-    ) {}
+    ) {
+        $this->signalName = $signalName instanceof \BackedEnum ? (string) $signalName->value : $signalName;
+    }
 }
