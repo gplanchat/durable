@@ -214,7 +214,7 @@ final class ExecutionContext
      * Un par un, jamais par lot : un message enregistré après le tir d'une échéance ne doit pas
      * régler la condition qu'elle bornait, et une condition satisfaite par le premier de deux
      * messages doit reprendre en n'ayant vu que celui-là. Les deux sortent de la même règle —
-     * le verdict est une position dans le journal (ADR DUR033).
+     * le verdict est une position dans le journal (ADR DUR035).
      *
      * `pending` porte l'update hors journal quand c'en est un, et null quand le message est relu
      * du journal : c'est ce qui distingue « produire l'issue » de « refaire l'état ».

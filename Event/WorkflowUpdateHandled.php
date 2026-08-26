@@ -29,7 +29,7 @@ final readonly class WorkflowUpdateHandled implements Event
          * Un champ nullable plutôt qu'un événement frère — comme `ActivityFailed` en est un de
          * `ActivityCompleted`. La raison est dans le protocole : Temporal n'écrit qu'un
          * `WORKFLOW_EXECUTION_UPDATE_COMPLETED`, dont l'`Outcome` est soit un succès soit un
-         * échec (ADR DUR033, sonde 1.3).
+         * échec (ADR DUR035, sonde 1.3).
          */
         private ?FailureEnvelope $failure = null,
     ) {}

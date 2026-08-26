@@ -71,7 +71,7 @@ interface WorkflowHistorySourceInterface
      * `position` is the rank of the event in this execution's recorded history — the stream index
      * in memory, the `eventId` on Temporal. Positions are comparable **within one execution's own
      * history** and nowhere else: they are never serialized, and never compared across backends.
-     * See ADR DUR033.
+     * See ADR DUR035.
      *
      * @return array{position: int, kind: 'signal'|'update', name: string, payload: array<string, mixed>}|null
      */
