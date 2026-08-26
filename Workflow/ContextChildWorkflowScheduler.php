@@ -21,8 +21,7 @@ final class ContextChildWorkflowScheduler implements ChildWorkflowSchedulerInter
 {
     public function __construct(
         private readonly ExecutionContext $context,
-    ) {
-    }
+    ) {}
 
     public function startChildWorkflow(string $childWorkflowType, array $input, ?ChildWorkflowOptions $options): Awaitable
     {

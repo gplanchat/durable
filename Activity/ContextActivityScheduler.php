@@ -20,8 +20,7 @@ final class ContextActivityScheduler implements ActivitySchedulerInterface
 {
     public function __construct(
         private readonly ExecutionContext $context,
-    ) {
-    }
+    ) {}
 
     public function scheduleActivity(string $activityName, array $payload, ?ActivityOptions $options): Awaitable
     {
