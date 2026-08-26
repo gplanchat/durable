@@ -25,8 +25,7 @@ final class WorkflowRegistry
 
     public function __construct(
         private readonly ?WorkflowDefinitionLoader $workflowLoader = null,
-    ) {
-    }
+    ) {}
 
     /**
      * Enregistre une classe workflow avec #[Workflow] et #[WorkflowMethod].

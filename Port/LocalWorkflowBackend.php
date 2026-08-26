@@ -19,8 +19,7 @@ final class LocalWorkflowBackend implements WorkflowBackendInterface
 {
     public function __construct(
         private readonly ExecutionEngine $engine,
-    ) {
-    }
+    ) {}
 
     #[\Override]
     public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed

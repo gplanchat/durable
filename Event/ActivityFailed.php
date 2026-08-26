@@ -26,8 +26,7 @@ final readonly class ActivityFailed implements Event
         private int $failureAttempt = 0,
         /** Pourquoi les tentatives se sont arrêtées ; null = journal antérieur au discriminant. */
         private ?ActivityRetryState $retryState = null,
-    ) {
-    }
+    ) {}
 
     public static function fromEnvelope(
         string $executionId,

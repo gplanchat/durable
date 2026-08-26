@@ -20,7 +20,5 @@ final class ActivityCancellationReason
      */
     public const WORKFLOW_CANCELLED = 'workflow_cancelled';
 
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 }

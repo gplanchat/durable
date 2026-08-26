@@ -59,6 +59,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             }
             $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
             $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
+
             throw new ChildWorkflowStartDeferred();
         }
 

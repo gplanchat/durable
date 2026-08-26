@@ -19,8 +19,7 @@ final class TimerAwaitable implements Awaitable
     public function __construct(
         private readonly Awaitable $inner,
         private readonly string $timerId,
-    ) {
-    }
+    ) {}
 
     public function timerId(): string
     {

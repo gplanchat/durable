@@ -21,8 +21,7 @@ final class CancellingAnyAwaitable implements Awaitable
         private readonly ExecutionContext $context,
         private readonly AnyAwaitable $inner,
         private readonly array $tracked,
-    ) {
-    }
+    ) {}
 
     public function innerAny(): AnyAwaitable
     {

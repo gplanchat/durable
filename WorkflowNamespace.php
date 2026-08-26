@@ -27,8 +27,7 @@ final readonly class WorkflowNamespace
 
     private function __construct(
         private string $name,
-    ) {
-    }
+    ) {}
 
     public static function named(string $name): self
     {

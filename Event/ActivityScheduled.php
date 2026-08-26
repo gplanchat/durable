@@ -16,8 +16,7 @@ final readonly class ActivityScheduled implements Event
         private string $activityName,
         private array $payload,
         private array $metadata = [],
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

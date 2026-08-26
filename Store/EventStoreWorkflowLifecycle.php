@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\AwaitableInspector;
-use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCancelled;
@@ -37,8 +37,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     public function __construct(
         private EventStoreInterface $eventStore,
         private ?ParentChildWorkflowCoordinatorInterface $parentChildCoordinator = null,
-    ) {
-    }
+    ) {}
 
     public function onBeforeRun(string $executionId): void
     {
@@ -134,10 +133,10 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
 
         throw match (true) {
-            $failure instanceof DurableCatastrophicActivityFailureException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle catastrophic activity failure: '.$failure->getMessage(), 0, $failure),
-            $failure instanceof DurableActivityFailedException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle activity failure: '.$failure->getMessage(), 0, $failure),
-            $failure instanceof ActivitySupersededException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle superseded activity: '.$failure->getMessage(), 0, $failure),
-            $failure instanceof DeclaredActivityFailureInterface => new DurableWorkflowAlgorithmFailureException('Workflow did not handle declared activity failure: '.$failure->getMessage(), 0, $failure),
+            $failure instanceof DurableCatastrophicActivityFailureException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle catastrophic activity failure: ' . $failure->getMessage(), 0, $failure),
+            $failure instanceof DurableActivityFailedException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle activity failure: ' . $failure->getMessage(), 0, $failure),
+            $failure instanceof ActivitySupersededException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle superseded activity: ' . $failure->getMessage(), 0, $failure),
+            $failure instanceof DeclaredActivityFailureInterface => new DurableWorkflowAlgorithmFailureException('Workflow did not handle declared activity failure: ' . $failure->getMessage(), 0, $failure),
             default => $failure,
         };
     }

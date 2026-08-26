@@ -14,8 +14,7 @@ final readonly class ActivityTaskStarted implements Event
         private string $activityId,
         private string $activityName,
         private int $attempt,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

@@ -22,8 +22,7 @@ final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordin
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ?WorkflowResumeDispatcher $resumeDispatcher = null,
-    ) {
-    }
+    ) {}
 
     public function onParentClosed(string $parentExecutionId, ParentClosureReason $reason): void
     {

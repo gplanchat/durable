@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Activity\ActivityContractResolver;use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
-use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Activity\ActivityContractResolver;
+use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
-use Gplanchat\Durable\Store\EventStoreWorkflowLifecycle;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\EventStoreWorkflowLifecycle;
 use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 use Gplanchat\Durable\Worker\WorkflowFiberDriver;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
@@ -28,8 +28,7 @@ final class ExecutionEngine
         private readonly ?WorkflowDefinitionLoader $workflowDefinitionLoader = null,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
         private readonly ?UuidGeneratorInterface $uuidGenerator = null,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $executionStartedPayloadExtras Fusionnés dans le payload {@see ExecutionStarted} (ex. bootstrap interpréteur Temporal).

@@ -19,14 +19,13 @@ final readonly class FailureEnvelope
         public array $context = [],
         public ?string $trace = null,
         public array $previousChain = [],
-    ) {
-    }
+    ) {}
 
     public static function fromThrowable(\Throwable $e, ?int $traceMaxLength = 4096): self
     {
         $trace = $e->getTraceAsString();
         if (null !== $traceMaxLength && \strlen($trace) > $traceMaxLength) {
-            $trace = substr($trace, 0, $traceMaxLength).'... (truncated)';
+            $trace = substr($trace, 0, $traceMaxLength) . '... (truncated)';
         }
 
         $context = [];

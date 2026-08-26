@@ -190,7 +190,7 @@ final class WorkflowDefinitionLoader
             }
             $attr = $attrs[0]->newInstance();
             $queryType = $attr->name;
-            $env->registerQueryHandler($queryType, static fn (mixed ...$args) => $method->invoke($instance, ...$args));
+            $env->registerQueryHandler($queryType, static fn(mixed ...$args) => $method->invoke($instance, ...$args));
         }
     }
 }

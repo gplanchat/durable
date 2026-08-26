@@ -27,8 +27,7 @@ final readonly class WorkflowExecutionFailed implements Event
         private string $failureMessage,
         private int $failureCode,
         private array $context,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $p

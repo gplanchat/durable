@@ -37,8 +37,7 @@ final readonly class ActivityMessage
          * son propre mécanisme de report, puis l'oublie — il ne survit pas à la mise en file.
          */
         public ?Duration $retryDelay = null,
-    ) {
-    }
+    ) {}
 
     public function withAttempt(int $attempt): self
     {

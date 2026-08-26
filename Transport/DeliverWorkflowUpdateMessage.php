@@ -19,6 +19,5 @@ final readonly class DeliverWorkflowUpdateMessage
         public string $updateName,
         public array $arguments = [],
         public mixed $result = null,
-    ) {
-    }
+    ) {}
 }

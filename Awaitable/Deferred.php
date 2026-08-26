@@ -87,6 +87,7 @@ final class Deferred
     {
         foreach ($this->callbacks as $callback) {
             [$onFulfilled, $onRejected] = $callback;
+
             try {
                 if ($this->fulfilled) {
                     if (null !== $onFulfilled) {

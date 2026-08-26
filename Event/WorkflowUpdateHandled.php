@@ -20,8 +20,7 @@ final readonly class WorkflowUpdateHandled implements Event
         private string $updateName,
         private array $arguments,
         private mixed $result,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

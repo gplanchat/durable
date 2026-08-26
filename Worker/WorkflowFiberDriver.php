@@ -29,8 +29,7 @@ final class WorkflowFiberDriver
 {
     public function __construct(
         private readonly WorkflowLifecycleInterface $lifecycle,
-    ) {
-    }
+    ) {}
 
     /**
      * @return mixed Résultat du handler s'il est allé au bout, null sinon (suspension, issue levée
@@ -44,7 +43,7 @@ final class WorkflowFiberDriver
     ): mixed {
         $this->lifecycle->onBeforeRun($executionId);
 
-        $fiber = new \Fiber(static fn () => $handler($environment));
+        $fiber = new \Fiber(static fn() => $handler($environment));
 
         // Au plus une livraison par exécution du pilote : après avoir relevé l'annulation, le
         // handler peut compenser en attendant de nouvelles opérations, et celles-ci ne doivent

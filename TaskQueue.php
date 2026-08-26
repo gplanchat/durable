@@ -25,8 +25,7 @@ final readonly class TaskQueue
 
     private function __construct(
         private string $name,
-    ) {
-    }
+    ) {}
 
     public static function named(string $name): self
     {

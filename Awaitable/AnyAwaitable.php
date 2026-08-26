@@ -12,8 +12,7 @@ final class AnyAwaitable implements Awaitable
     /** @param list<Awaitable<mixed>> $awaitables */
     public function __construct(
         private readonly array $awaitables,
-    ) {
-    }
+    ) {}
 
     /**
      * @return list<Awaitable<mixed>>

@@ -20,8 +20,7 @@ final readonly class WorkflowExecutionCancelled implements Event
         private string $executionId,
         private string $reason,
         private ?string $sourceParentExecutionId = null,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

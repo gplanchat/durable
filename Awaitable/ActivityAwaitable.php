@@ -18,8 +18,7 @@ final class ActivityAwaitable implements Awaitable
     public function __construct(
         private readonly Awaitable $inner,
         private readonly string $activityId,
-    ) {
-    }
+    ) {}
 
     public function activityId(): string
     {

@@ -40,8 +40,7 @@ final class InMemoryWorkflowRunner
          * activité durablement en échec ferait tourner ce runner sans fin.
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
-    ) {
-    }
+    ) {}
 
     /**
      * Lance un workflow et boucle suspend/resume jusqu'à complétion.
@@ -65,7 +64,7 @@ final class InMemoryWorkflowRunner
             $this->activityTransport,
             $this->activityExecutor,
             $this->maxActivityRetries,
-            static fn (): float => $clock->now,
+            static fn(): float => $clock->now,
             true, // distributed = true => suspension
         );
         // Le moteur était construit sans runner d'enfant ni coordinateur parent/enfant :

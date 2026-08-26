@@ -18,6 +18,5 @@ final readonly class DeliverWorkflowSignalMessage
         public string $executionId,
         public string $signalName,
         public array $payload = [],
-    ) {
-    }
+    ) {}
 }

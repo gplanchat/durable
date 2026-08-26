@@ -31,7 +31,7 @@ final readonly class WorkflowTimeouts
         if (null !== $run && null !== $execution && $run->isLongerThan($execution)) {
             throw new \InvalidArgumentException(\sprintf(
                 'Run timeout (%s) cannot exceed execution timeout (%s): the execution would end first. '
-                .'Temporal silently rewrites the run timeout down to the execution timeout.',
+                . 'Temporal silently rewrites the run timeout down to the execution timeout.',
                 $run,
                 $execution,
             ));

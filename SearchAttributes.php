@@ -34,8 +34,7 @@ final readonly class SearchAttributes
      */
     private function __construct(
         private array $attributes = [],
-    ) {
-    }
+    ) {}
 
     public static function none(): self
     {
@@ -115,7 +114,7 @@ final readonly class SearchAttributes
      */
     public function toValues(): array
     {
-        return array_map(static fn (array $entry): mixed => $entry['value'], $this->attributes);
+        return array_map(static fn(array $entry): mixed => $entry['value'], $this->attributes);
     }
 
     /**
@@ -124,7 +123,7 @@ final readonly class SearchAttributes
     public function toMetadata(): array
     {
         return array_map(
-            static fn (array $entry): array => ['type' => $entry['type']->value, 'value' => $entry['value']],
+            static fn(array $entry): array => ['type' => $entry['type']->value, 'value' => $entry['value']],
             $this->attributes,
         );
     }

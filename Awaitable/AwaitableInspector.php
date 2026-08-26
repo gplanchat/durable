@@ -9,9 +9,7 @@ namespace Gplanchat\Durable\Awaitable;
  */
 final class AwaitableInspector
 {
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * L'attente porte-t-elle (au moins en partie) sur un minuteur ?

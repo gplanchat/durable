@@ -10,8 +10,7 @@ final readonly class ActivityCompleted implements Event
         private string $executionId,
         private string $activityId,
         private mixed $result,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

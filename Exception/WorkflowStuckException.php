@@ -25,8 +25,8 @@ final class WorkflowStuckException extends \RuntimeException
     {
         return new self($executionId, \sprintf(
             'Workflow %s is suspended on something the in-memory runner cannot settle '
-            .'(undelivered signal / update, or a timer that is not due). '
-            .'Append the awaited event to the store before running, or use the distributed backend.',
+            . '(undelivered signal / update, or a timer that is not due). '
+            . 'Append the awaited event to the store before running, or use the distributed backend.',
             $executionId,
         ));
     }
@@ -39,8 +39,8 @@ final class WorkflowStuckException extends \RuntimeException
     {
         return new self($executionId, \sprintf(
             'Workflow %s did not finish within %.1fs. Activities retry indefinitely by default '
-            .'(RetryLimit::unlimited(), Temporal semantics): pass RetryLimit::ofAttempts(n) or '
-            .'RetryLimit::once(), declare the exception non-retryable, or raise the runner budget.',
+            . '(RetryLimit::unlimited(), Temporal semantics): pass RetryLimit::ofAttempts(n) or '
+            . 'RetryLimit::once(), declare the exception non-retryable, or raise the runner budget.',
             $executionId,
             $budgetSeconds,
         ));

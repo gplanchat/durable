@@ -44,8 +44,7 @@ final readonly class CronSchedule
 
     private function __construct(
         private string $expression,
-    ) {
-    }
+    ) {}
 
     public static function parse(string $expression): self
     {
@@ -57,7 +56,7 @@ final readonly class CronSchedule
         [$timeZonePrefix, $schedule] = self::splitTimeZone($trimmed);
         self::assertValidSchedule($schedule);
 
-        return new self($timeZonePrefix.$schedule);
+        return new self($timeZonePrefix . $schedule);
     }
 
     /**
@@ -103,7 +102,7 @@ final readonly class CronSchedule
             throw new \InvalidArgumentException(\sprintf('A cron interval must be at least one second, %s given.', $interval));
         }
 
-        return new self('@every '.self::toGoDuration($seconds));
+        return new self('@every ' . self::toGoDuration($seconds));
     }
 
     /**
@@ -188,7 +187,7 @@ final readonly class CronSchedule
         if (5 !== \count($fields)) {
             throw new \InvalidArgumentException(\sprintf(
                 'A cron schedule has 5 fields (minute hour day-of-month month day-of-week), %d given in "%s". '
-                .'Six-field expressions (Quartz, with seconds) are not supported.',
+                . 'Six-field expressions (Quartz, with seconds) are not supported.',
                 \count($fields),
                 $schedule,
             ));
@@ -331,7 +330,7 @@ final readonly class CronSchedule
         $minutes = intdiv($seconds % 3600, 60);
         $rest = $seconds % 60;
 
-        $text = ($hours > 0 ? $hours.'h' : '').($minutes > 0 ? $minutes.'m' : '').($rest > 0 ? $rest.'s' : '');
+        $text = ($hours > 0 ? $hours . 'h' : '') . ($minutes > 0 ? $minutes . 'm' : '') . ($rest > 0 ? $rest . 's' : '');
 
         return '' === $text ? '0s' : $text;
     }
