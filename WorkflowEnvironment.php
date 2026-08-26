@@ -13,6 +13,7 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Awaitable\Deferred;
+use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
@@ -136,29 +137,27 @@ final class WorkflowEnvironment
         return $this->any(...$awaitables);
     }
 
-    public function delay(float $seconds, string $timerSummary = ''): void
+    public function sleep(Duration|\DateInterval|\DateTimeInterface|int|float $duration, string $timerSummary = ''): void
     {
-        $this->await($this->context->delay($seconds, $timerSummary));
-    }
-
-    public function timer(float $seconds, string $timerSummary = ''): void
-    {
-        $this->await($this->context->timer($seconds, $timerSummary));
+        $this->await($this->timer($duration, $timerSummary));
     }
 
     /**
-     * Minuteur non bloquant, à composer avec {@see any()} / {@see parallel()}.
+     * Minuteur, à attendre avec {@see await()} ou à composer avec {@see any()} / {@see parallel()}.
      *
-     * {@see timer()} attend l'échéance et ne rend donc rien de composable ; c'est cette
-     * variante qui permet le motif « activité avec timeout ». Le minuteur perdant d'un
-     * {@see any()} est annulé ({@see \Gplanchat\Durable\Event\TimerCancelled}) pour ne pas
-     * réveiller l'exécution sur une échéance morte.
+     * Rend un awaitable comme {@see activity()} : les deux méthodes de cette façade se
+     * comportent pareil. Pour simplement attendre une échéance, {@see sleep()} le dit dans son
+     * nom.
+     *
+     * Le minuteur perdant d'un {@see any()} est annulé
+     * ({@see \Gplanchat\Durable\Event\TimerCancelled}) pour ne pas réveiller l'exécution sur
+     * une échéance morte.
      *
      * @return Awaitable<mixed>
      */
-    public function timerAwaitable(float $seconds, string $timerSummary = ''): Awaitable
+    public function timer(Duration|\DateInterval|\DateTimeInterface|int|float $duration, string $timerSummary = ''): Awaitable
     {
-        return $this->context->timer($seconds, $timerSummary);
+        return $this->context->timer(Duration::from($duration), $timerSummary);
     }
 
     /**

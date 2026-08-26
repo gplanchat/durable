@@ -52,9 +52,9 @@ final class ActivityMessageProcessor
             return;
         }
 
-        $options = ActivityOptions::fromMetadata($message->metadata);
+        $options = $message->options;
         $now = microtime(true);
-        $firstQueued = isset($message->metadata['first_queued_at']) ? (float) $message->metadata['first_queued_at'] : null;
+        $firstQueued = $message->firstQueuedAt;
 
         if (null !== $options && null !== $firstQueued) {
             $timeouts = $options->timeouts;
@@ -63,7 +63,7 @@ final class ActivityMessageProcessor
 
                 return;
             }
-            if ($message->attempt() <= 1 && $timeouts->scheduleToStart?->hasElapsedSince($firstQueued, $now)) {
+            if ($message->attempt <= 1 && $timeouts->scheduleToStart?->hasElapsedSince($firstQueued, $now)) {
                 $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-start timeout exceeded.'), ActivityRetryState::Timeout);
 
                 return;
@@ -86,13 +86,13 @@ final class ActivityMessageProcessor
                     $this->eventStore,
                     $message->executionId,
                     $message->activityId,
-                    $message->attempt(),
+                    $message->attempt,
                 )) {
                     $this->eventStore->append(new ActivityTaskStarted(
                         $message->executionId,
                         $message->activityId,
                         $message->activityName,
-                        $message->attempt(),
+                        $message->attempt,
                     ));
                 }
                 $t0 = microtime(true);
@@ -154,7 +154,7 @@ final class ActivityMessageProcessor
                 ->narrowedTo(RetryLimit::ofRetries($this->maxRetries));
 
             $nonRetryable = null !== $options && $options->isNonRetryable($e);
-            $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt() + 1);
+            $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt + 1);
 
             // Le transport ne retente pas côté PHP (worker Temporal natif) : l'autorité sur les
             // retentatives appartient entièrement au serveur, donc le décompte de tentatives PHP
@@ -174,7 +174,7 @@ final class ActivityMessageProcessor
                 $message->executionId,
                 $message->activityId,
                 $message->activityName,
-                $message->attempt(),
+                $message->attempt,
                 $e,
                 $retryState,
             ));
@@ -186,20 +186,10 @@ final class ActivityMessageProcessor
             }
 
             if ($shouldRetry) {
-                $nextAttempt = $message->attempt() + 1;
-                $meta = $message->metadata;
-                $meta['attempt'] = $nextAttempt;
-                $delay = $options?->retryDelayBeforeAttempt($nextAttempt);
-                if (null !== $delay && !$delay->isZero()) {
-                    $meta['retry_delay_seconds'] = $delay->toSeconds();
-                }
-                $this->activityTransport->enqueue(new ActivityMessage(
-                    $message->executionId,
-                    $message->activityId,
-                    $message->activityName,
-                    $message->payload,
-                    $meta,
-                ));
+                $delay = $options?->retryDelayBeforeAttempt($message->attempt + 1);
+                $this->activityTransport->enqueue(
+                    $message->retryingIn(null !== $delay && !$delay->isZero() ? $delay : null),
+                );
             } else {
                 $this->appendActivityFailure($message, $e, $retryState);
             }
@@ -212,7 +202,7 @@ final class ActivityMessageProcessor
             $message->executionId,
             $message->activityId,
             $message->activityName,
-            $message->attempt(),
+            $message->attempt,
             $e,
             $retryState,
         ));

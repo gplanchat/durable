@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
+use Gplanchat\Durable\ChildWorkflowOptions;
+use Gplanchat\Durable\Duration;
+
 /**
  * Collects new workflow orchestration commands discovered during fiber replay.
  *
@@ -15,15 +19,22 @@ interface WorkflowCommandBufferInterface
     /**
      * Records a new activity to schedule (COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK for Temporal).
      *
+     * Reçoit les options telles que l'appelant les a construites : leurs invariants traversent,
+     * et c'est au backend de les traduire vers ses primitives et d'horodater la mise en file avec
+     * sa propre horloge.
+     *
      * @param array<string, mixed> $payload
-     * @param array<string, mixed> $metadata
      */
-    public function scheduleActivity(string $activityId, string $activityName, array $payload, array $metadata): void;
+    public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void;
 
     /**
      * Records a new timer to start (COMMAND_TYPE_START_TIMER for Temporal).
+     *
+     * Reçoit le **délai**, pas une échéance : le backend in-memory a besoin d'un instant à
+     * comparer à son horloge, le serveur Temporal exige une durée. Chacun fait son arithmétique,
+     * le cœur ne lit aucune horloge.
      */
-    public function startTimer(string $timerId, float $scheduledAt, string $summary): void;
+    public function startTimer(string $timerId, Duration $delay, string $summary): void;
 
     /**
      * Records a side effect result (COMMAND_TYPE_RECORD_MARKER for Temporal).
@@ -34,13 +45,12 @@ interface WorkflowCommandBufferInterface
      * Records a child workflow to schedule (COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION for Temporal).
      *
      * @param array<string, mixed> $input
-     * @param array<string, mixed> $schedulingMetadata
      */
     public function scheduleChildWorkflow(
         string $childExecutionId,
         string $childWorkflowType,
         array $input,
-        array $schedulingMetadata,
+        ChildWorkflowOptions $options,
     ): void;
 
     /**

@@ -41,7 +41,12 @@ final class ExecutionEngine
         $context = new ExecutionContext(
             $executionId,
             new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->runtime->getActivityTransport(), $executionId),
+            new EventStoreCommandBuffer(
+                $this->eventStore,
+                $this->runtime->getActivityTransport(),
+                $executionId,
+                $this->runtime->nowSeconds(...),
+            ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,
         );
@@ -71,7 +76,12 @@ final class ExecutionEngine
         $context = new ExecutionContext(
             $executionId,
             new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->runtime->getActivityTransport(), $executionId),
+            new EventStoreCommandBuffer(
+                $this->eventStore,
+                $this->runtime->getActivityTransport(),
+                $executionId,
+                $this->runtime->nowSeconds(...),
+            ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,
         );

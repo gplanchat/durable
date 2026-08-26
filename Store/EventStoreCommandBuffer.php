@@ -14,6 +14,9 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\Activity\ActivityOptions;
+use Gplanchat\Durable\ChildWorkflowOptions;
+use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
@@ -26,15 +29,32 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
  */
 final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 {
+    /** @var callable(): float */
+    private $clock;
+
+    /**
+     * @param (callable(): float)|null $clock horloge du backend ; injectable pour les harnais qui
+     *                                        avancent un temps virtuel
+     */
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
         private readonly string $executionId,
+        ?callable $clock = null,
     ) {
+        $this->clock = $clock ?? static fn (): float => microtime(true);
     }
 
-    public function scheduleActivity(string $activityId, string $activityName, array $payload, array $metadata): void
+    public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
     {
+        // C'est ici, dans l'adaptateur, que les options prennent leur forme de fil — et que la
+        // mise en file est horodatée, avec l'horloge de ce backend.
+        $queuedAt = ($this->clock)();
+        $metadata = ($options?->toMetadata() ?? []) + [
+            'queued_at' => $queuedAt,
+            'first_queued_at' => $queuedAt,
+        ];
+
         $this->eventStore->append(new ActivityScheduled(
             $this->executionId,
             $activityId,
@@ -47,16 +67,18 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $activityId,
             $activityName,
             $payload,
-            $metadata,
+            $options,
+            firstQueuedAt: $queuedAt,
         ));
     }
 
-    public function startTimer(string $timerId, float $scheduledAt, string $summary): void
+    public function startTimer(string $timerId, Duration $delay, string $summary): void
     {
+        // Ce backend compare des échéances à son horloge : c'est ici que le délai en devient une.
         $this->eventStore->append(new TimerScheduled(
             $this->executionId,
             $timerId,
-            $scheduledAt,
+            ($this->clock)() + $delay->toSeconds(),
             $summary,
         ));
     }
@@ -74,18 +96,21 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         string $childExecutionId,
         string $childWorkflowType,
         array $input,
-        array $schedulingMetadata,
+        ChildWorkflowOptions $options,
     ): void {
-        $parentClosePolicy = $schedulingMetadata['parentClosePolicy'] ?? null;
-        $workflowId = $schedulingMetadata['workflowId'] ?? null;
+        // La forme de fil se fabrique ici : le journal enregistre les métadonnées plates que
+        // l'ancien code lui donnait déjà, y compris les deux clés que le cœur ajoutait à la main.
         $this->eventStore->append(new ChildWorkflowScheduled(
             $this->executionId,
             $childExecutionId,
             $childWorkflowType,
             $input,
-            $parentClosePolicy,
-            $workflowId,
-            $schedulingMetadata,
+            $options->parentClosePolicy,
+            $options->workflowId,
+            [
+                'parentClosePolicy' => $options->parentClosePolicy,
+                'workflowId' => $options->workflowId,
+            ] + $options->toSchedulingMetadata(),
         ));
     }
 

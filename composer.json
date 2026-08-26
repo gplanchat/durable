@@ -3,6 +3,7 @@
     "description": "PHP library for durable execution: workflows, activities, event journal, and transports (HttpKernel integration lives in the bundle).",
     "license": "MIT",
     "type": "library",
+    "version": "0.1.0",
     "require": {
         "php": ">=8.2",
         "psr/clock": "^1.0",

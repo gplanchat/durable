@@ -12,7 +12,7 @@ namespace Gplanchat\Durable\Port;
  * le noyau du composant.
  *
  * @see DUR002 (CQRS repositories, ports around the event journal)
- * @see OST001 Opportunités futures - Temporal driver
+ * @see OST001 Backends d'exécution durable alternatifs (étude)
  */
 interface WorkflowBackendInterface
 {
