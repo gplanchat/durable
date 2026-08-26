@@ -12,7 +12,6 @@ use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingCompositeAwaitable;
-use Gplanchat\Durable\Awaitable\Deferred;
 use Gplanchat\Durable\Awaitable\QuorumAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
@@ -402,13 +401,6 @@ final class WorkflowEnvironment
         return new ActivityStub(new ContextActivityScheduler($this->context), $contractClass, $resolver, $options);
     }
 
-    /**
-     * @return Awaitable<mixed>
-     */
-    public function async(mixed $value): Awaitable
-    {
-        return Deferred::resolved($value);
-    }
 
     /**
      * @param array<string, mixed> $payload
