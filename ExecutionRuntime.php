@@ -210,7 +210,7 @@ final class ExecutionRuntime
 
             $wait = $dueAt - microtime(true);
             if ($wait > 0) {
-                usleep((int) ceil($wait * 1_000_000));
+                usleep((int) ceil($wait * 1_000_000.0));
             }
             if (!$this->drainActivityQueueOnce($context)) {
                 return;

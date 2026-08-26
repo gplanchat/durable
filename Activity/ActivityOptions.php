@@ -80,7 +80,7 @@ final readonly class ActivityOptions
         }
 
         return $this->initialInterval
-            ->multipliedBy($this->backoffCoefficient ** ($nextAttempt - 2))
+            ->multipliedBy($this->backoffCoefficient ** (float) ($nextAttempt - 2))
             ->shortest($this->effectiveMaximumInterval());
     }
 

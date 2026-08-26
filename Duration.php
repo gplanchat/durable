@@ -164,7 +164,7 @@ final readonly class Duration
     {
         $anchor = new \DateTimeImmutable('@0');
 
-        return $anchor->diff($anchor->modify(\sprintf('+%d microseconds', (int) round($this->seconds * 1_000_000))));
+        return $anchor->diff($anchor->modify(\sprintf('+%d microseconds', (int) round($this->seconds * 1_000_000.0))));
     }
 
     public function __toString(): string
