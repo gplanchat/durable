@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\Exception\DeadlineExceededException;
+
 /**
  * Le handler de workflow n'a pas géré une erreur (ex. échec d'activité non attrapé) :
  * défaillance d'algorithme / d'intégration côté workflow.
@@ -14,6 +16,7 @@ final readonly class WorkflowExecutionFailed implements Event
     public const KIND_UNHANDLED_DECLARED_ACTIVITY = 'unhandled_declared_activity_failure';
     public const KIND_UNHANDLED_ACTIVITY_SUPERSEDED = 'unhandled_activity_superseded';
     public const KIND_UNHANDLED_CATASTROPHIC_ACTIVITY = 'unhandled_catastrophic_activity_failure';
+    public const KIND_DEADLINE_EXCEEDED = 'deadline_exceeded';
     public const KIND_WORKFLOW_HANDLER = 'workflow_handler_failure';
     public const KIND_TERMINATED_BY_PARENT = 'terminated_by_parent';
 
@@ -80,6 +83,22 @@ final readonly class WorkflowExecutionFailed implements Event
             $cause->getMessage(),
             (int) $cause->getCode(),
             [],
+        );
+    }
+
+    /**
+     * Échéance workflow non rattrapée : distincte d'un échec de handler, elle dit *quelle*
+     * attente n'a pas abouti (ADR DUR032).
+     */
+    public static function deadlineExceeded(string $executionId, DeadlineExceededException $cause): self
+    {
+        return new self(
+            $executionId,
+            self::KIND_DEADLINE_EXCEEDED,
+            $cause::class,
+            $cause->getMessage(),
+            0,
+            ['deadlineSeconds' => $cause->deadline()->toSeconds(), 'awaited' => $cause->awaited()],
         );
     }
 

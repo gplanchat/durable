@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Worker;
 
 use Gplanchat\Durable\ActivityCancellationReason;
-use Gplanchat\Durable\Awaitable\ActivityAwaitable;
-use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
-use Gplanchat\Durable\Awaitable\TimerAwaitable;
+use Gplanchat\Durable\Awaitable\AwaitableCancellation;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\ExecutionContext;
@@ -129,7 +126,7 @@ final class WorkflowFiberDriver
     }
 
     /**
-     * Retire de la file l'opération sur laquelle le fiber attend. Un `any()` en enveloppe
+     * Retire de la file l'opération sur laquelle le fiber attend. Un composite en enveloppe
      * plusieurs : toutes les branches encore en attente sont annulées.
      *
      * @param Awaitable<mixed> $pending
@@ -138,37 +135,6 @@ final class WorkflowFiberDriver
      */
     private static function cancelPending(ExecutionContext $context, Awaitable $pending): array
     {
-        if ($pending instanceof CancellingAnyAwaitable) {
-            return self::cancelPending($context, $pending->innerAny());
-        }
-
-        if ($pending instanceof AnyAwaitable) {
-            $cancelled = [];
-            foreach ($pending->members() as $member) {
-                foreach (self::cancelPending($context, $member) as $id) {
-                    $cancelled[] = $id;
-                }
-            }
-
-            return $cancelled;
-        }
-
-        if ($pending->isSettled()) {
-            return [];
-        }
-
-        if ($pending instanceof ActivityAwaitable) {
-            $context->cancelScheduledActivity($pending->activityId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
-
-            return [$pending->activityId()];
-        }
-
-        if ($pending instanceof TimerAwaitable) {
-            $context->cancelScheduledTimer($pending->timerId(), ActivityCancellationReason::WORKFLOW_CANCELLED);
-
-            return [$pending->timerId()];
-        }
-
-        return [];
+        return AwaitableCancellation::cancelUnsettled($context, $pending, ActivityCancellationReason::WORKFLOW_CANCELLED);
     }
 }

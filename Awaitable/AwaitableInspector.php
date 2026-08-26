@@ -14,9 +14,10 @@ final class AwaitableInspector
     /**
      * L'attente porte-t-elle (au moins en partie) sur un minuteur ?
      *
-     * Doit traverser les composites : un `any(activity, timer)` attend bien une échéance, et le
-     * tester par un simple `instanceof TimerAwaitable` laissait l'exécution sans réveil planifié
-     * — elle ne repartait jamais si l'activité n'aboutissait pas.
+     * Doit traverser les composites ({@see CompositeAwaitable}) : un `any(activity, timer)`
+     * attend bien une échéance, et le tester par un simple `instanceof TimerAwaitable` laissait
+     * l'exécution sans réveil planifié — elle ne repartait jamais si l'activité n'aboutissait
+     * pas.
      *
      * @param Awaitable<mixed> $awaitable
      */
@@ -26,11 +27,11 @@ final class AwaitableInspector
             return true;
         }
 
-        if ($awaitable instanceof CancellingAnyAwaitable) {
-            return self::waitsOnTimer($awaitable->innerAny());
+        if ($awaitable instanceof CancellingCompositeAwaitable) {
+            return self::waitsOnTimer($awaitable->inner());
         }
 
-        if ($awaitable instanceof AnyAwaitable) {
+        if ($awaitable instanceof CompositeAwaitable) {
             foreach ($awaitable->members() as $member) {
                 if (self::waitsOnTimer($member)) {
                     return true;

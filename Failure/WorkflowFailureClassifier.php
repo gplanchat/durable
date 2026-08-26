@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Failure;
 
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
@@ -27,6 +28,7 @@ final class WorkflowFailureClassifier
             $e instanceof DurableCatastrophicActivityFailureException => WorkflowExecutionFailed::unhandledCatastrophicActivity($executionId, $e),
             $e instanceof DurableActivityFailedException => WorkflowExecutionFailed::unhandledActivityFailure($executionId, $e->activityId(), $e->activityName(), $e),
             $e instanceof ActivitySupersededException => WorkflowExecutionFailed::unhandledActivitySuperseded($executionId, $e),
+            $e instanceof DeadlineExceededException => WorkflowExecutionFailed::deadlineExceeded($executionId, $e),
             $e instanceof DeclaredActivityFailureInterface => WorkflowExecutionFailed::unhandledDeclaredActivityFailure($executionId, $e),
             default => WorkflowExecutionFailed::workflowHandlerFailure($executionId, $e),
         };

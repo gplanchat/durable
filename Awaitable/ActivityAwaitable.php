@@ -33,11 +33,6 @@ final class ActivityAwaitable implements Awaitable
         return $this->inner;
     }
 
-    public function then(?callable $onFulfilled = null, ?callable $onRejected = null): void
-    {
-        $this->inner->then($onFulfilled, $onRejected);
-    }
-
     public function isSettled(): bool
     {
         return $this->inner->isSettled();

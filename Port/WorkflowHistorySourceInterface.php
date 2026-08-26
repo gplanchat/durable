@@ -65,9 +65,15 @@ interface WorkflowHistorySourceInterface
     /**
      * Returns the payload of the signal received at signal slot N for the given signal name, or null.
      *
+     * Slots are counted over the signals *of that name*, in recorded order.
+     *
+     * `$notAfterTimerId` bounds the lookup: a signal recorded after that timer fired does not
+     * settle the wait the timer bounded. The verdict of a deadline is a function of history
+     * order, never of the clock of the process performing the replay — see ADR DUR032.
+     *
      * @return array{payload: mixed}|null
      */
-    public function findSignalForSlot(string $signalName, int $slot): ?array;
+    public function findSignalForSlot(string $signalName, int $slot, ?string $notAfterTimerId = null): ?array;
 
     /**
      * Returns the result of the update handled at update slot N for the given update name, or null.

@@ -13,11 +13,6 @@ final class AwaitableAdapter implements Awaitable
         private readonly Deferred $deferred,
     ) {}
 
-    public function then(?callable $onFulfilled = null, ?callable $onRejected = null): void
-    {
-        $this->deferred->then($onFulfilled, $onRejected);
-    }
-
     public function isSettled(): bool
     {
         return $this->deferred->isSettled();

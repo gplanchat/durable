@@ -234,17 +234,20 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findSignalForSlot(string $signalName, int $slot): ?array
+    public function findSignalForSlot(string $signalName, int $slot, ?string $notAfterTimerId = null): ?array
     {
         $index = 0;
+        $deadlineFired = false;
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof WorkflowSignalReceived) {
+            if (null !== $notAfterTimerId && $event instanceof TimerCompleted && $event->timerId() === $notAfterTimerId) {
+                $deadlineFired = true;
+                continue;
+            }
+            if ($event instanceof WorkflowSignalReceived && $event->signalName() === $signalName) {
                 if ($index === $slot) {
-                    if ($event->signalName() !== $signalName) {
-                        return null;
-                    }
-
-                    return ['payload' => $event->signalPayload()];
+                    // Enregistré après le tir de l'échéance : il ne règle pas l'attente qu'elle
+                    // bornait, sinon le replay lirait le verdict inverse.
+                    return $deadlineFired ? null : ['payload' => $event->signalPayload()];
                 }
                 ++$index;
             }

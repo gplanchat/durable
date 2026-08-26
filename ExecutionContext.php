@@ -200,15 +200,20 @@ final class ExecutionContext
     }
 
     /**
-     * Waits for a signal at signal slot N (order of signals in history).
+     * Waits for a signal at signal slot N (order of signals of that name in history).
      * In distributed mode, suspends until the signal is present in history.
+     *
+     * `$notAfterTimerId` borne l'attente : un signal enregistré *après* le tir de ce minuteur ne
+     * la règle pas. Sans cette règle, une attente sous échéance qui a expiré serait réglée au
+     * replay par le signal arrivé ensuite, et l'exécution rejouée prendrait le chemin inverse de
+     * celui déjà journalisé (ADR DUR032).
      *
      * @return Awaitable<mixed>
      */
-    public function waitSignal(string $signalName): Awaitable
+    public function waitSignal(string $signalName, ?string $notAfterTimerId = null): Awaitable
     {
         $slot = $this->signalWaitSlotIndex++;
-        $found = $this->historySource->findSignalForSlot($signalName, $slot);
+        $found = $this->historySource->findSignalForSlot($signalName, $slot, $notAfterTimerId);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $found) {
             $deferred->resolve($found['payload']);
@@ -217,6 +222,19 @@ final class ExecutionContext
         }
 
         return $deferred->awaitable();
+    }
+
+    /**
+     * Rend le rang qu'une attente de signal abandonnée n'a pas consommé.
+     *
+     * Une attente qui expire n'a lu aucun signal : sans cela, l'attente suivante du même nom
+     * chercherait le deuxième et manquerait celui arrivé en retard.
+     */
+    public function releaseSignalWaitSlot(): void
+    {
+        if ($this->signalWaitSlotIndex > 0) {
+            --$this->signalWaitSlotIndex;
+        }
     }
 
     /**

@@ -11,9 +11,6 @@ final class Deferred
     private mixed $value = null;
     private ?\Throwable $reason = null;
 
-    /** @var list<array{?callable, ?callable}> */
-    private array $callbacks = [];
-
     public function resolve(mixed $value): void
     {
         if ($this->settled) {
@@ -22,7 +19,6 @@ final class Deferred
         $this->settled = true;
         $this->fulfilled = true;
         $this->value = $value;
-        $this->notify();
     }
 
     public function reject(\Throwable $reason): void
@@ -33,7 +29,6 @@ final class Deferred
         $this->settled = true;
         $this->fulfilled = false;
         $this->reason = $reason;
-        $this->notify();
     }
 
     /**
@@ -73,42 +68,5 @@ final class Deferred
     public function reason(): ?\Throwable
     {
         return $this->reason;
-    }
-
-    public function then(?callable $onFulfilled = null, ?callable $onRejected = null): void
-    {
-        $this->callbacks[] = [$onFulfilled, $onRejected];
-        if ($this->settled) {
-            $this->notify();
-        }
-    }
-
-    private function notify(): void
-    {
-        foreach ($this->callbacks as $callback) {
-            [$onFulfilled, $onRejected] = $callback;
-
-            try {
-                if ($this->fulfilled) {
-                    if (null !== $onFulfilled) {
-                        $onFulfilled($this->value);
-                    }
-                } else {
-                    if (null !== $onRejected && null !== $this->reason) {
-                        $onRejected($this->reason);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // DUR011: isolate callback failures — a then() callback must not break other waiters; cause remains in logs.
-                error_log(\sprintf(
-                    '[Gplanchat\Durable\Awaitable\Deferred] callback in notify() threw %s: %s at %s:%d',
-                    $e::class,
-                    $e->getMessage(),
-                    $e->getFile(),
-                    $e->getLine(),
-                ));
-            }
-        }
-        $this->callbacks = [];
     }
 }
