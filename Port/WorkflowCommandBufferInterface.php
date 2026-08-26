@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\ChildWorkflowOptions;
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Failure\FailureEnvelope;
 
 /**
  * Collects new workflow orchestration commands discovered during fiber replay.
@@ -59,6 +60,21 @@ interface WorkflowCommandBufferInterface
     public function recordSideEffect(string $sideEffectId, mixed $result): void;
 
     /**
+     * Records the outcome of an update the execution has just handled.
+     *
+     * Called at the moment the update is applied, so its record lands **before** whatever the
+     * workflow does in response — the same order Temporal produces, where the acceptance command
+     * precedes the workflow's commands and the server writes the events.
+     *
+     * On the Temporal backend this is deliberately a no-op: there, the **server** writes
+     * `WORKFLOW_EXECUTION_UPDATE_ACCEPTED` and `..._UPDATE_COMPLETED` from the protocol messages
+     * the worker sends back, and a worker that also journalled them would double-record.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void;
+
+    /**
      * Records a child workflow to schedule (COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION for Temporal).
      *
      * @param array<string, mixed> $input
@@ -96,6 +112,29 @@ interface WorkflowCommandBufferInterface
     /**
      * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
      */
+    /**
+     * Planifie une opération Nexus : un appel servi par un endpoint extérieur.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     */
+    public function scheduleNexusOperation(
+        string $operationId,
+        \Gplanchat\Durable\Nexus\NexusEndpoint $endpoint,
+        \Gplanchat\Durable\Nexus\NexusService $service,
+        \Gplanchat\Durable\Nexus\NexusOperationName $operation,
+        array $payload,
+        \Gplanchat\Durable\Nexus\NexusOperationTimeouts $timeouts,
+    ): void;
+
+    /**
+     * Demande l'annulation d'une opération Nexus encore en vol.
+     *
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     */
+    public function cancelNexusOperation(string $operationId, string $reason): void;
+
     public function cancelActivity(string $activityId, string $reason): void;
 
     /**

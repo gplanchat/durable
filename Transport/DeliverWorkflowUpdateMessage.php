@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Message Messenger : enregistrer une mise à jour traitée ({@see \Gplanchat\Durable\Event\WorkflowUpdateHandled}) puis relancer.
+ * Message Messenger : remettre un update à l'exécution, qui le traitera.
  *
- * @param array<string, mixed> $arguments
+ * Aucun résultat ici : l'issue d'un update est le retour de son handler, et seule une passe du
+ * workflow la produit — {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowUpdateHandler}.
  */
 final readonly class DeliverWorkflowUpdateMessage
 {
@@ -18,6 +19,5 @@ final readonly class DeliverWorkflowUpdateMessage
         public string $executionId,
         public string $updateName,
         public array $arguments = [],
-        public mixed $result = null,
     ) {}
 }
