@@ -9,7 +9,7 @@ namespace Gplanchat\Durable\Port;
  */
 final class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
 {
-    public function dispatchResume(string $executionId): void
+    public function dispatchResume(string $executionId, array $pendingUpdates = []): void
     {
         // No-op
     }

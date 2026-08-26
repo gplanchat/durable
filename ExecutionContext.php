@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Awaitable\NexusOperationAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\Failure\FailureEnvelope;
+use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationName;
+use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
+use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
@@ -22,15 +27,18 @@ use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 
 final class ExecutionContext
 {
-    private ?QueryHandlerRegistry $queryHandlers = null;
-
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
     private array $pendingActivities = [];
+
+    /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
+    private array $pendingNexusOperations = [];
 
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
     private array $pendingTimers = [];
 
     private int $activitySlotIndex = 0;
+
+    private int $nexusOperationSlotIndex = 0;
 
     private int $timerSlotIndex = 0;
 
@@ -38,9 +46,11 @@ final class ExecutionContext
 
     private int $childWorkflowSlotIndex = 0;
 
-    private int $signalWaitSlotIndex = 0;
-
-    private int $updateWaitSlotIndex = 0;
+    /**
+     * Rang du prochain message non appliqué. Reconstruit à zéro à chaque passe, avancé par la
+     * même règle sur le même journal : c'est ce qui rend le verdict d'une condition reproductible.
+     */
+    private int $messageCursor = 0;
 
     public function __construct(
         private readonly string $executionId,
@@ -48,20 +58,14 @@ final class ExecutionContext
         private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
         private readonly ?UuidGeneratorInterface $uuidGenerator = null,
+        /**
+         * Les updates que la passe reçoit hors journal. Ils viennent après tout ce qui est
+         * enregistré : n'ayant pas encore de position, ils prennent celle de leur arrivée.
+         *
+         * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
+         */
+        private readonly array $pendingUpdates = [],
     ) {}
-
-    /**
-     * Les handlers de query de cette exécution.
-     *
-     * Porté ici parce qu'un workflow ne reçoit jamais le contexte : c'est ce qui met la
-     * plomberie des queries hors de sa portée sans la rendre inaccessible au moteur.
-     *
-     * @internal
-     */
-    public function queryHandlers(): QueryHandlerRegistry
-    {
-        return $this->queryHandlers ??= new QueryHandlerRegistry();
-    }
 
     public function executionId(): string
     {
@@ -106,6 +110,58 @@ final class ExecutionContext
         }
 
         return new ActivityAwaitable($deferred->awaitable(), $activityId);
+    }
+
+    /**
+     * Planifie une opération Nexus et rend l'attente de son résultat.
+     *
+     * Même discipline de slot que {@see activity()} : le rang de l'appel identifie l'opération
+     * d'une passe de replay à l'autre. La différence de conséquence mérite d'être dite — une
+     * activité replanifiée par erreur retombe sur un worker à soi, une opération Nexus part chez
+     * un tiers, où le doublon est le sien.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return Awaitable<mixed>
+     */
+    public function nexusOperation(
+        NexusEndpoint $endpoint,
+        NexusService $service,
+        NexusOperationName $operation,
+        array $payload = [],
+        ?NexusOperationTimeouts $timeouts = null,
+    ): Awaitable {
+        $slotIndex = $this->nexusOperationSlotIndex++;
+        $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
+        $operationId = $scheduled ?? $this->uuid();
+
+        $replay = $this->historySource->findNexusOperationSlotResult($slotIndex);
+        if (null !== $replay) {
+            $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
+            if (null !== $replay['failed']) {
+                $deferred->reject($replay['failed']);
+            } else {
+                $deferred->resolve($replay['result']);
+            }
+
+            return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
+        }
+
+        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
+        $this->pendingNexusOperations[$operationId] = $deferred;
+
+        if (null === $scheduled) {
+            $this->commandBuffer->scheduleNexusOperation(
+                $operationId,
+                $endpoint,
+                $service,
+                $operation,
+                $payload,
+                $timeouts ?? NexusOperationTimeouts::none(),
+            );
+        }
+
+        return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
     }
 
     /**
@@ -216,60 +272,74 @@ final class ExecutionContext
     }
 
     /**
-     * Waits for a signal at signal slot N (order of signals of that name in history).
-     * In distributed mode, suspends until the signal is present in history.
+     * Applique le prochain message enregistré, s'il en reste un avant `$beforePosition`.
      *
-     * `$notAfterTimerId` borne l'attente : un signal enregistré *après* le tir de ce minuteur ne
-     * la règle pas. Sans cette règle, une attente sous échéance qui a expiré serait réglée au
-     * replay par le signal arrivé ensuite, et l'exécution rejouée prendrait le chemin inverse de
-     * celui déjà journalisé (ADR DUR032).
+     * Un par un, jamais par lot : un message enregistré après le tir d'une échéance ne doit pas
+     * régler la condition qu'elle bornait, et une condition satisfaite par le premier de deux
+     * messages doit reprendre en n'ayant vu que celui-là. Les deux sortent de la même règle —
+     * le verdict est une position dans le journal (ADR DUR035).
      *
-     * @return Awaitable<mixed>
+     * `pending` porte l'update hors journal quand c'en est un, et null quand le message est relu
+     * du journal : c'est ce qui distingue « produire l'issue » de « refaire l'état ».
+     *
+     * @return array{kind: 'signal'|'update', name: string, payload: array<string, mixed>, pending: \Gplanchat\Durable\Workflow\PendingUpdate|null}|null
      */
-    public function waitSignal(string $signalName, ?string $notAfterTimerId = null): Awaitable
+    public function nextMessage(?int $beforePosition = null): ?array
     {
-        $slot = $this->signalWaitSlotIndex++;
-        $found = $this->historySource->findSignalForSlot($signalName, $slot, $notAfterTimerId);
-        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $found) {
-            $deferred->resolve($found['payload']);
+        $message = $this->historySource->messageAt($this->messageCursor);
+        if (null !== $message) {
+            if (null !== $beforePosition && $message['position'] > $beforePosition) {
+                return null;
+            }
 
-            return $deferred->awaitable();
+            ++$this->messageCursor;
+
+            return [
+                'kind' => $message['kind'],
+                'name' => $message['name'],
+                'payload' => $message['payload'],
+                'pending' => null,
+            ];
         }
 
-        return $deferred->awaitable();
+        // Le journal est épuisé : restent les updates arrivés hors journal pour cette passe.
+        $recorded = $this->countRecordedMessages();
+        $pending = $this->pendingUpdates[$this->messageCursor - $recorded] ?? null;
+        if (null === $pending) {
+            return null;
+        }
+
+        ++$this->messageCursor;
+
+        return ['kind' => 'update', 'name' => $pending->name, 'payload' => $pending->arguments, 'pending' => $pending];
+    }
+
+    private function countRecordedMessages(): int
+    {
+        $count = 0;
+        while (null !== $this->historySource->messageAt($count)) {
+            ++$count;
+        }
+
+        return $count;
     }
 
     /**
-     * Rend le rang qu'une attente de signal abandonnée n'a pas consommé.
+     * Consigne l'issue d'un update qui vient d'être traité, à la position où il l'a été.
      *
-     * Une attente qui expire n'a lu aucun signal : sans cela, l'attente suivante du même nom
-     * chercherait le deuxième et manquerait celui arrivé en retard.
+     * @param array<string, mixed> $arguments
      */
-    public function releaseSignalWaitSlot(): void
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
     {
-        if ($this->signalWaitSlotIndex > 0) {
-            --$this->signalWaitSlotIndex;
-        }
+        $this->commandBuffer->recordUpdateHandled($updateName, $arguments, $result, $failure);
     }
 
     /**
-     * Waits for an update at update slot N (order of updates in history).
-     *
-     * @return Awaitable<mixed>
+     * Position à laquelle le tir de ce minuteur est enregistré, ou null s'il n'a pas tiré.
      */
-    public function waitUpdate(string $updateName): Awaitable
+    public function timerCompletionPosition(string $timerId): ?int
     {
-        $slot = $this->updateWaitSlotIndex++;
-        $found = $this->historySource->findUpdateForSlot($updateName, $slot);
-        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $found) {
-            $deferred->resolve($found['result']);
-
-            return $deferred->awaitable();
-        }
-
-        return $deferred->awaitable();
+        return $this->historySource->timerCompletionPosition($timerId);
     }
 
     /**
@@ -367,6 +437,19 @@ final class ExecutionContext
     /**
      * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
      */
+    /**
+     * Les opérations Nexus encore en vol, par identifiant.
+     *
+     * Miroir de {@see pendingActivities()} : c'est par là que l'issue d'une opération, lue dans
+     * l'historique, retrouve l'attente qu'elle doit régler.
+     *
+     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
+     */
+    public function pendingNexusOperations(): array
+    {
+        return $this->pendingNexusOperations;
+    }
+
     public function pendingActivities(): array
     {
         return $this->pendingActivities;

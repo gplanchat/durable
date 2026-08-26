@@ -40,11 +40,7 @@ final class WorkflowFiberDriver
     ): mixed {
         $this->lifecycle->onBeforeRun($executionId);
 
-        // Second argument volontairement non déclaré par la plupart des handlers : PHP accepte
-        // les arguments en trop sur une fonction utilisateur, donc une closure qui ne prend que
-        // l'environnement continue de fonctionner. Seule la fabrique du chargeur le déclare.
-        $queries = $context->queryHandlers();
-        $fiber = new \Fiber(static fn() => $handler($environment, $queries));
+        $fiber = new \Fiber(static fn() => $handler($environment));
 
         // Au plus une livraison par exécution du pilote : après avoir relevé l'annulation, le
         // handler peut compenser en attendant de nouvelles opérations, et celles-ci ne doivent

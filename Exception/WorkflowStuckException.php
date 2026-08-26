@@ -21,13 +21,14 @@ final class WorkflowStuckException extends \RuntimeException
     /**
      * L'exécution attend quelque chose que ce runner ne produit pas.
      */
-    public static function noProgress(string $executionId): self
+    public static function noProgress(string $executionId, ?string $waitingOn = null): self
     {
         return new self($executionId, \sprintf(
             'Workflow %s is suspended on something the in-memory runner cannot settle '
-            . '(undelivered signal / update, or a timer that is not due). '
+            . '(undelivered signal / update, or a timer that is not due)%s. '
             . 'Append the awaited event to the store before running, or use the distributed backend.',
             $executionId,
+            null !== $waitingOn ? ', waiting on ' . $waitingOn : '',
         ));
     }
 

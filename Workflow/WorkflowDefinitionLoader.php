@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\Attribute\QueryMethod;
+use Gplanchat\Durable\Attribute\SignalMethod;
+use Gplanchat\Durable\Attribute\UpdateMethod;
 use Gplanchat\Durable\Attribute\Workflow;
 use Gplanchat\Durable\Attribute\WorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
@@ -71,9 +73,11 @@ final class WorkflowDefinitionLoader
         $method = $this->resolveWorkflowMethod($reflection);
 
         $factory = function (array $input) use ($workflowClass, $method): callable {
-            return function (WorkflowEnvironment $env, ?QueryHandlerRegistry $queries = null) use ($workflowClass, $method, $input): mixed {
+            return function (WorkflowEnvironment $env) use ($workflowClass, $method, $input): mixed {
                 $instance = $this->instantiate($workflowClass, $env);
-                $this->registerQueryHandlers($workflowClass, $instance, $queries ?? new QueryHandlerRegistry());
+                $this->registerQueryHandlers($workflowClass, $instance, $env);
+                $this->registerSignalHandlers($workflowClass, $instance, $env);
+                $this->registerUpdateHandlers($workflowClass, $instance, $env);
 
                 return $method->invokeArgs($instance, $this->mapInputToArguments($method, $input));
             };
@@ -176,11 +180,48 @@ final class WorkflowDefinitionLoader
     }
 
     /**
+     * Scans the workflow class for #[SignalMethod] attributes and registers them on WorkflowEnvironment.
+     *
+     * Même traduction que pour les queries : l'attribut est la forme déclarative de
+     * {@see WorkflowEnvironment::onSignal()}, et les deux produisent le même dispatch.
+     *
+     * @param class-string $workflowClass
+     */
+    private function registerSignalHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
+    {
+        $reflection = new \ReflectionClass($workflowClass);
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $attrs = $method->getAttributes(SignalMethod::class);
+            if ($attrs === []) {
+                continue;
+            }
+            $env->onSignal($attrs[0]->newInstance()->signalName(), static fn(mixed ...$args) => $method->invoke($instance, ...$args));
+        }
+    }
+
+    /**
+     * Scans the workflow class for #[UpdateMethod] attributes and registers them on WorkflowEnvironment.
+     *
+     * @param class-string $workflowClass
+     */
+    private function registerUpdateHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
+    {
+        $reflection = new \ReflectionClass($workflowClass);
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $attrs = $method->getAttributes(UpdateMethod::class);
+            if ($attrs === []) {
+                continue;
+            }
+            $env->onUpdate($attrs[0]->newInstance()->updateName(), static fn(mixed ...$args): mixed => $method->invoke($instance, ...$args));
+        }
+    }
+
+    /**
      * Scans the workflow class for #[QueryMethod] attributes and registers them on WorkflowEnvironment.
      *
      * @param class-string $workflowClass
      */
-    private function registerQueryHandlers(string $workflowClass, object $instance, QueryHandlerRegistry $queries): void
+    private function registerQueryHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
     {
         $reflection = new \ReflectionClass($workflowClass);
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
@@ -190,7 +231,7 @@ final class WorkflowDefinitionLoader
             }
             $attr = $attrs[0]->newInstance();
             $queryType = $attr->name;
-            $queries->register($queryType, static fn(mixed ...$args) => $method->invoke($instance, ...$args));
+            $env->registerQueryHandler($queryType, static fn(mixed ...$args) => $method->invoke($instance, ...$args));
         }
     }
 }

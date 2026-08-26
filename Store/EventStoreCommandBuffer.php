@@ -17,6 +17,13 @@ use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Failure\FailureEnvelope;
+use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationName;
+use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
+use Gplanchat\Durable\Nexus\NexusService;
+use Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
@@ -89,6 +96,17 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $this->executionId,
             $sideEffectId,
             $result,
+        ));
+    }
+
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    {
+        $this->eventStore->append(new WorkflowUpdateHandled(
+            $this->executionId,
+            $updateName,
+            $arguments,
+            $result,
+            $failure,
         ));
     }
 
@@ -170,5 +188,21 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $activityId,
             $reason,
         ));
+    }
+
+    public function scheduleNexusOperation(
+        string $operationId,
+        NexusEndpoint $endpoint,
+        NexusService $service,
+        NexusOperationName $operation,
+        array $payload,
+        NexusOperationTimeouts $timeouts,
+    ): void {
+        throw NexusUnsupportedByBackendException::forBackend('journal');
+    }
+
+    public function cancelNexusOperation(string $operationId, string $reason): void
+    {
+        throw NexusUnsupportedByBackendException::forBackend('journal');
     }
 }

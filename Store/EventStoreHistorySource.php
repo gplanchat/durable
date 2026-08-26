@@ -234,42 +234,49 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findSignalForSlot(string $signalName, int $slot, ?string $notAfterTimerId = null): ?array
+    public function messageAt(int $index): ?array
     {
-        $index = 0;
-        $deadlineFired = false;
+        $position = 0;
+        $seen = 0;
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if (null !== $notAfterTimerId && $event instanceof TimerCompleted && $event->timerId() === $notAfterTimerId) {
-                $deadlineFired = true;
-                continue;
-            }
-            if ($event instanceof WorkflowSignalReceived && $event->signalName() === $signalName) {
-                if ($index === $slot) {
-                    // Enregistré après le tir de l'échéance : il ne règle pas l'attente qu'elle
-                    // bornait, sinon le replay lirait le verdict inverse.
-                    return $deadlineFired ? null : ['payload' => $event->signalPayload()];
+            // Signaux et updates partagent le même curseur : ce qui les ordonne est leur rang
+            // dans le journal, pas leur nature.
+            if ($event instanceof WorkflowSignalReceived) {
+                if ($seen === $index) {
+                    return [
+                        'position' => $position,
+                        'kind' => 'signal',
+                        'name' => $event->signalName(),
+                        'payload' => $event->signalPayload(),
+                    ];
                 }
-                ++$index;
+                ++$seen;
             }
+            if ($event instanceof WorkflowUpdateHandled) {
+                if ($seen === $index) {
+                    return [
+                        'position' => $position,
+                        'kind' => 'update',
+                        'name' => $event->updateName(),
+                        'payload' => $event->arguments(),
+                    ];
+                }
+                ++$seen;
+            }
+            ++$position;
         }
 
         return null;
     }
 
-    public function findUpdateForSlot(string $updateName, int $slot): ?array
+    public function timerCompletionPosition(string $timerId): ?int
     {
-        $index = 0;
+        $position = 0;
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            if ($event instanceof WorkflowUpdateHandled) {
-                if ($index === $slot) {
-                    if ($event->updateName() !== $updateName) {
-                        return null;
-                    }
-
-                    return ['result' => $event->result()];
-                }
-                ++$index;
+            if ($event instanceof TimerCompleted && $event->timerId() === $timerId) {
+                return $position;
             }
+            ++$position;
         }
 
         return null;
@@ -293,5 +300,22 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         return false;
+    }
+
+    /**
+     * Toujours null : le tampon de ce backend refuse de planifier une opération Nexus
+     * ({@see \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException}), donc aucune ne peut
+     * figurer dans son journal. Ce n'est pas une implémentation en attente — il n'y a rien à
+     * relire parce qu'il n'y a rien eu à écrire.
+     */
+    public function findNexusOperationSlotResult(int $slot): ?array
+    {
+        return null;
+    }
+
+    /** Toujours null, pour la même raison que {@see findNexusOperationSlotResult()}. */
+    public function findScheduledNexusOperation(int $slot): ?string
+    {
+        return null;
     }
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\Observation\BackendHealth;
+use Gplanchat\Durable\Observation\WorkflowRunDescription;
+use Gplanchat\Durable\Observation\WorkflowRunEvent;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
@@ -29,4 +32,27 @@ interface WorkflowRunCatalogInterface
      *                                       première page
      */
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
+
+    /**
+     * L'historique enregistré d'une exécution, dans l'ordre où il a été enregistré.
+     *
+     * Prend la **description** et non l'identifiant seul : Temporal exige le workflow id en plus du
+     * run id pour retrouver une histoire, et il vit dans `groupId`. Un port qui ne passerait que
+     * l'identifiant obligerait l'appelant à le retrouver par ses propres moyens, c'est-à-dire à
+     * savoir de quel backend il parle.
+     *
+     * Une exécution inconnue rend une liste vide : une exécution purgée, ou jamais vue, n'est pas
+     * une erreur d'appel — la vue doit pouvoir l'afficher sans rien avoir à rattraper.
+     *
+     * @return list<WorkflowRunEvent>
+     */
+    public function readHistory(WorkflowRunDescription $run): array;
+
+    /**
+     * Le backend répond-il, maintenant.
+     *
+     * Ne lève jamais : une sonde qui échoue est un diagnostic, pas une panne de l'appelant. La page
+     * doit pouvoir afficher « injoignable » plutôt que rendre une erreur cinq-cents.
+     */
+    public function checkHealth(): BackendHealth;
 }

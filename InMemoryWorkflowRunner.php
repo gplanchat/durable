@@ -85,10 +85,15 @@ final class InMemoryWorkflowRunner
             new ParentChildWorkflowCoordinator($this->eventStore),
         );
 
+        // Ce que la dernière suspension attendait, quand ça se nomme : c'est tout ce qui
+        // distingue « bloqué » de « bloqué sur cette condition-là » dans le diagnostic.
+        $waitingOn = null;
+
         try {
             return $engine->start($executionId, $handler);
-        } catch (WorkflowSuspendedException) {
+        } catch (WorkflowSuspendedException $e) {
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
+            $waitingOn = $e->waitingOn();
         }
 
         $deadline = microtime(true) + $this->budgetSeconds;
@@ -105,8 +110,9 @@ final class InMemoryWorkflowRunner
 
             try {
                 return $engine->resume($executionId, $handler);
-            } catch (WorkflowSuspendedException) {
+            } catch (WorkflowSuspendedException $e) {
                 // DUR003: same — suspension until activities have produced the events needed for replay.
+                $waitingOn = $e->waitingOn();
             }
 
             // Un tour qui n'ajoute rien au journal ne peut pas en ajouter au suivant : le
@@ -127,7 +133,7 @@ final class InMemoryWorkflowRunner
                 // toujours (budget épuisé), plutôt qu'il attend un événement qui ne viendra pas.
                 throw null !== $this->activityTransport->nextDueAt()
                     ? WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds)
-                    : WorkflowStuckException::noProgress($executionId);
+                    : WorkflowStuckException::noProgress($executionId, $waitingOn);
             }
         }
     }

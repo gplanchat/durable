@@ -33,7 +33,7 @@ final class ExecutionEngine
     /**
      * @param array<string, mixed> $executionStartedPayloadExtras Fusionnés dans le payload {@see ExecutionStarted} (ex. bootstrap interpréteur Temporal).
      */
-    public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = []): mixed
+    public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
 
@@ -48,6 +48,7 @@ final class ExecutionEngine
             ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,
+            $pendingUpdates,
         );
 
         if (0 === $this->eventStore->countEventsInStream($executionId)) {
@@ -68,7 +69,7 @@ final class ExecutionEngine
      * Reprend une exécution suspendue. N'ajoute pas ExecutionStarted.
      * Utilisé après WorkflowSuspendedException lorsque les activités ont été exécutées.
      */
-    public function resume(string $executionId, callable $handler, ?string $workflowType = null): mixed
+    public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
 
@@ -83,6 +84,7 @@ final class ExecutionEngine
             ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,
+            $pendingUpdates,
         );
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler);

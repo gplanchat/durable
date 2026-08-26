@@ -22,6 +22,12 @@ final class WorkflowSuspendedException extends \RuntimeException
         ?\Throwable $previous = null,
         private readonly bool $shouldDispatchResume = true,
         private readonly bool $waitingOnTimer = false,
+        /**
+         * Ce sur quoi l'attente porte, quand ça se nomme : sans ça, un runner qui constate
+         * qu'une exécution n'avance plus ne peut dire que « bloquée », jamais « bloquée sur
+         * cette condition-là ».
+         */
+        private readonly ?string $waitingOn = null,
     ) {
         parent::__construct($message, $code, $previous);
     }
@@ -39,6 +45,11 @@ final class WorkflowSuspendedException extends \RuntimeException
      * Si vrai, l’attente porte sur un minuteur durable : ne pas enchaîner des reprises immédiates ;
      * planifier {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (éventuellement avec délai Messenger).
      */
+    public function waitingOn(): ?string
+    {
+        return $this->waitingOn;
+    }
+
     public function waitingOnTimer(): bool
     {
         return $this->waitingOnTimer;

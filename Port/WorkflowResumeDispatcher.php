@@ -11,7 +11,11 @@ namespace Gplanchat\Durable\Port;
  */
 interface WorkflowResumeDispatcher
 {
-    public function dispatchResume(string $executionId): void;
+    /**
+     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates à
+     *        remettre à l'exécution pour la passe déclenchée par cette reprise
+     */
+    public function dispatchResume(string $executionId, array $pendingUpdates = []): void;
 
     /**
      * Démarre un nouveau run (historique vierge) après continue-as-new ou équivalent.

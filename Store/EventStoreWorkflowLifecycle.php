@@ -112,6 +112,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             null,
             $waitingOnTimer,
             $waitingOnTimer,
+            AwaitableInspector::describeCondition($pending),
         );
     }
 
