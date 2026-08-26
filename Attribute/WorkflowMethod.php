@@ -9,6 +9,5 @@ final class WorkflowMethod
 {
     public function __construct(
         public readonly ?string $name = null,
-    ) {
-    }
+    ) {}
 }

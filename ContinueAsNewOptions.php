@@ -23,7 +23,7 @@ final readonly class ContinueAsNewOptions
         if (null !== $timeouts->execution) {
             throw new \InvalidArgumentException(
                 'Continue-as-new cannot set an execution timeout: the new run belongs to the '
-                .'current execution and inherits it. Use WorkflowTimeouts::withoutExecutionBound().',
+                . 'current execution and inherits it. Use WorkflowTimeouts::withoutExecutionBound().',
             );
         }
 

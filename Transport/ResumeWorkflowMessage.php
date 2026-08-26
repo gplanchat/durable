@@ -16,6 +16,5 @@ final readonly class ResumeWorkflowMessage
 {
     public function __construct(
         public string $executionId,
-    ) {
-    }
+    ) {}
 }

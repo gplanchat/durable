@@ -13,8 +13,7 @@ final readonly class ChildWorkflowCompleted implements Event
         private string $parentExecutionId,
         private string $childExecutionId,
         private mixed $result,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

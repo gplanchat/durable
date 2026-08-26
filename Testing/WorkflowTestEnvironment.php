@@ -6,9 +6,9 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
-use Gplanchat\Durable\WorkflowRegistry;
 use Gplanchat\Durable\Store\InMemoryEventStore;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
+use Gplanchat\Durable\WorkflowRegistry;
 
 /**
  * Environnement de test in-memory complet pour les workflows.
@@ -168,6 +168,6 @@ final class WorkflowTestEnvironment
 
     private function generateExecutionId(): string
     {
-        return 'test-exec-'.bin2hex(random_bytes(8));
+        return 'test-exec-' . bin2hex(random_bytes(8));
     }
 }

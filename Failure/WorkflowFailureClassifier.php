@@ -19,9 +19,7 @@ use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
  */
 final class WorkflowFailureClassifier
 {
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     public static function classify(string $executionId, \Throwable $e): WorkflowExecutionFailed
     {

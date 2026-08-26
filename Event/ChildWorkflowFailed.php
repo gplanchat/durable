@@ -20,8 +20,7 @@ final readonly class ChildWorkflowFailed implements Event
         private ?string $workflowFailureKind = null,
         private ?string $workflowFailureClass = null,
         private array $workflowFailureContext = [],
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

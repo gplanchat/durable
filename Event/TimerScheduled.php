@@ -11,8 +11,7 @@ final readonly class TimerScheduled implements Event
         private string $timerId,
         private float $scheduledAt,
         private string $summary = '',
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

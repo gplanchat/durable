@@ -12,8 +12,7 @@ final readonly class ExecutionStarted implements Event
     public function __construct(
         private string $executionId,
         private array $payload = [],
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

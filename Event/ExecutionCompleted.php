@@ -9,8 +9,7 @@ final readonly class ExecutionCompleted implements Event
     public function __construct(
         private string $executionId,
         private mixed $result = null,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

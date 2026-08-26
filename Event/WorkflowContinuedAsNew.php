@@ -21,8 +21,7 @@ final readonly class WorkflowContinuedAsNew implements Event
         private string $nextWorkflowType,
         private array $nextPayload,
         private array $continuationMetadata = [],
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

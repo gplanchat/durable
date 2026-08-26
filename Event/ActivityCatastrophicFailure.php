@@ -18,8 +18,7 @@ final readonly class ActivityCatastrophicFailure implements Event
         private string $exceptionClass,
         private string $exceptionMessage,
         private string $reasonCode,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $p
@@ -47,7 +46,7 @@ final readonly class ActivityCatastrophicFailure implements Event
     ): self {
         $message = $e->getMessage();
         if (\strlen($message) > 2048) {
-            $message = substr($message, 0, 2048).'…';
+            $message = substr($message, 0, 2048) . '…';
         }
 
         return new self(

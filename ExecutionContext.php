@@ -8,19 +8,16 @@ use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
-use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
-use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
-use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
 use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
-use Gplanchat\Durable\WorkflowIdReusePolicy;
 
 final class ExecutionContext
 {
@@ -48,8 +45,7 @@ final class ExecutionContext
         private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
         private readonly ?UuidGeneratorInterface $uuidGenerator = null,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

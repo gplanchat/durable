@@ -9,8 +9,7 @@ final readonly class TimerCompleted implements Event
     public function __construct(
         private string $executionId,
         private string $timerId,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

@@ -13,8 +13,7 @@ final readonly class ExecutionId implements \Stringable
 {
     private function __construct(
         private string $value,
-    ) {
-    }
+    ) {}
 
     public static function fromString(string $value): self
     {

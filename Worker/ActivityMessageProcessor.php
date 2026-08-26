@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Worker;
 
-use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\RetryLimit;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
@@ -39,8 +38,7 @@ final class ActivityMessageProcessor
         private readonly ActivityHeartbeatSenderInterface $heartbeatSender,
         private readonly int $maxRetries = 0,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
-    ) {
-    }
+    ) {}
 
     public function process(ActivityMessage $message): void
     {
@@ -81,6 +79,7 @@ final class ActivityMessageProcessor
             if (null !== $startToClose) {
                 set_time_limit(max(1, (int) ceil($startToClose->toSeconds())));
             }
+
             try {
                 if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
                     $this->eventStore,

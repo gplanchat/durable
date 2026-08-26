@@ -22,8 +22,7 @@ final readonly class Duration
 {
     private function __construct(
         private float $seconds,
-    ) {
-    }
+    ) {}
 
     public static function seconds(float $seconds): self
     {

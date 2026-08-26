@@ -117,7 +117,7 @@ final class DurableActivityFailedException extends \Exception
         int $attempt,
         FailureEnvelope $envelope,
     ): string {
-        $namePart = '' !== $activityName ? $activityName.' / ' : '';
+        $namePart = '' !== $activityName ? $activityName . ' / ' : '';
 
         return \sprintf(
             '[%s%s] attempt=%d — %s: %s',

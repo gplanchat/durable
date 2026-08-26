@@ -13,8 +13,7 @@ final readonly class ActivityCancelled implements Event
         private string $executionId,
         private string $activityId,
         private string $reason,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

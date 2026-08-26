@@ -9,9 +9,7 @@ namespace Gplanchat\Durable\Transport;
  */
 final class NoopActivityTransport implements ActivityTransportInterface
 {
-    public function enqueue(ActivityMessage $message): void
-    {
-    }
+    public function enqueue(ActivityMessage $message): void {}
 
     public function dequeue(): ?ActivityMessage
     {

@@ -20,8 +20,7 @@ final class ActivityContractResolver
 
     public function __construct(
         private readonly ?CacheItemPoolInterface $cache = null,
-    ) {
-    }
+    ) {}
 
     /**
      * @param class-string $contractClass
@@ -30,7 +29,7 @@ final class ActivityContractResolver
      */
     public function resolveActivityMethods(string $contractClass): array
     {
-        $cacheKey = self::CACHE_PREFIX.str_replace('\\', '_', $contractClass);
+        $cacheKey = self::CACHE_PREFIX . str_replace('\\', '_', $contractClass);
 
         if (null !== $this->cache) {
             $item = $this->cache->getItem($cacheKey);
@@ -80,7 +79,7 @@ final class ActivityContractResolver
             $activityMethod = $attrs[0]->newInstance();
             $activityName = $activityMethod->name;
             if (null !== $activityPrefixName && '' !== $activityPrefixName) {
-                $activityName = $activityPrefixName.'.'.$activityName;
+                $activityName = $activityPrefixName . '.' . $activityName;
             }
             $methods[$method->getName()] = $activityName;
         }

@@ -11,8 +11,7 @@ final class AwaitableAdapter implements Awaitable
 {
     public function __construct(
         private readonly Deferred $deferred,
-    ) {
-    }
+    ) {}
 
     public function then(?callable $onFulfilled = null, ?callable $onRejected = null): void
     {

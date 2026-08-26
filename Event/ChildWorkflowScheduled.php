@@ -23,8 +23,7 @@ final readonly class ChildWorkflowScheduled implements Event
         private ParentClosePolicy $parentClosePolicy = ParentClosePolicy::Terminate,
         private ?string $requestedWorkflowId = null,
         private array $schedulingMetadata = [],
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

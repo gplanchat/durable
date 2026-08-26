@@ -13,9 +13,7 @@ use Gplanchat\Durable\Event\Event;
  */
 final class NullEventStore implements EventStoreInterface
 {
-    public function append(Event $event): void
-    {
-    }
+    public function append(Event $event): void {}
 
     public function readStream(string $executionId): iterable
     {

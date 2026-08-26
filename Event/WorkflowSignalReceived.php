@@ -16,8 +16,7 @@ final readonly class WorkflowSignalReceived implements Event
         private string $executionId,
         private string $signalName,
         private array $payload,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

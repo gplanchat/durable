@@ -26,8 +26,7 @@ final readonly class ActivityTaskFailed implements Event
         private string $failureMessage,
         /** Prochaine tentative planifiée ({@see ActivityRetryState::InProgress}) ou raison de l'arrêt. */
         private ActivityRetryState $retryState = ActivityRetryState::InProgress,
-    ) {
-    }
+    ) {}
 
     public static function forThrowable(
         string $executionId,
@@ -39,7 +38,7 @@ final readonly class ActivityTaskFailed implements Event
     ): self {
         $message = $e->getMessage();
         if (\strlen($message) > 2048) {
-            $message = substr($message, 0, 2048).'…';
+            $message = substr($message, 0, 2048) . '…';
         }
 
         return new self($executionId, $activityId, $activityName, $attempt, $e::class, $message, $retryState);

@@ -15,8 +15,7 @@ final class WorkflowQueryRunner
 {
     public function __construct(
         private readonly EventStoreInterface $eventStore,
-    ) {
-    }
+    ) {}
 
     public function lastExecutionResult(string $executionId): mixed
     {

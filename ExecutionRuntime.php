@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Awaitable\ActivityAwaitable;
-use Gplanchat\Durable\Awaitable\AnyAwaitable;
-use Gplanchat\Durable\Awaitable\AwaitableInspector;
-use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\Awaitable\CancellingAnyAwaitable;
-use Gplanchat\Durable\Awaitable\TimerAwaitable;
-use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Activity\NullActivityHeartbeatSender;
+use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Awaitable\AwaitableInspector;
+use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
@@ -23,8 +19,8 @@ use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
-use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
+use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
@@ -55,7 +51,7 @@ final class ExecutionRuntime
         private readonly bool $distributed = false,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {
-        $this->clock = $clock ?? static fn (): float => microtime(true);
+        $this->clock = $clock ?? static fn(): float => microtime(true);
     }
 
     /**
@@ -70,9 +66,11 @@ final class ExecutionRuntime
         if ($this->distributed) {
             if (null !== \Fiber::getCurrent()) {
                 \Fiber::suspend($awaitable);
+
                 // Resumed by ExecutionEngine fiber loop after the awaitable was settled
                 return $awaitable->getResult();
             }
+
             // Called outside of a fiber (backward-compatibility path for non-fiber callers)
             throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), AwaitableInspector::waitsOnTimer($awaitable));
         }

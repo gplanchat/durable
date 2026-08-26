@@ -22,8 +22,7 @@ final readonly class TimerCancelled implements Event
         private string $executionId,
         private string $timerId,
         private string $reason,
-    ) {
-    }
+    ) {}
 
     public function executionId(): string
     {

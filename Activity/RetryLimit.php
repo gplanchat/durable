@@ -24,8 +24,7 @@ final readonly class RetryLimit
     private function __construct(
         /** Nombre total de tentatives permises, ou null quand rien ne les borne. */
         private ?int $maxAttempts,
-    ) {
-    }
+    ) {}
 
     /**
      * Réessayer sans borne de nombre.
