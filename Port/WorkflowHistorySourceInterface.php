@@ -7,6 +7,10 @@ namespace Gplanchat\Durable\Port;
 /**
  * Read-only access to recorded workflow history for slot-based replay.
  *
+ * Recorded timings are returned as {@see \Gplanchat\Durable\Duration}, so a value read from
+ * history and a value about to be written are the same kind of thing. Third-party implementations
+ * written against the previous `float` return must adapt. See ADR DUR031.
+ *
  * Each "slot" is a sequential index within a family of operations (activities, timers, signals, etc.).
  * The in-memory backend implements this over EventStoreInterface; the Temporal backend implements this
  * over TemporalHistoryCursor-built TemporalExecutionHistory.

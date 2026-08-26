@@ -13,6 +13,23 @@ use Gplanchat\Durable\Duration;
  *
  * Each method corresponds to a Temporal CommandType emitted in RespondWorkflowTaskCompleted.
  * The in-memory backend appends domain events; the Temporal backend builds protobuf Command objects.
+ *
+ * **This port carries value objects, not primitives.** An implementation receives the options the
+ * caller constructed — with their invariants intact — and owns the translation to its own
+ * representation, including any serialisation to a wire format and any reading of a clock. See
+ * ADR DUR031.
+ *
+ * Third-party implementations written against the previous signatures must update three methods:
+ *
+ * | Before | Now |
+ * |---|---|
+ * | `scheduleActivity(..., array $metadata)` | `scheduleActivity(..., ?ActivityOptions $options)` |
+ * | `scheduleChildWorkflow(..., array $schedulingMetadata)` | `scheduleChildWorkflow(..., ChildWorkflowOptions $options)` |
+ * | `startTimer($id, float $scheduledAt, ...)` | `startTimer($id, Duration $delay, ...)` |
+ *
+ * `startTimer` is the one that changes meaning, not just type: it now receives the **delay** to
+ * wait. Turning it into a deadline is the implementation's decision, and the implementation's
+ * clock.
  */
 interface WorkflowCommandBufferInterface
 {
