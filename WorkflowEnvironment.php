@@ -11,6 +11,7 @@ use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\CancellingCompositeAwaitable;
+use Gplanchat\Durable\Awaitable\ConditionAwaitable;
 use Gplanchat\Durable\Awaitable\Deferred;
 use Gplanchat\Durable\Awaitable\QuorumAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
@@ -97,12 +98,24 @@ final class WorkflowEnvironment
      * tentative en cours peut continuer côté serveur — Temporal reçoit une *demande*
      * d'annulation ({@see \Gplanchat\Durable\Activity\ActivityCancellationType}).
      *
-     * @param Awaitable<mixed> $awaitable
+     * Une `Closure` est acceptée à la place d'un awaitable : c'est une **condition** sur l'état
+     * du workflow, et l'exécution repart dès qu'elle est vraie. Elle doit être fonction du seul
+     * état du workflow — ce qu'un replay ne reproduit pas se consigne d'abord avec
+     * {@see sideEffect()}. Attention, `fn()` capture par valeur : une condition sur une variable
+     * locale s'écrit `function () use (&$…)`.
+     *
+     * @param Awaitable<mixed>|\Closure(): bool $awaitable
      *
      * @throws DeadlineExceededException si l'échéance s'écoule avant le règlement
      */
-    public function await(Awaitable $awaitable, Duration|\DateInterval|\DateTimeInterface|int|float|null $deadline = null): mixed
+    public function await(Awaitable|\Closure $awaitable, Duration|\DateInterval|\DateTimeInterface|int|float|null $deadline = null): mixed
     {
+        // Une condition entre par la même porte que tout le reste : `await()` est la seule
+        // attente, et le contrat d'awaitable est déjà exactement un prédicat.
+        if ($awaitable instanceof \Closure) {
+            $awaitable = new ConditionAwaitable($awaitable);
+        }
+
         $deadline = null === $deadline ? Duration::infinity() : Duration::from($deadline);
 
         // Une échéance infinie ne planifie pas de minuteur : le seul écart entre les deux
@@ -183,6 +196,7 @@ final class WorkflowEnvironment
         return match (true) {
             $awaitable instanceof ActivityAwaitable => 'activity ' . $awaitable->activityId(),
             $awaitable instanceof TimerAwaitable => 'timer ' . $awaitable->timerId(),
+            $awaitable instanceof ConditionAwaitable => $awaitable->describe(),
             default => (new \ReflectionClass($awaitable))->getShortName(),
         };
     }

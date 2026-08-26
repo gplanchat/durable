@@ -41,4 +41,34 @@ final class AwaitableInspector
 
         return false;
     }
+
+    /**
+     * Nomme la condition sur laquelle porte l'attente, s'il y en a une.
+     *
+     * Sert au diagnostic : une exécution qu'aucun message ne peut plus faire avancer doit dire
+     * *laquelle* de ses conditions ne peut pas devenir vraie, pas seulement qu'elle est bloquée.
+     *
+     * @param Awaitable<mixed> $awaitable
+     */
+    public static function describeCondition(Awaitable $awaitable): ?string
+    {
+        if ($awaitable instanceof ConditionAwaitable) {
+            return $awaitable->describe();
+        }
+
+        if ($awaitable instanceof CancellingCompositeAwaitable) {
+            return self::describeCondition($awaitable->inner());
+        }
+
+        if ($awaitable instanceof CompositeAwaitable) {
+            foreach ($awaitable->members() as $member) {
+                $described = self::describeCondition($member);
+                if (null !== $described) {
+                    return $described;
+                }
+            }
+        }
+
+        return null;
+    }
 }
