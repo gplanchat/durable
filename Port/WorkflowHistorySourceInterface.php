@@ -90,7 +90,10 @@ interface WorkflowHistorySourceInterface
      * history** and nowhere else: they are never serialized, and never compared across backends.
      * See ADR DUR033.
      *
-     * @return array{position: int, name: string, payload: array<string, mixed>}|null
+     * Signals and updates share one cursor: what orders them is their rank in the journal, not
+     * their kind.
+     *
+     * @return array{position: int, kind: 'signal'|'update', name: string, payload: array<string, mixed>}|null
      */
     public function messageAt(int $index): ?array;
 

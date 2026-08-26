@@ -8,6 +8,12 @@ namespace Gplanchat\Durable\Attribute;
 final class UpdateMethod
 {
     public function __construct(
-        public readonly string $name,
+        public readonly \BackedEnum|string $name,
     ) {}
+
+    /** Le nom tel qu'il voyage : sur le fil, un update est une chaîne. */
+    public function updateName(): string
+    {
+        return $this->name instanceof \BackedEnum ? (string) $this->name->value : $this->name;
+    }
 }

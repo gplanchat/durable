@@ -20,6 +20,7 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
@@ -38,6 +39,9 @@ final class WorkflowEnvironment
 
     /** @var array<string, callable> signal name → handler */
     private array $signalHandlers = [];
+
+    /** @var array<string, callable> update name → handler */
+    private array $updateHandlers = [];
 
     public function __construct(
         private readonly ExecutionContext $context,
@@ -104,6 +108,22 @@ final class WorkflowEnvironment
     public function hasSignalHandler(\BackedEnum|string $signalName): bool
     {
         return isset($this->signalHandlers[self::messageName($signalName)]);
+    }
+
+    /**
+     * Enregistre le handler d'un update.
+     *
+     * La différence avec un signal tient dans la valeur de retour : c'est la réponse que
+     * l'appelant reçoit. Un handler qui relève fait échouer l'update, pas l'exécution.
+     */
+    public function onUpdate(\BackedEnum|string $updateName, callable $handler): void
+    {
+        $this->updateHandlers[self::messageName($updateName)] = $handler;
+    }
+
+    public function hasUpdateHandler(\BackedEnum|string $updateName): bool
+    {
+        return isset($this->updateHandlers[self::messageName($updateName)]);
     }
 
     private static function messageName(\BackedEnum|string $name): string
@@ -195,10 +215,38 @@ final class WorkflowEnvironment
                 return;
             }
 
-            $handler = $this->signalHandlers[$message['name']] ?? null;
-            if (null !== $handler) {
-                $handler($message['payload']);
-            }
+            $this->dispatch($message);
+        }
+    }
+
+    /**
+     * @param array{kind: string, name: string, payload: array<string, mixed>, pending: \Gplanchat\Durable\Workflow\PendingUpdate|null} $message
+     */
+    private function dispatch(array $message): void
+    {
+        $handlers = 'update' === $message['kind'] ? $this->updateHandlers : $this->signalHandlers;
+        $handler = $handlers[$message['name']] ?? null;
+        if (null === $handler) {
+            // Un message que personne n'attend est enregistré et ignoré, pas une erreur.
+            return;
+        }
+
+        $pending = $message['pending'];
+        if (null === $pending) {
+            // Rejoué depuis le journal : le handler retourne pour reconstruire l'état, mais
+            // l'issue déjà consignée reste celle que l'appelant a reçue.
+            $handler($message['payload']);
+
+            return;
+        }
+
+        $pending->handled = true;
+
+        try {
+            $pending->result = $handler($message['payload']);
+        } catch (\Throwable $e) {
+            // L'update échoue, pas l'exécution : le workflow poursuit son chemin.
+            $pending->failure = FailureEnvelope::fromThrowable($e);
         }
     }
 

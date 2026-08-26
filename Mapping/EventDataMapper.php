@@ -154,6 +154,11 @@ final class EventDataMapper
                 (string) $payload['updateName'],
                 \is_array($payload['arguments'] ?? null) ? $payload['arguments'] : [],
                 $payload['result'] ?? null,
+                \is_array($payload['failure'] ?? null) ? new \Gplanchat\Durable\Failure\FailureEnvelope(
+                    (string) ($payload['failure']['class'] ?? \RuntimeException::class),
+                    (string) ($payload['failure']['message'] ?? ''),
+                    (int) ($payload['failure']['code'] ?? 0),
+                ) : null,
             ),
             WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($executionId, $payload),
             WorkflowExecutionCancelled::class => new WorkflowExecutionCancelled(

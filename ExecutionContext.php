@@ -51,6 +51,13 @@ final class ExecutionContext
         private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
         private readonly ?UuidGeneratorInterface $uuidGenerator = null,
+        /**
+         * Les updates que la passe reçoit hors journal. Ils viennent après tout ce qui est
+         * enregistré : n'ayant pas encore de position, ils prennent celle de leur arrivée.
+         *
+         * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
+         */
+        private readonly array $pendingUpdates = [],
     ) {}
 
     public function executionId(): string
@@ -238,22 +245,49 @@ final class ExecutionContext
      * messages doit reprendre en n'ayant vu que celui-là. Les deux sortent de la même règle —
      * le verdict est une position dans le journal (ADR DUR033).
      *
-     * @return array{name: string, payload: array<string, mixed>}|null le message appliqué, ou null
+     * `pending` porte l'update hors journal quand c'en est un, et null quand le message est relu
+     * du journal : c'est ce qui distingue « produire l'issue » de « refaire l'état ».
+     *
+     * @return array{kind: 'signal'|'update', name: string, payload: array<string, mixed>, pending: \Gplanchat\Durable\Workflow\PendingUpdate|null}|null
      */
     public function nextMessage(?int $beforePosition = null): ?array
     {
         $message = $this->historySource->messageAt($this->messageCursor);
-        if (null === $message) {
-            return null;
+        if (null !== $message) {
+            if (null !== $beforePosition && $message['position'] > $beforePosition) {
+                return null;
+            }
+
+            ++$this->messageCursor;
+
+            return [
+                'kind' => $message['kind'],
+                'name' => $message['name'],
+                'payload' => $message['payload'],
+                'pending' => null,
+            ];
         }
 
-        if (null !== $beforePosition && $message['position'] > $beforePosition) {
+        // Le journal est épuisé : restent les updates arrivés hors journal pour cette passe.
+        $recorded = $this->countRecordedMessages();
+        $pending = $this->pendingUpdates[$this->messageCursor - $recorded] ?? null;
+        if (null === $pending) {
             return null;
         }
 
         ++$this->messageCursor;
 
-        return ['name' => $message['name'], 'payload' => $message['payload']];
+        return ['kind' => 'update', 'name' => $pending->name, 'payload' => $pending->arguments, 'pending' => $pending];
+    }
+
+    private function countRecordedMessages(): int
+    {
+        $count = 0;
+        while (null !== $this->historySource->messageAt($count)) {
+            ++$count;
+        }
+
+        return $count;
     }
 
     /**

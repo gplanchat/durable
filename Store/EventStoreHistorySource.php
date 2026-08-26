@@ -280,12 +280,26 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         $position = 0;
         $seen = 0;
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            // Signaux et updates partagent le même curseur : ce qui les ordonne est leur rang
+            // dans le journal, pas leur nature.
             if ($event instanceof WorkflowSignalReceived) {
                 if ($seen === $index) {
                     return [
                         'position' => $position,
+                        'kind' => 'signal',
                         'name' => $event->signalName(),
                         'payload' => $event->signalPayload(),
+                    ];
+                }
+                ++$seen;
+            }
+            if ($event instanceof WorkflowUpdateHandled) {
+                if ($seen === $index) {
+                    return [
+                        'position' => $position,
+                        'kind' => 'update',
+                        'name' => $event->updateName(),
+                        'payload' => $event->arguments(),
                     ];
                 }
                 ++$seen;
