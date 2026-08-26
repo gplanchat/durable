@@ -235,7 +235,16 @@ final class WorkflowEnvironment
         if (null === $pending) {
             // Rejoué depuis le journal : le handler retourne pour reconstruire l'état, mais
             // l'issue déjà consignée reste celle que l'appelant a reçue.
-            $handler($message['payload']);
+            try {
+                $handler($message['payload']);
+            } catch (\Throwable $e) {
+                if ('update' !== $message['kind']) {
+                    throw $e;
+                }
+                // Un update qui avait échoué échoue encore au replay, et c'est normal : sa
+                // défaillance est déjà partie chez l'appelant. La relever ici ferait échouer une
+                // exécution que l'original avait laissée vivante.
+            }
 
             return;
         }
