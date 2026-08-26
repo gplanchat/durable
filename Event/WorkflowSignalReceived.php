@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Signal reçu par l’exécution (ordre dans le journal = ordre des {@see \Gplanchat\Durable\ExecutionContext::waitSignal}).
+ * Signal reçu par l’exécution. L’ordre dans le journal est l’ordre d’application : chaque signal
+ * est remis à son handler à son rang, un par un.
  */
 final readonly class WorkflowSignalReceived implements Event
 {

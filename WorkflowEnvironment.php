@@ -472,59 +472,6 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Attend un signal, éventuellement sous échéance.
-     *
-     * Sans échéance, l'attente est inchangée : elle ne se règle qu'à la livraison du signal.
-     * Avec une échéance, un signal *enregistré après le tir* de celle-ci ne règle pas cette
-     * attente-là — sinon un replay lirait le verdict inverse de l'exécution d'origine. Ce
-     * signal reste disponible pour une attente ultérieure du même nom.
-     *
-     * Le nom se donne en {@see \BackedEnum} — une enum adossée à des chaînes énumère la surface
-     * de signaux d'un workflow et fait relever la faute de frappe par le moteur de types plutôt
-     * que par une attente qui ne se règle jamais. La chaîne nue reste acceptée : un signal
-     * arrive de l'extérieur (curl, CLI Temporal, un autre langage), et cette frontière-là ne se
-     * type pas (ADR DUR034).
-     *
-     * @return array<string, mixed>
-     *
-     * @throws DeadlineExceededException si l'échéance s'écoule avant la livraison
-     */
-    public function waitSignal(\BackedEnum|string $signalName, Duration|\DateInterval|\DateTimeInterface|int|float|null $deadline = null): array
-    {
-        $signalName = $signalName instanceof \BackedEnum ? (string) $signalName->value : $signalName;
-        $deadline = null === $deadline ? Duration::infinity() : Duration::from($deadline);
-
-        if ($deadline->isInfinite()) {
-            /** @var array<string, mixed> */
-            return $this->await($this->context->waitSignal($signalName));
-        }
-
-        $timer = $this->timer($deadline, 'deadline: signal ' . $signalName);
-
-        try {
-            /** @var array<string, mixed> */
-            return $this->awaitUnderDeadline(
-                $this->context->waitSignal($signalName, $timer instanceof TimerAwaitable ? $timer->timerId() : null),
-                $timer,
-                $deadline,
-                'signal ' . $signalName,
-            );
-        } catch (DeadlineExceededException $e) {
-            // L'attente abandonnée n'a consommé aucun signal : elle rend son rang, faute de quoi
-            // l'attente suivante du même nom chercherait le *deuxième* signal et manquerait
-            // celui arrivé en retard.
-            $this->context->releaseSignalWaitSlot();
-
-            throw $e;
-        }
-    }
-
-    public function waitUpdate(string $updateName): mixed
-    {
-        return $this->await($this->context->waitUpdate($updateName));
-    }
-
-    /**
      * @param array<string, mixed> $payload
      *
      * @return Awaitable<mixed>

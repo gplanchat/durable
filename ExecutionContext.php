@@ -35,15 +35,11 @@ final class ExecutionContext
 
     private int $childWorkflowSlotIndex = 0;
 
-    private int $signalWaitSlotIndex = 0;
-
     /**
      * Rang du prochain message non appliqué. Reconstruit à zéro à chaque passe, avancé par la
      * même règle sur le même journal : c'est ce qui rend le verdict d'une condition reproductible.
      */
     private int $messageCursor = 0;
-
-    private int $updateWaitSlotIndex = 0;
 
     public function __construct(
         private readonly string $executionId,
@@ -213,31 +209,6 @@ final class ExecutionContext
     }
 
     /**
-     * Waits for a signal at signal slot N (order of signals of that name in history).
-     * In distributed mode, suspends until the signal is present in history.
-     *
-     * `$notAfterTimerId` borne l'attente : un signal enregistré *après* le tir de ce minuteur ne
-     * la règle pas. Sans cette règle, une attente sous échéance qui a expiré serait réglée au
-     * replay par le signal arrivé ensuite, et l'exécution rejouée prendrait le chemin inverse de
-     * celui déjà journalisé (ADR DUR032).
-     *
-     * @return Awaitable<mixed>
-     */
-    public function waitSignal(string $signalName, ?string $notAfterTimerId = null): Awaitable
-    {
-        $slot = $this->signalWaitSlotIndex++;
-        $found = $this->historySource->findSignalForSlot($signalName, $slot, $notAfterTimerId);
-        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $found) {
-            $deferred->resolve($found['payload']);
-
-            return $deferred->awaitable();
-        }
-
-        return $deferred->awaitable();
-    }
-
-    /**
      * Applique le prochain message enregistré, s'il en reste un avant `$beforePosition`.
      *
      * Un par un, jamais par lot : un message enregistré après le tir d'une échéance ne doit pas
@@ -296,38 +267,6 @@ final class ExecutionContext
     public function timerCompletionPosition(string $timerId): ?int
     {
         return $this->historySource->timerCompletionPosition($timerId);
-    }
-
-    /**
-     * Rend le rang qu'une attente de signal abandonnée n'a pas consommé.
-     *
-     * Une attente qui expire n'a lu aucun signal : sans cela, l'attente suivante du même nom
-     * chercherait le deuxième et manquerait celui arrivé en retard.
-     */
-    public function releaseSignalWaitSlot(): void
-    {
-        if ($this->signalWaitSlotIndex > 0) {
-            --$this->signalWaitSlotIndex;
-        }
-    }
-
-    /**
-     * Waits for an update at update slot N (order of updates in history).
-     *
-     * @return Awaitable<mixed>
-     */
-    public function waitUpdate(string $updateName): Awaitable
-    {
-        $slot = $this->updateWaitSlotIndex++;
-        $found = $this->historySource->findUpdateForSlot($updateName, $slot);
-        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $found) {
-            $deferred->resolve($found['result']);
-
-            return $deferred->awaitable();
-        }
-
-        return $deferred->awaitable();
     }
 
     /**

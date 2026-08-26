@@ -8,7 +8,7 @@ use Gplanchat\Durable\Duration;
 
 /**
  * L'échéance passée à {@see \Gplanchat\Durable\WorkflowEnvironment::await()} ou à
- * {@see \Gplanchat\Durable\WorkflowEnvironment::waitSignal()} s'est écoulée avant que le travail
+ * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} s'est écoulée avant que le travail
  * attendu ne se règle.
  *
  * Une défaillance, pas une valeur : `null` est une réponse qu'un travail borné a le droit de

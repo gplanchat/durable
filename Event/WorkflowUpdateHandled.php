@@ -10,7 +10,8 @@ use Gplanchat\Durable\Failure\FailureEnvelope;
  * Mise à jour workflow traitée : arguments + résultat persistés pour le replay
  * (équivalent simplifié d’un couple request/response Temporal).
  *
- * L’ordre dans le journal correspond aux appels {@see \Gplanchat\Durable\ExecutionContext::waitUpdate}.
+ * L’ordre dans le journal donne l’ordre d’application : les updates partagent un curseur avec
+ * les signaux, et c’est leur rang qui les ordonne, pas leur nature.
  */
 final readonly class WorkflowUpdateHandled implements Event
 {

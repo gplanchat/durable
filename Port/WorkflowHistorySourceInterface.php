@@ -63,35 +63,15 @@ interface WorkflowHistorySourceInterface
     public function findScheduledChildExecutionId(int $slot): ?string;
 
     /**
-     * Returns the payload of the signal received at signal slot N for the given signal name, or null.
+     * Returns the Nth recorded message, in recorded order, or null past the end.
      *
-     * Slots are counted over the signals *of that name*, in recorded order.
-     *
-     * `$notAfterTimerId` bounds the lookup: a signal recorded after that timer fired does not
-     * settle the wait the timer bounded. The verdict of a deadline is a function of history
-     * order, never of the clock of the process performing the replay — see ADR DUR032.
-     *
-     * @return array{payload: mixed}|null
-     */
-    public function findSignalForSlot(string $signalName, int $slot, ?string $notAfterTimerId = null): ?array;
-
-    /**
-     * Returns the result of the update handled at update slot N for the given update name, or null.
-     *
-     * @return array{result: mixed}|null
-     */
-    public function findUpdateForSlot(string $updateName, int $slot): ?array;
-
-    /**
-     * Returns the Nth recorded message (signal), in recorded order, or null past the end.
+     * Signals and updates share one cursor: what orders them is their rank in the journal, not
+     * their kind.
      *
      * `position` is the rank of the event in this execution's recorded history — the stream index
      * in memory, the `eventId` on Temporal. Positions are comparable **within one execution's own
      * history** and nowhere else: they are never serialized, and never compared across backends.
      * See ADR DUR033.
-     *
-     * Signals and updates share one cursor: what orders them is their rank in the journal, not
-     * their kind.
      *
      * @return array{position: int, kind: 'signal'|'update', name: string, payload: array<string, mixed>}|null
      */
