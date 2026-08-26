@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
  * Proxy de planification côté workflow.
  *
  * Expose uniquement les méthodes marquées #[ActivityMethod] du contrat ;
- * chaque appel retourne un Awaitable et délègue à WorkflowEnvironment::activity().
+ * chaque appel retourne un Awaitable et délègue à {@see ActivitySchedulerInterface}.
  *
  * À initialiser dans le constructeur du workflow pour configurer retry et gestion d'erreur via ActivityOptions.
  *
@@ -23,7 +22,7 @@ final class ActivityStub
     private array $methodToActivityName;
 
     public function __construct(
-        private readonly WorkflowEnvironment $environment,
+        private readonly ActivitySchedulerInterface $scheduler,
         /** @var class-string<TActivity> */
         private readonly string $contractClass,
         ActivityContractResolver $resolver,
@@ -46,7 +45,7 @@ final class ActivityStub
 
         $payload = $this->argumentsToPayload($name, $arguments);
 
-        return $this->environment->activity($activityName, $payload, $this->options);
+        return $this->scheduler->scheduleActivity($activityName, $payload, $this->options);
     }
 
     /**

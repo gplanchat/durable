@@ -7,6 +7,7 @@ namespace Gplanchat\Durable;
 use Gplanchat\Durable\Activity\ActivityContractResolver;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\ActivityStub;
+use Gplanchat\Durable\Activity\ContextActivityScheduler;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
@@ -384,15 +385,6 @@ final class WorkflowEnvironment
         return $this->await($this->context->waitUpdate($updateName));
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     *
-     * @return Awaitable<mixed>
-     */
-    public function activity(string $name, array $payload = [], ?ActivityOptions $options = null): Awaitable
-    {
-        return $this->context->activity($name, $payload, $options);
-    }
 
     /**
      * Retourne un stub typé pour le contrat d'activité.
@@ -403,11 +395,31 @@ final class WorkflowEnvironment
      *
      * @return ActivityStub<TActivity>
      */
+    /**
+     * Planifie une activité en la nommant.
+     *
+     * @internal Réservée au harnais de test le temps de la tâche 5.3 du change
+     *           workflow-authoring-surface, qui réécrit les quatre-vingt-dix-sept appels de la
+     *           suite vers des contrats typés. Elle disparaît ensuite : une faute de frappe ici
+     *           produit une activité qui n'est jamais planifiée, au lieu d'une erreur de type.
+     *
+     *           Le code métier passe par {@see activityStub()}, qui ne l'utilise déjà plus — il
+     *           planifie via {@see \Gplanchat\Durable\Activity\ActivitySchedulerInterface}.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return Awaitable<mixed>
+     */
+    public function activity(string $name, array $payload = [], ?ActivityOptions $options = null): Awaitable
+    {
+        return $this->context->activity($name, $payload, $options);
+    }
+
     public function activityStub(string $contractClass, ?ActivityOptions $options = null): ActivityStub
     {
         $resolver = $this->activityResolver ?? new ActivityContractResolver(null);
 
-        return new ActivityStub($this, $contractClass, $resolver, $options);
+        return new ActivityStub(new ContextActivityScheduler($this->context), $contractClass, $resolver, $options);
     }
 
     /**
