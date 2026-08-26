@@ -58,15 +58,14 @@ final class QuorumAwaitable implements CompositeAwaitable
 
     public function isSettled(): bool
     {
-        [$fulfilled, $failures] = $this->partition();
+        [$fulfilled, $failed] = $this->partition();
 
-        return \count($fulfilled) >= $this->required
-            || \count($failures) > \count($this->awaitables) - $this->required;
+        return \count($fulfilled) >= $this->required || $this->isOutOfReach($failed);
     }
 
     public function getResult(): mixed
     {
-        [$fulfilled, $failures] = $this->partition();
+        [$fulfilled, $failed, $firstFailure] = $this->partition();
 
         if (\count($fulfilled) >= $this->required) {
             // Exactement le quorum demandé : un membre arrivé en même temps que le dernier
@@ -74,8 +73,8 @@ final class QuorumAwaitable implements CompositeAwaitable
             return \array_slice($fulfilled, 0, $this->required, true);
         }
 
-        if (\count($failures) > \count($this->awaitables) - $this->required) {
-            throw reset($failures);
+        if (null !== $firstFailure && $this->isOutOfReach($failed)) {
+            throw $firstFailure;
         }
 
         throw new \RuntimeException(\sprintf(
@@ -87,12 +86,25 @@ final class QuorumAwaitable implements CompositeAwaitable
     }
 
     /**
-     * @return array{array<int, mixed>, array<int, \Throwable>}
+     * Trop peu de membres restent en course pour que le quorum tombe encore.
+     */
+    private function isOutOfReach(int $failed): bool
+    {
+        return $failed > \count($this->awaitables) - $this->required;
+    }
+
+    /**
+     * Les membres aboutis, leur nombre d'échecs, et le premier de ces échecs dans l'ordre de
+     * déclaration — celui qui a fait basculer le quorum hors d'atteinte du point de vue de
+     * l'appelant.
+     *
+     * @return array{array<int, mixed>, int, ?\Throwable}
      */
     private function partition(): array
     {
         $fulfilled = [];
-        $failures = [];
+        $failed = 0;
+        $firstFailure = null;
         foreach ($this->awaitables as $i => $a) {
             if (!$a->isSettled()) {
                 continue;
@@ -101,10 +113,11 @@ final class QuorumAwaitable implements CompositeAwaitable
             try {
                 $fulfilled[$i] = $a->getResult();
             } catch (\Throwable $e) {
-                $failures[$i] = $e;
+                ++$failed;
+                $firstFailure ??= $e;
             }
         }
 
-        return [$fulfilled, $failures];
+        return [$fulfilled, $failed, $firstFailure];
     }
 }
