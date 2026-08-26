@@ -343,7 +343,7 @@ final class WorkflowEnvironment
      * de signaux d'un workflow et fait relever la faute de frappe par le moteur de types plutôt
      * que par une attente qui ne se règle jamais. La chaîne nue reste acceptée : un signal
      * arrive de l'extérieur (curl, CLI Temporal, un autre langage), et cette frontière-là ne se
-     * type pas.
+     * type pas (ADR DUR034).
      *
      * @return array<string, mixed>
      *

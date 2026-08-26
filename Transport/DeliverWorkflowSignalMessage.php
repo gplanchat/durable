@@ -11,7 +11,7 @@ namespace Gplanchat\Durable\Transport;
  */
 final readonly class DeliverWorkflowSignalMessage
 {
-    /** Le nom tel qu'il voyage : le message est sérialisé par Messenger, pas une enum. */
+    /** Le nom tel qu'il voyage : le message est sérialisé par Messenger, pas une enum (ADR DUR034). */
     public string $signalName;
 
     /**
