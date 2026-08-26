@@ -13,6 +13,7 @@ use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
@@ -259,6 +260,16 @@ final class ExecutionContext
         }
 
         return $count;
+    }
+
+    /**
+     * Consigne l'issue d'un update qui vient d'être traité, à la position où il l'a été.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    {
+        $this->commandBuffer->recordUpdateHandled($updateName, $arguments, $result, $failure);
     }
 
     /**

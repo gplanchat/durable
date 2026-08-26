@@ -257,6 +257,11 @@ final class WorkflowEnvironment
             // L'update échoue, pas l'exécution : le workflow poursuit son chemin.
             $pending->failure = FailureEnvelope::fromThrowable($e);
         }
+
+        // Consigné ici, et pas par l'appelant de la passe : l'enregistrement doit précéder ce
+        // que le workflow fait en réponse, sinon un replay les appliquerait dans l'autre ordre.
+        // C'est l'ordre que Temporal produit — l'acceptation avant les commandes du workflow.
+        $this->context->recordUpdateHandled($message['name'], $message['payload'], $pending->result, $pending->failure);
     }
 
     /**
