@@ -360,6 +360,31 @@ final class ExecutionContext
     }
 
     /**
+     * Retire une opération Nexus encore en vol (best effort).
+     *
+     * Comme pour une activité, la demande part vers l'endpoint sans garantie qu'il l'honore : ce
+     * qui est garanti est que sa réponse ne réveillera plus cette exécution. L'annulation du
+     * workflow rejette l'attente pour qu'il puisse compenser ; un perdant de course reste
+     * simplement non réglé.
+     */
+    public function cancelScheduledNexusOperation(string $operationId, string $reason): bool
+    {
+        if (!isset($this->pendingNexusOperations[$operationId])) {
+            return false;
+        }
+
+        $deferred = $this->pendingNexusOperations[$operationId];
+        unset($this->pendingNexusOperations[$operationId]);
+        $this->commandBuffer->cancelNexusOperation($operationId, $reason);
+
+        if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
+            $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
+        }
+
+        return true;
+    }
+
+    /**
      * Annule un minuteur encore en attente (best effort).
      *
      * Le minuteur ne sera jamais résolu : il est retiré des pending pour que
