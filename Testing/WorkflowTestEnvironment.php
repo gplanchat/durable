@@ -137,6 +137,36 @@ final class WorkflowTestEnvironment
         $this->workflowRegistry->registerClass($workflowClass);
     }
 
+    /**
+     * Exécute un workflow **classe**, dans sa forme de production.
+     *
+     * L'environnement atteint le constructeur, l'input atteint la méthode marquée
+     * {@see \Gplanchat\Durable\Attribute\WorkflowMethod} — exactement comme sur un backend.
+     *
+     * C'est la forme à préférer. {@see run()} prend une closure qui reçoit l'environnement : une
+     * signature qu'aucun workflow n'a depuis que l'environnement est passé au constructeur. Elle
+     * reste, pour les workflows anonymes de trois lignes, mais c'est la forme du harnais et non
+     * celle d'un workflow.
+     *
+     * ```php
+     * $result = $env->runWorkflowClass(CheckoutWorkflow::class, ['orderId' => 'ORD-1']);
+     * ```
+     *
+     * @param class-string             $workflowClass
+     * @param array<string, mixed>     $input       Arguments métier, appariés par nom
+     * @param string|null              $executionId ID d'exécution (généré si null)
+     */
+    public function runWorkflowClass(string $workflowClass, array $input = [], ?string $executionId = null): mixed
+    {
+        // Idempotent : un test peut enregistrer la classe lui-même pour la démarrer aussi comme
+        // enfant, et n'a pas à savoir laquelle des deux voies l'a fait en premier.
+        if (!$this->workflowRegistry->has($workflowClass)) {
+            $this->registerWorkflowClass($workflowClass);
+        }
+
+        return $this->run($this->workflowRegistry->getHandler($workflowClass, $input), $executionId);
+    }
+
     public function getWorkflowRegistry(): WorkflowRegistry
     {
         return $this->workflowRegistry;
