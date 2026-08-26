@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
@@ -46,4 +47,12 @@ interface WorkflowRunCatalogInterface
      * @return list<WorkflowRunEvent>
      */
     public function readHistory(WorkflowRunDescription $run): array;
+
+    /**
+     * Le backend répond-il, maintenant.
+     *
+     * Ne lève jamais : une sonde qui échoue est un diagnostic, pas une panne de l'appelant. La page
+     * doit pouvoir afficher « injoignable » plutôt que rendre une erreur cinq-cents.
+     */
+    public function checkHealth(): BackendHealth;
 }
