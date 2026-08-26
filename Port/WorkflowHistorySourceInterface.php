@@ -83,6 +83,25 @@ interface WorkflowHistorySourceInterface
     public function findUpdateForSlot(string $updateName, int $slot): ?array;
 
     /**
+     * Returns the Nth recorded message (signal), in recorded order, or null past the end.
+     *
+     * `position` is the rank of the event in this execution's recorded history — the stream index
+     * in memory, the `eventId` on Temporal. Positions are comparable **within one execution's own
+     * history** and nowhere else: they are never serialized, and never compared across backends.
+     * See ADR DUR033.
+     *
+     * @return array{position: int, name: string, payload: array<string, mixed>}|null
+     */
+    public function messageAt(int $index): ?array;
+
+    /**
+     * Returns the position at which the given timer's completion was recorded, or null if it has
+     * not fired. Compared against {@see messageAt()} positions to decide whether a message landed
+     * before or after a deadline.
+     */
+    public function timerCompletionPosition(string $timerId): ?int;
+
+    /**
      * Returns whether the given child execution ID has already been scheduled (for reuse policy checks).
      */
     public function hasChildExecutionId(string $childExecutionId): bool;

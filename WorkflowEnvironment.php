@@ -10,6 +10,7 @@ use Gplanchat\Durable\Activity\ActivityStub;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\AnyAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Awaitable\AwaitableInspector;
 use Gplanchat\Durable\Awaitable\CancellingCompositeAwaitable;
 use Gplanchat\Durable\Awaitable\ConditionAwaitable;
 use Gplanchat\Durable\Awaitable\Deferred;
@@ -34,6 +35,9 @@ final class WorkflowEnvironment
 
     /** @var array<string, callable> query type → handler */
     private array $queryHandlers = [];
+
+    /** @var array<string, callable> signal name → handler */
+    private array $signalHandlers = [];
 
     public function __construct(
         private readonly ExecutionContext $context,
@@ -82,6 +86,32 @@ final class WorkflowEnvironment
     }
 
     /**
+     * Enregistre le handler d'un signal, comme {@see registerQueryHandler()} le fait d'une query.
+     *
+     * La forme déclarative est {@see \Gplanchat\Durable\Attribute\SignalMethod}, que le
+     * chargeur traduit en cet appel. La forme impérative n'est pas un pis-aller : un workflow
+     * écrit comme une callable ne porte pas d'attribut, et c'est ainsi que s'écrit la majorité
+     * des tests de ce composant.
+     *
+     * Le handler reçoit la charge utile du signal et mute l'état que le corps observe, en
+     * général à travers une condition passée à {@see await()}.
+     */
+    public function onSignal(\BackedEnum|string $signalName, callable $handler): void
+    {
+        $this->signalHandlers[self::messageName($signalName)] = $handler;
+    }
+
+    public function hasSignalHandler(\BackedEnum|string $signalName): bool
+    {
+        return isset($this->signalHandlers[self::messageName($signalName)]);
+    }
+
+    private static function messageName(\BackedEnum|string $name): string
+    {
+        return $name instanceof \BackedEnum ? (string) $name->value : $name;
+    }
+
+    /**
      * Attend le règlement d'un awaitable, éventuellement sous échéance.
      *
      * L'échéance par défaut est {@see Duration::infinity()} : une attente non bornée dure ce
@@ -122,15 +152,54 @@ final class WorkflowEnvironment
         // chemins, et il est irréductible — un minuteur qui ne tire jamais serait une commande
         // de plus dans l'historique, pour un réveil qui n'arrive pas.
         if ($deadline->isInfinite()) {
+            $this->applyMessagesUntil($awaitable, null);
+
             return $this->runtime->await($awaitable, $this->context);
         }
 
-        return $this->awaitUnderDeadline(
+        $timer = $this->timer($deadline, 'deadline');
+        // L'échéance borne l'application des messages : c'est ici, et pas dans une lecture
+        // d'historique, que vit la règle de DUR032.
+        $this->applyMessagesUntil(
             $awaitable,
-            $this->timer($deadline, 'deadline'),
-            $deadline,
-            self::describe($awaitable),
+            $timer instanceof TimerAwaitable ? $this->context->timerCompletionPosition($timer->timerId()) : null,
         );
+
+        return $this->awaitUnderDeadline($awaitable, $timer, $deadline, self::describe($awaitable));
+    }
+
+    /**
+     * Applique les messages enregistrés, un par un, jusqu'à ce que l'attente soit réglée.
+     *
+     * C'est la boucle d'entrelacement : chaque message est appliqué, son handler appelé, puis
+     * l'attente retestée avant de passer au suivant. La faire d'un bloc suffirait au premier
+     * passage et donnerait le verdict inverse au replay — un message enregistré après le tir
+     * d'une échéance réglerait la condition que cette échéance avait déjà tranchée.
+     *
+     * Elle est pilotée ici, avant que le composite n'atteigne le runtime : `isSettled()` d'un
+     * composite rend vrai dès qu'une branche l'est, et le minuteur réglé par l'historique
+     * court-circuiterait tout avant qu'un seul message n'ait été appliqué.
+     *
+     * @param Awaitable<mixed> $awaitable
+     */
+    private function applyMessagesUntil(Awaitable $awaitable, ?int $beforePosition): void
+    {
+        if (null === AwaitableInspector::describeCondition($awaitable)) {
+            // Rien qui dépende de l'état du workflow : aucun message à appliquer pour trancher.
+            return;
+        }
+
+        while (!$awaitable->isSettled()) {
+            $message = $this->context->nextMessage($beforePosition);
+            if (null === $message) {
+                return;
+            }
+
+            $handler = $this->signalHandlers[$message['name']] ?? null;
+            if (null !== $handler) {
+                $handler($message['payload']);
+            }
+        }
     }
 
     /**

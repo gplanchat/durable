@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\Attribute\QueryMethod;
+use Gplanchat\Durable\Attribute\SignalMethod;
 use Gplanchat\Durable\Attribute\Workflow;
 use Gplanchat\Durable\Attribute\WorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
@@ -74,6 +75,7 @@ final class WorkflowDefinitionLoader
             return function (WorkflowEnvironment $env) use ($workflowClass, $method, $input): mixed {
                 $instance = $this->instantiate($workflowClass, $env);
                 $this->registerQueryHandlers($workflowClass, $instance, $env);
+                $this->registerSignalHandlers($workflowClass, $instance, $env);
 
                 return $method->invokeArgs($instance, $this->mapInputToArguments($method, $input));
             };
@@ -173,6 +175,26 @@ final class WorkflowDefinitionLoader
         }
 
         return $args;
+    }
+
+    /**
+     * Scans the workflow class for #[SignalMethod] attributes and registers them on WorkflowEnvironment.
+     *
+     * Même traduction que pour les queries : l'attribut est la forme déclarative de
+     * {@see WorkflowEnvironment::onSignal()}, et les deux produisent le même dispatch.
+     *
+     * @param class-string $workflowClass
+     */
+    private function registerSignalHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
+    {
+        $reflection = new \ReflectionClass($workflowClass);
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $attrs = $method->getAttributes(SignalMethod::class);
+            if ($attrs === []) {
+                continue;
+            }
+            $env->onSignal($attrs[0]->newInstance()->signalName(), static fn(mixed ...$args) => $method->invoke($instance, ...$args));
+        }
     }
 
     /**

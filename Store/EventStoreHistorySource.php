@@ -275,6 +275,40 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
+    public function messageAt(int $index): ?array
+    {
+        $position = 0;
+        $seen = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof WorkflowSignalReceived) {
+                if ($seen === $index) {
+                    return [
+                        'position' => $position,
+                        'name' => $event->signalName(),
+                        'payload' => $event->signalPayload(),
+                    ];
+                }
+                ++$seen;
+            }
+            ++$position;
+        }
+
+        return null;
+    }
+
+    public function timerCompletionPosition(string $timerId): ?int
+    {
+        $position = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof TimerCompleted && $event->timerId() === $timerId) {
+                return $position;
+            }
+            ++$position;
+        }
+
+        return null;
+    }
+
     public function hasChildExecutionId(string $childExecutionId): bool
     {
         foreach ($this->eventStore->readStream($childExecutionId) as $_event) {

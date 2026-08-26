@@ -37,6 +37,12 @@ final class ExecutionContext
 
     private int $signalWaitSlotIndex = 0;
 
+    /**
+     * Rang du prochain message non appliqué. Reconstruit à zéro à chaque passe, avancé par la
+     * même règle sur le même journal : c'est ce qui rend le verdict d'une condition reproductible.
+     */
+    private int $messageCursor = 0;
+
     private int $updateWaitSlotIndex = 0;
 
     public function __construct(
@@ -222,6 +228,40 @@ final class ExecutionContext
         }
 
         return $deferred->awaitable();
+    }
+
+    /**
+     * Applique le prochain message enregistré, s'il en reste un avant `$beforePosition`.
+     *
+     * Un par un, jamais par lot : un message enregistré après le tir d'une échéance ne doit pas
+     * régler la condition qu'elle bornait, et une condition satisfaite par le premier de deux
+     * messages doit reprendre en n'ayant vu que celui-là. Les deux sortent de la même règle —
+     * le verdict est une position dans le journal (ADR DUR033).
+     *
+     * @return array{name: string, payload: array<string, mixed>}|null le message appliqué, ou null
+     */
+    public function nextMessage(?int $beforePosition = null): ?array
+    {
+        $message = $this->historySource->messageAt($this->messageCursor);
+        if (null === $message) {
+            return null;
+        }
+
+        if (null !== $beforePosition && $message['position'] > $beforePosition) {
+            return null;
+        }
+
+        ++$this->messageCursor;
+
+        return ['name' => $message['name'], 'payload' => $message['payload']];
+    }
+
+    /**
+     * Position à laquelle le tir de ce minuteur est enregistré, ou null s'il n'a pas tiré.
+     */
+    public function timerCompletionPosition(string $timerId): ?int
+    {
+        return $this->historySource->timerCompletionPosition($timerId);
     }
 
     /**
