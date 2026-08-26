@@ -70,6 +70,59 @@ final readonly class ActivityOptions
     }
 
     /**
+     * Le même objet, écrit comme on le pense.
+     *
+     * Le constructeur ordonne ses paramètres comme le fil les sérialise ; à l'usage, la question
+     * qu'on se pose d'abord est « combien de tentatives, et bornées à combien de temps ? » — deux
+     * réponses qui vivaient aux positions 1 et 8, donc inatteignables sans arguments nommés.
+     * Cette fabrique remet ces deux-là en tête et accepte les scalaires équivalents :
+     *
+     *     ActivityOptions::of(3, 30)                    // 3 tentatives, 30 s chacune
+     *     ActivityOptions::of(5, 120, 2, [Refused::class])
+     *
+     * Les coercitions restent explicites et sans valeur magique : un entier est un **nombre de
+     * tentatives** ({@see RetryLimit::ofAttempts()}, qui refuse 0 au lieu d'y lire « illimité »),
+     * une durée nue est la borne d'**une** tentative ({@see ActivityTimeouts::attempt()}), et un
+     * flottant s'exprime en secondes. Rien ici que le constructeur ne sache faire : tous ses
+     * paramètres sont couverts, pour n'avoir jamais à réécrire un `of()` en `new` sur le premier
+     * besoin d'un champ rare.
+     *
+     * @param list<class-string<\Throwable>> $nonRetryableExceptions
+     */
+    public static function of(
+        RetryLimit|int|null $retryLimit = null,
+        ActivityTimeouts|Duration|float|null $timeouts = null,
+        Duration|float|null $initialInterval = null,
+        array $nonRetryableExceptions = [],
+        TaskQueue|string|null $taskQueue = null,
+        float $backoffCoefficient = 2.0,
+        Duration|float|null $maximumInterval = null,
+        ?string $summary = null,
+        ?string $activityId = null,
+        ActivityCancellationType $cancellationType = ActivityCancellationType::TryCancel,
+    ): self {
+        return new self(
+            \is_int($retryLimit) ? RetryLimit::ofAttempts($retryLimit) : $retryLimit,
+            self::duration($initialInterval),
+            $backoffCoefficient,
+            self::duration($maximumInterval),
+            $nonRetryableExceptions,
+            TaskQueue::fromNullable($taskQueue),
+            $activityId,
+            $timeouts instanceof ActivityTimeouts || null === $timeouts
+                ? $timeouts
+                : ActivityTimeouts::attempt(self::duration($timeouts)),
+            $cancellationType,
+            $summary,
+        );
+    }
+
+    private static function duration(Duration|float|null $value): ?Duration
+    {
+        return \is_float($value) ? Duration::seconds($value) : $value;
+    }
+
+    /**
      * Délai à appliquer **avant** la tentative n° {@code $nextAttempt} (1-based), après l’échec
      * de la tentative précédente. Nul pour la première tentative.
      */
@@ -79,8 +132,16 @@ final readonly class ActivityOptions
             return Duration::zero();
         }
 
+        $factor = $this->backoffCoefficient ** (float) ($nextAttempt - 2);
+        // Sans borne de tentatives, l'exposant finit par dépasser le flottant — vers la
+        // millième tentative avec les défauts. Le produit est de toute façon plafonné : un
+        // facteur débordé veut dire « le plafond », pas une erreur d'arithmétique.
+        if (is_infinite($factor)) {
+            return $this->effectiveMaximumInterval();
+        }
+
         return $this->initialInterval
-            ->multipliedBy($this->backoffCoefficient ** (float) ($nextAttempt - 2))
+            ->multipliedBy($factor)
             ->shortest($this->effectiveMaximumInterval());
     }
 

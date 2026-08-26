@@ -29,6 +29,11 @@ final readonly class Duration
         if ($seconds < 0.0) {
             throw new \InvalidArgumentException(\sprintf('A duration cannot be negative, %.3fs given.', $seconds));
         }
+        if (is_infinite($seconds) || is_nan($seconds)) {
+            // Un INF calculé est une faute d'arithmétique, pas une intention : l'infini se
+            // demande par son nom, {@see infinity()}, et jamais par accident.
+            throw new \InvalidArgumentException('A duration must be a finite number of seconds. Use Duration::infinity() to say "no bound at all".');
+        }
 
         return new self($seconds);
     }
@@ -98,11 +103,28 @@ final readonly class Duration
     }
 
     /**
-     * Aucune attente. Distinct de « pas de borne », qui se dit `null`.
+     * Aucune attente. Distinct de « pas de borne », qui se dit {@see infinity()}.
      */
     public static function zero(): self
     {
         return new self(0.0);
+    }
+
+    /**
+     * Tout le temps qu'il faudra.
+     *
+     * L'absence de borne était jusqu'ici un `null` : l'absence d'une valeur, pas une valeur.
+     * Elle ne se comparait pas ({@see shortest()}), ne se transportait pas dans une
+     * configuration, et obligeait chaque site qui accepte une échéance à écrire son cas
+     * particulier. C'est pourtant une longueur de temps parfaitement définie du domaine — celle
+     * d'une attente qu'on ne borne pas — et elle mérite d'être dite comme telle.
+     *
+     * Une durée infinie n'est pas une durée de fil : {@see WorkflowEnvironment::timer()} la
+     * refuse, parce qu'un minuteur qui ne tire jamais est un réveil qui n'existe pas.
+     */
+    public static function infinity(): self
+    {
+        return new self(\INF);
     }
 
     /**
@@ -128,6 +150,14 @@ final readonly class Duration
     public function isZero(): bool
     {
         return 0.0 === $this->seconds;
+    }
+
+    /**
+     * Cette durée ne s'écoule jamais : rien ne borne l'attente qu'elle mesure.
+     */
+    public function isInfinite(): bool
+    {
+        return is_infinite($this->seconds);
     }
 
     public function isLongerThan(self $other): bool
