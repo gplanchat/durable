@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
-use Gplanchat\Durable\Observation\WorkflowRunDescription;
+use Gplanchat\Durable\Observation\WorkflowRunPage;
+use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
 /**
  * Lecture seule : quelles exécutions existent, et ce qu'elles sont devenues.
@@ -14,15 +15,18 @@ use Gplanchat\Durable\Observation\WorkflowRunDescription;
  * exécution à la fois. Un tableau de bord lit en travers des exécutions ; c'est un autre besoin, et
  * ce port est là pour qu'il ne soit pas servi en parlant gRPC ou SQL depuis la vue.
  *
- * Les implémentations rendent des {@see WorkflowRunDescription} : ce que le backend sait dire, et
- * rien qu'il ne saurait pas.
+ * Les implémentations rendent des {@see \Gplanchat\Durable\Observation\WorkflowRunDescription} : ce
+ * que le backend sait dire, et rien qu'il ne saurait pas.
  */
 interface WorkflowRunCatalogInterface
 {
     /**
-     * Les exécutions connues, de la plus récemment démarrée à la plus ancienne.
+     * Une page d'exécutions, de la plus récemment démarrée à la plus ancienne.
      *
-     * @return list<WorkflowRunDescription>
+     * @param WorkflowRunStatus|null $status `null` pour toutes les issues
+     * @param string|null            $cursor `nextCursor` d'une page précédente, obtenu du même
+     *                                       catalogue et avec le même filtre ; `null` pour la
+     *                                       première page
      */
-    public function listRuns(int $limit = 20): array;
+    public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
 }
