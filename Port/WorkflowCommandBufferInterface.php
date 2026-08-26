@@ -112,6 +112,29 @@ interface WorkflowCommandBufferInterface
     /**
      * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
      */
+    /**
+     * Planifie une opération Nexus : un appel servi par un endpoint extérieur.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     */
+    public function scheduleNexusOperation(
+        string $operationId,
+        \Gplanchat\Durable\Nexus\NexusEndpoint $endpoint,
+        \Gplanchat\Durable\Nexus\NexusService $service,
+        \Gplanchat\Durable\Nexus\NexusOperationName $operation,
+        array $payload,
+        \Gplanchat\Durable\Nexus\NexusOperationTimeouts $timeouts,
+    ): void;
+
+    /**
+     * Demande l'annulation d'une opération Nexus encore en vol.
+     *
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     */
+    public function cancelNexusOperation(string $operationId, string $reason): void;
+
     public function cancelActivity(string $activityId, string $reason): void;
 
     /**
