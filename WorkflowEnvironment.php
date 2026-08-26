@@ -21,6 +21,10 @@ use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\FailureEnvelope;
+use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationName;
+use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
+use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
@@ -484,6 +488,37 @@ final class WorkflowEnvironment
     public function activity(string $name, array $payload = [], ?ActivityOptions $options = null): Awaitable
     {
         return $this->context->activity($name, $payload, $options);
+    }
+
+    /**
+     * Appelle une opération Nexus : une opération servie par une autre équipe, un autre namespace,
+     * un autre déploiement — et qu'on attend comme une activité.
+     *
+     * Les trois noms sont des objets-valeurs parce que le serveur ne protège que le premier :
+     * sondé, il refuse net un endpoint mal formé, et accepte sans broncher un service ou une
+     * opération vides, blancs ou truffés de caractères de contrôle. Une opération ainsi nommée est
+     * enregistrée telle quelle puis attend un gestionnaire qui ne correspondra jamais.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return Awaitable<mixed>
+     *
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend configuré ne sait pas router l'appel
+     */
+    public function nexusOperation(
+        NexusEndpoint|string $endpoint,
+        NexusService|string $service,
+        NexusOperationName|string $operation,
+        array $payload = [],
+        ?NexusOperationTimeouts $timeouts = null,
+    ): Awaitable {
+        return $this->context->nexusOperation(
+            NexusEndpoint::from($endpoint),
+            NexusService::from($service),
+            NexusOperationName::from($operation),
+            $payload,
+            $timeouts,
+        );
     }
 
     /**

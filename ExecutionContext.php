@@ -7,6 +7,7 @@ namespace Gplanchat\Durable;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Awaitable\ActivityAwaitable;
 use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Awaitable\NexusOperationAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
@@ -14,6 +15,10 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\FailureEnvelope;
+use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationName;
+use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
+use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
@@ -26,9 +31,14 @@ final class ExecutionContext
     private array $pendingActivities = [];
 
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
+    private array $pendingNexusOperations = [];
+
+    /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
     private array $pendingTimers = [];
 
     private int $activitySlotIndex = 0;
+
+    private int $nexusOperationSlotIndex = 0;
 
     private int $timerSlotIndex = 0;
 
@@ -100,6 +110,58 @@ final class ExecutionContext
         }
 
         return new ActivityAwaitable($deferred->awaitable(), $activityId);
+    }
+
+    /**
+     * Planifie une opération Nexus et rend l'attente de son résultat.
+     *
+     * Même discipline de slot que {@see activity()} : le rang de l'appel identifie l'opération
+     * d'une passe de replay à l'autre. La différence de conséquence mérite d'être dite — une
+     * activité replanifiée par erreur retombe sur un worker à soi, une opération Nexus part chez
+     * un tiers, où le doublon est le sien.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return Awaitable<mixed>
+     */
+    public function nexusOperation(
+        NexusEndpoint $endpoint,
+        NexusService $service,
+        NexusOperationName $operation,
+        array $payload = [],
+        ?NexusOperationTimeouts $timeouts = null,
+    ): Awaitable {
+        $slotIndex = $this->nexusOperationSlotIndex++;
+        $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
+        $operationId = $scheduled ?? $this->uuid();
+
+        $replay = $this->historySource->findNexusOperationSlotResult($slotIndex);
+        if (null !== $replay) {
+            $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
+            if (null !== $replay['failed']) {
+                $deferred->reject($replay['failed']);
+            } else {
+                $deferred->resolve($replay['result']);
+            }
+
+            return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
+        }
+
+        $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
+        $this->pendingNexusOperations[$operationId] = $deferred;
+
+        if (null === $scheduled) {
+            $this->commandBuffer->scheduleNexusOperation(
+                $operationId,
+                $endpoint,
+                $service,
+                $operation,
+                $payload,
+                $timeouts ?? NexusOperationTimeouts::none(),
+            );
+        }
+
+        return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
     }
 
     /**
@@ -375,6 +437,19 @@ final class ExecutionContext
     /**
      * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
      */
+    /**
+     * Les opérations Nexus encore en vol, par identifiant.
+     *
+     * Miroir de {@see pendingActivities()} : c'est par là que l'issue d'une opération, lue dans
+     * l'historique, retrouve l'attente qu'elle doit régler.
+     *
+     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
+     */
+    public function pendingNexusOperations(): array
+    {
+        return $this->pendingNexusOperations;
+    }
+
     public function pendingActivities(): array
     {
         return $this->pendingActivities;
