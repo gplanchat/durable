@@ -61,6 +61,12 @@ final class AwaitableCancellation
             return [$awaitable->timerId()];
         }
 
+        if ($awaitable instanceof NexusOperationAwaitable) {
+            $context->cancelScheduledNexusOperation($awaitable->operationId(), $reason);
+
+            return [$awaitable->operationId()];
+        }
+
         return [];
     }
 }
