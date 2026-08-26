@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\Observation\WorkflowRunEvent;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
@@ -29,4 +30,14 @@ interface WorkflowRunCatalogInterface
      *                                       première page
      */
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
+
+    /**
+     * L'historique enregistré d'une exécution, dans l'ordre où il a été enregistré.
+     *
+     * Une exécution inconnue rend une liste vide : une exécution purgée, ou jamais vue, n'est pas
+     * une erreur d'appel — la vue doit pouvoir l'afficher sans rien avoir à rattraper.
+     *
+     * @return list<WorkflowRunEvent>
+     */
+    public function readHistory(string $runId): array;
 }
