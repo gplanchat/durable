@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\ChildWorkflowOptions;
-use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
  * Proxy de planification côté workflow pour exécuter un workflow enfant typé.
  *
- * Chaque appel à la méthode WorkflowMethod délègue à WorkflowEnvironment::executeChildWorkflow.
+ * Chaque appel à la méthode WorkflowMethod démarre l'enfant et rend un `Awaitable` : c'est
+ * l'appelant qui attend, ce qui rend l'enfant composable — une course, un quorum, une
+ * échéance. Un stub qui attendait pour l'appelant ne pouvait entrer dans aucun assemblage.
  *
  * @template TWorkflow of object
  */
@@ -24,7 +25,7 @@ final class ChildWorkflowStub
      * @param class-string<TWorkflow> $workflowClass
      */
     public function __construct(
-        private readonly WorkflowEnvironment $environment,
+        private readonly ChildWorkflowSchedulerInterface $scheduler,
         private readonly string $workflowClass,
         WorkflowDefinitionLoader $loader,
         private readonly ?ChildWorkflowOptions $options = null,
@@ -37,7 +38,10 @@ final class ChildWorkflowStub
     /**
      * @param array<int, mixed> $arguments
      */
-    public function __call(string $name, array $arguments): mixed
+    /**
+     * @return \Gplanchat\Durable\Awaitable\Awaitable<mixed>
+     */
+    public function __call(string $name, array $arguments): \Gplanchat\Durable\Awaitable\Awaitable
     {
         if ($name !== $this->workflowMethod->getName()) {
             throw new \BadMethodCallException(\sprintf('Method %s::%s() is not the workflow entry point (expected %s).', $this->workflowClass, $name, $this->workflowMethod->getName()));
@@ -45,7 +49,7 @@ final class ChildWorkflowStub
 
         $input = $this->argumentsToInput($arguments);
 
-        return $this->environment->executeChildWorkflow($this->workflowType, $input, $this->options);
+        return $this->scheduler->startChildWorkflow($this->workflowType, $input, $this->options);
     }
 
     /**

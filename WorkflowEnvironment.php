@@ -19,6 +19,7 @@ use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
+use Gplanchat\Durable\Workflow\ContextChildWorkflowScheduler;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
 /**
@@ -262,25 +263,7 @@ final class WorkflowEnvironment
         return $this->await($this->context->sideEffect($closure));
     }
 
-    /**
-     * Planifie un workflow enfant sans l’attendre ; à combiner avec {@see all()} pour plusieurs enfants en parallèle.
-     *
-     * @param array<string, mixed> $input
-     *
-     * @return Awaitable<mixed>
-     */
-    public function scheduleChildWorkflow(string $childWorkflowType, array $input = [], ?ChildWorkflowOptions $options = null): Awaitable
-    {
-        return $this->context->executeChildWorkflow($childWorkflowType, $input, $options);
-    }
 
-    /**
-     * @param array<string, mixed> $input
-     */
-    public function executeChildWorkflow(string $childWorkflowType, array $input = [], ?ChildWorkflowOptions $options = null): mixed
-    {
-        return $this->await($this->scheduleChildWorkflow($childWorkflowType, $input, $options));
-    }
 
     /**
      * Retourne un stub typé pour un workflow enfant.
@@ -295,7 +278,7 @@ final class WorkflowEnvironment
     {
         $loader = $this->workflowLoader ?? new WorkflowDefinitionLoader();
 
-        return new ChildWorkflowStub($this, $workflowClass, $loader, $options);
+        return new ChildWorkflowStub(new ContextChildWorkflowScheduler($this->context), $workflowClass, $loader, $options);
     }
 
     /**
