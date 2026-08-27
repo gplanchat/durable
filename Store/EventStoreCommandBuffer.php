@@ -16,6 +16,7 @@ use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Failure\FailureEnvelope;
@@ -158,6 +159,11 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $reason->getMessage(),
             (int) $reason->getCode(),
         ));
+    }
+
+    public function recordVersion(string $changeId, int $version): void
+    {
+        $this->eventStore->append(new VersionMarked($this->executionId, $changeId, $version));
     }
 
     public function failWorkflow(\Throwable $reason): void

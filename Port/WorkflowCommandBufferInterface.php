@@ -107,6 +107,14 @@ interface WorkflowCommandBufferInterface
     /**
      * Records workflow failure (COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION for Temporal).
      */
+    /**
+     * Records the version an execution resolved for a declared change point.
+     *
+     * Written once, the first time the execution reaches the point. Everything after that reads it
+     * back rather than deciding again.
+     */
+    public function recordVersion(string $changeId, int $version): void;
+
     public function failWorkflow(\Throwable $reason): void;
 
     /**

@@ -22,6 +22,7 @@ use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -91,6 +92,7 @@ final class EventDataMapper
                 (string) $payload['reason'],
             ),
             ActivityCompleted::class => new ActivityCompleted($executionId, (string) $payload['activityId'], $payload['result'] ?? null),
+            VersionMarked::class => new VersionMarked($executionId, (string) $payload['changeId'], (int) $payload['version']),
             ActivityTaskStarted::class => new ActivityTaskStarted(
                 $executionId,
                 (string) $payload['activityId'],

@@ -43,6 +43,16 @@ interface WorkflowHistorySourceInterface
     public function activityNameForSlot(int $slot): ?string;
 
     /**
+     * Returns the version this execution recorded for a declared change point, or null if it has
+     * not reached that point yet.
+     *
+     * Keyed by change id and **not** by slot: a change point is a named place in the code, and two
+     * of them in the same workflow are independent — an execution can be on the old side of one and
+     * the new side of another.
+     */
+    public function versionForChangeId(string $changeId): ?int;
+
+    /**
      * Returns the recorded result for Nexus operation slot N, or null if not yet recorded.
      *
      * @return array{result: mixed, failed: \Throwable|null}|null

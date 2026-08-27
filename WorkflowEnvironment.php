@@ -412,6 +412,34 @@ final class WorkflowEnvironment
      *
      * @return T
      */
+    /**
+     * Déclare que le comportement de ce workflow a changé ici, et rend celui qui concerne
+     * l'exécution en cours.
+     *
+     * ```php
+     * if ($this->environment->version('ajout-remise', ChangePoint::DEFAULT_VERSION, 1) === ChangePoint::DEFAULT_VERSION) {
+     *     $total = $this->await($this->facturation->totalSansRemise($panier));
+     * } else {
+     *     $total = $this->await($this->facturation->totalAvecRemise($panier));
+     * }
+     * ```
+     *
+     * La réponse est figée à la première rencontre et relue du journal ensuite : une exécution
+     * déjà partie garde son comportement quoi qu'on déploie après elle, et c'est le seul endroit
+     * où la garde de divergence (DUR042) accepte que le code s'écarte de l'historique.
+     *
+     * Deux points de changement sont indépendants : une exécution peut être du vieux côté de l'un
+     * et du neuf côté de l'autre.
+     *
+     * @param string $changeId     le nom de ce point, stable dans le temps — il vit dans l'historique
+     * @param int    $minSupported la plus ancienne version que ce code sait encore jouer
+     * @param int    $maxSupported la plus récente, celle qu'une exécution neuve prendra
+     */
+    public function version(string $changeId, int $minSupported, int $maxSupported): int
+    {
+        return $this->context->version($changeId, $minSupported, $maxSupported);
+    }
+
     public function sideEffect(\Closure $closure): mixed
     {
         return $this->await($this->context->sideEffect($closure));

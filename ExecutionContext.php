@@ -192,6 +192,34 @@ final class ExecutionContext
     }
 
     /**
+     * Déclare que le comportement du workflow a changé ici, et rend celui qui concerne CETTE
+     * exécution.
+     *
+     * La réponse est figée à la première rencontre et relue du journal ensuite : une exécution en
+     * vol garde son comportement quoi qu'on déploie après elle. C'est ce qui distingue le
+     * versioning de la devinette.
+     *
+     * Deux points de changement sont indépendants — ils sont indexés par leur identifiant, pas par
+     * une position —, donc une exécution peut être du vieux côté de l'un et du neuf côté de
+     * l'autre.
+     *
+     * @param string $changeId     le nom de ce point de changement, stable dans le temps
+     * @param int    $minSupported la plus ancienne version que ce code sait encore jouer
+     * @param int    $maxSupported la plus récente, celle qu'une exécution neuve prendra
+     */
+    public function version(string $changeId, int $minSupported, int $maxSupported): int
+    {
+        $recorded = $this->historySource->versionForChangeId($changeId);
+        if (null !== $recorded) {
+            return $recorded;
+        }
+
+        $this->commandBuffer->recordVersion($changeId, $maxSupported);
+
+        return $maxSupported;
+    }
+
+    /**
      * Refuse de résoudre un slot avec un enregistrement qui n'est pas le sien.
      *
      * Les slots sont positionnels : le slot N est le N-ième appel, pas le N-ième appel *à cette

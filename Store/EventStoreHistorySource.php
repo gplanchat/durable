@@ -18,6 +18,7 @@ use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
@@ -93,6 +94,17 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
         if (\array_key_exists($activityId, $completedResults)) {
             return ['result' => $completedResults[$activityId], 'failed' => null];
+        }
+
+        return null;
+    }
+
+    public function versionForChangeId(string $changeId): ?int
+    {
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof VersionMarked && $event->changeId() === $changeId) {
+                return $event->version();
+            }
         }
 
         return null;
