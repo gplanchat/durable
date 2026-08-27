@@ -26,6 +26,7 @@ use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
 use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
+use Gplanchat\Durable\Versioning\ChangePoint;
 use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 
 final class ExecutionContext
@@ -214,9 +215,41 @@ final class ExecutionContext
             return $recorded;
         }
 
+        // Aucun marqueur, et du travail enregistré encore devant : cette exécution est passée
+        // ici avant que le point n'existe. Elle garde donc l'ancien comportement, et rien n'est
+        // écrit — la réponse se déduit de l'historique plutôt que de s'y ajouter, ce qui la rend
+        // stable par construction.
+        if ($this->hasRecordedWorkAhead()) {
+            return ChangePoint::DEFAULT_VERSION;
+        }
+
         $this->commandBuffer->recordVersion($changeId, $maxSupported);
 
         return $maxSupported;
+    }
+
+    /**
+     * Le journal porte-t-il encore du travail que cette passe n'a pas atteint ?
+     *
+     * C'est le signal « en train de rejouer » que ce moteur n'avait pas, déduit de ce que le port
+     * expose déjà plutôt qu'ajouté à côté : si le slot suivant de l'un des types est enregistré,
+     * l'appel courant se situe dans le préfixe rejoué. Sinon l'exécution est arrivée au bout de
+     * son historique et ce qu'elle fait maintenant est neuf.
+     *
+     * Déduit, donc déterministe : deux replays de la même histoire répondent pareil, ce qui est la
+     * seule propriété dont le versioning a besoin.
+     *
+     * Les effets de bord ne sont pas consultés : `findSideEffectForSlot()` rend `mixed`, et une
+     * valeur enregistrée peut légitimement être `null` — on ne peut pas distinguer « rien ici » de
+     * « ici, la valeur null ». Un workflow dont le seul travail avant un point de changement est
+     * un effet de bord sera donc traité comme neuf. C'est le trou, il est étroit, et il est écrit.
+     */
+    private function hasRecordedWorkAhead(): bool
+    {
+        return null !== $this->historySource->findScheduledActivityId($this->activitySlotIndex)
+            || null !== $this->historySource->findScheduledTimerId($this->timerSlotIndex)
+            || null !== $this->historySource->findScheduledChildExecutionId($this->childWorkflowSlotIndex)
+            || null !== $this->historySource->findScheduledNexusOperation($this->nexusOperationSlotIndex);
     }
 
     /**
