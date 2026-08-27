@@ -11,6 +11,7 @@ use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\InMemoryEventStore;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
+use Gplanchat\Durable\Versioning\ChangePoint;
 use Gplanchat\Durable\WorkflowEnvironment;
 use Gplanchat\Durable\WorkflowRegistry;
 
@@ -119,6 +120,41 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         self::assertSame($fromReference->nexusOperationSignatureForSlot(0), $fromSubject->nexusOperationSignatureForSlot(0));
     }
 
+    /**
+     * La version qu'une exécution a enregistrée doit survivre à l'aller-retour dans le store.
+     *
+     * C'est la propriété dont dépend tout le versioning : au replay, la réponse vient du journal.
+     * Un adaptateur qui la perdrait ferait reprendre à une exécution en vol l'autre branche — sans
+     * rien signaler, puisque la garde de divergence, elle, verrait un code cohérent avec sa
+     * nouvelle version.
+     */
+    public function testVersionLookupsAgreeWithTheReference(): void
+    {
+        $reference = new InMemoryEventStore();
+        $subject = $this->createEventStore();
+
+        self::runConformanceWorkflow($reference, 'exec-reference');
+        self::runConformanceWorkflow($subject, 'exec-subject');
+
+        $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
+        $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
+
+        self::assertSame(1, $fromSubject->versionForChangeId('conformance-change'), 'la version enregistrée revient telle quelle');
+        self::assertSame(
+            $fromReference->versionForChangeId('conformance-change'),
+            $fromSubject->versionForChangeId('conformance-change'),
+        );
+
+        // Un point que ce workflow n'a jamais déclaré : null des deux côtés. C'est ce qui
+        // distingue « pas encore atteint » de « version 0 », et un adaptateur qui répondrait 0
+        // ferait prendre l'ancienne branche à une exécution qui n'y a jamais eu droit.
+        self::assertNull($fromSubject->versionForChangeId('jamais-declare'));
+        self::assertSame(
+            $fromReference->versionForChangeId('jamais-declare'),
+            $fromSubject->versionForChangeId('jamais-declare'),
+        );
+    }
+
     private static function runConformanceWorkflow(EventStoreInterface $eventStore, string $executionId): mixed
     {
         $activityExecutor = new RegistryActivityExecutor();
@@ -137,6 +173,11 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
 
         return $runner->run($executionId, static function (WorkflowEnvironment $wf): array {
+            // Un point de changement dans le workflow de conformité : c'est ce qui oblige chaque
+            // adaptateur à faire l'aller-retour du marqueur de version, et pas seulement la
+            // référence. Un store qui perdrait `VersionMarked` ferait rebasculer une exécution en
+            // vol sur l'autre branche — en silence.
+            $wf->version('conformance-change', ChangePoint::DEFAULT_VERSION, 1);
             $nested = $wf->sideEffect(static fn(): array => ['nested' => ['deep' => true], 'ratio' => 0.1]);
             $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
             $wf->sleep(Duration::seconds(0.001));
