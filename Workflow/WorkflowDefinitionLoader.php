@@ -73,9 +73,9 @@ final class WorkflowDefinitionLoader
         $method = $this->resolveWorkflowMethod($reflection);
 
         $factory = function (array $input) use ($workflowClass, $method): callable {
-            return function (WorkflowEnvironment $env) use ($workflowClass, $method, $input): mixed {
+            return function (WorkflowEnvironment $env, ?QueryHandlerRegistry $queries = null) use ($workflowClass, $method, $input): mixed {
                 $instance = $this->instantiate($workflowClass, $env);
-                $this->registerQueryHandlers($workflowClass, $instance, $env);
+                $this->registerQueryHandlers($workflowClass, $instance, $queries ?? new QueryHandlerRegistry());
                 $this->registerSignalHandlers($workflowClass, $instance, $env);
                 $this->registerUpdateHandlers($workflowClass, $instance, $env);
 
@@ -221,7 +221,7 @@ final class WorkflowDefinitionLoader
      *
      * @param class-string $workflowClass
      */
-    private function registerQueryHandlers(string $workflowClass, object $instance, WorkflowEnvironment $env): void
+    private function registerQueryHandlers(string $workflowClass, object $instance, QueryHandlerRegistry $queries): void
     {
         $reflection = new \ReflectionClass($workflowClass);
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
@@ -231,7 +231,7 @@ final class WorkflowDefinitionLoader
             }
             $attr = $attrs[0]->newInstance();
             $queryType = $attr->name;
-            $env->registerQueryHandler($queryType, static fn(mixed ...$args) => $method->invoke($instance, ...$args));
+            $queries->register($queryType, static fn(mixed ...$args) => $method->invoke($instance, ...$args));
         }
     }
 }
