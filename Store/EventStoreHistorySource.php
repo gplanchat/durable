@@ -115,6 +115,31 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
+    public function childWorkflowTypeForSlot(int $slot): ?string
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ChildWorkflowScheduled) {
+                if ($index === $slot) {
+                    return '' === $event->childWorkflowType() ? null : $event->childWorkflowType();
+                }
+                ++$index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Ce backend refuse d'ordonnancer une opération Nexus (DUR036) : aucun de ses journaux n'en
+     * porte, et la réponse est donc toujours « rien ». Ce n'est pas un trou d'implémentation mais
+     * la conséquence exacte du refus.
+     */
+    public function nexusOperationSignatureForSlot(int $slot): ?string
+    {
+        return null;
+    }
+
     public function findScheduledActivityId(int $slot): ?string
     {
         $index = 0;
