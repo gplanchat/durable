@@ -30,6 +30,19 @@ interface WorkflowHistorySourceInterface
     public function findScheduledActivityId(int $slot): ?string;
 
     /**
+     * Returns the activity **name** recorded at slot N, or null if none was recorded there.
+     *
+     * Null covers both cases a caller must treat alike: no slot at that index, and a slot whose
+     * journal entry carries no name. An implementation never answers an empty string.
+     *
+     * The slot lookups above answer "what happened here"; this one answers "what was this".
+     * Without it a replay resolves a slot with whatever the journal holds at that index, whether
+     * or not it belongs to the call the code is making — measured, and it terminates the run
+     * successfully carrying the wrong value.
+     */
+    public function activityNameForSlot(int $slot): ?string;
+
+    /**
      * Returns the recorded result for Nexus operation slot N, or null if not yet recorded.
      *
      * @return array{result: mixed, failed: \Throwable|null}|null
