@@ -20,6 +20,7 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationHeaders;
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
@@ -197,6 +198,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         NexusOperationName $operation,
         array $payload,
         NexusOperationTimeouts $timeouts,
+        NexusOperationHeaders $headers,
     ): void {
         throw NexusUnsupportedByBackendException::forBackend('journal');
     }

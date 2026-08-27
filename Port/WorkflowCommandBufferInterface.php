@@ -126,6 +126,7 @@ interface WorkflowCommandBufferInterface
         \Gplanchat\Durable\Nexus\NexusOperationName $operation,
         array $payload,
         \Gplanchat\Durable\Nexus\NexusOperationTimeouts $timeouts,
+        \Gplanchat\Durable\Nexus\NexusOperationHeaders $headers,
     ): void;
 
     /**

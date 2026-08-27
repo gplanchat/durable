@@ -16,6 +16,7 @@ use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
+use Gplanchat\Durable\Nexus\NexusOperationHeaders;
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
@@ -130,6 +131,7 @@ final class ExecutionContext
         NexusOperationName $operation,
         array $payload = [],
         ?NexusOperationTimeouts $timeouts = null,
+        ?NexusOperationHeaders $headers = null,
     ): Awaitable {
         $slotIndex = $this->nexusOperationSlotIndex++;
         $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
@@ -158,6 +160,7 @@ final class ExecutionContext
                 $operation,
                 $payload,
                 $timeouts ?? NexusOperationTimeouts::none(),
+                $headers ?? NexusOperationHeaders::none(),
             );
         }
 
