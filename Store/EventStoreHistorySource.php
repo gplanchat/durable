@@ -98,6 +98,23 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
+    public function activityNameForSlot(int $slot): ?string
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ActivityScheduled) {
+                if ($index === $slot) {
+                    // Une chaîne vide n'est pas un nom : c'est « rien d'enregistré ». Le port
+                    // promet null dans ce cas, et la garde compte dessus.
+                    return '' === $event->activityName() ? null : $event->activityName();
+                }
+                ++$index;
+            }
+        }
+
+        return null;
+    }
+
     public function findScheduledActivityId(int $slot): ?string
     {
         $index = 0;

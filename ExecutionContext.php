@@ -14,6 +14,7 @@ use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\Exception\WorkflowTaskFailure;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
 use Gplanchat\Durable\Nexus\NexusOperationHeaders;
@@ -97,6 +98,7 @@ final class ExecutionContext
     public function activity(string $name, array $payload = [], ?ActivityOptions $options = null): Awaitable
     {
         $slotIndex = $this->activitySlotIndex++;
+        $this->refuseActivityDivergence($slotIndex, $name);
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
@@ -181,6 +183,40 @@ final class ExecutionContext
         }
 
         return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
+    }
+
+    /**
+     * Refuse de résoudre un slot avec un enregistrement qui n'est pas le sien.
+     *
+     * Les slots sont positionnels : le slot N est le N-ième appel, pas le N-ième appel *à cette
+     * activité-là*. Insérer un appel avant un autre décale donc tout ce qui suit, et le replay
+     * rendait jusqu'ici le résultat enregistré du voisin — sans un mot. Mesuré contre un vrai
+     * serveur : l'exécution se terminait **en succès** en portant la mauvaise valeur.
+     *
+     * La comparaison ne s'appuie que sur ce que l'historique porte déjà. Ajouter un champ aux
+     * événements aurait laissé sans garde exactement les exécutions que la garde protège : les
+     * anciennes.
+     *
+     * Un slot que personne n'a enregistré n'est pas une divergence — c'est un workflow qui
+     * grandit, et le refuser casserait le cas normal.
+     *
+     * @throws WorkflowTaskFailure si le code demande autre chose que ce que le journal tient
+     */
+    private function refuseActivityDivergence(int $slotIndex, string $requested): void
+    {
+        $recorded = $this->historySource->activityNameForSlot($slotIndex);
+        if (null === $recorded || $recorded === $requested) {
+            return;
+        }
+
+        throw new WorkflowTaskFailure(\sprintf(
+            'Replay divergence at activity slot %d of execution "%s": history recorded "%s", code scheduled "%s". '
+            . 'This history was written by a different version of the workflow.',
+            $slotIndex,
+            $this->executionId,
+            $recorded,
+            $requested,
+        ));
     }
 
     /**
