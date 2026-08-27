@@ -75,6 +75,50 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         self::assertNotNull($fromSubject->findScheduledTimerId(0), 'le minuteur doit être relu depuis le store');
     }
 
+    /**
+     * Les accesseurs d'identité que la garde de divergence interroge (DUR042).
+     *
+     * Ils sont sur le même port que les recherches de slot ci-dessus, mais ils ne répondent pas à
+     * la même question : « qu'est-ce qui s'est passé ici » d'un côté, « qu'est-ce que c'était » de
+     * l'autre. Un adaptateur peut très bien rendre le bon résultat au bon slot et se tromper
+     * d'identité — et une garde qui compare la mauvaise identité vaut moins que pas de garde,
+     * puisqu'elle refuserait des replays fidèles.
+     *
+     * Ici plutôt que dans un test de parité dédié à un adaptateur : tout store qui étend cette
+     * classe hérite du contrôle, aujourd'hui comme demain.
+     */
+    public function testIdentityLookupsAgreeWithTheReference(): void
+    {
+        $reference = new InMemoryEventStore();
+        $subject = $this->createEventStore();
+
+        self::runConformanceWorkflow($reference, 'exec-reference');
+        self::runConformanceWorkflow($subject, 'exec-subject');
+
+        $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
+        $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
+
+        self::assertSame(
+            $fromReference->activityNameForSlot(0),
+            $fromSubject->activityNameForSlot(0),
+            "l'identité du slot d'activité doit survivre à l'aller-retour dans le store",
+        );
+        self::assertNotNull($fromSubject->activityNameForSlot(0), 'et ne pas être perdue en route');
+
+        // Un slot que le workflow n'a pas atteint : null des deux côtés. C'est ce qui distingue
+        // « rien à comparer » de « divergence », et un adaptateur qui répondrait la chaîne vide
+        // ferait refuser un workflow qui grandit.
+        self::assertNull($fromSubject->activityNameForSlot(1));
+        self::assertSame($fromReference->activityNameForSlot(1), $fromSubject->activityNameForSlot(1));
+
+        // Le workflow de conformité ne démarre aucun enfant et ce backend refuse Nexus (DUR036) :
+        // les deux accesseurs doivent le dire, et le dire pareil.
+        self::assertNull($fromSubject->childWorkflowTypeForSlot(0));
+        self::assertSame($fromReference->childWorkflowTypeForSlot(0), $fromSubject->childWorkflowTypeForSlot(0));
+        self::assertNull($fromSubject->nexusOperationSignatureForSlot(0));
+        self::assertSame($fromReference->nexusOperationSignatureForSlot(0), $fromSubject->nexusOperationSignatureForSlot(0));
+    }
+
     private static function runConformanceWorkflow(EventStoreInterface $eventStore, string $executionId): mixed
     {
         $activityExecutor = new RegistryActivityExecutor();
