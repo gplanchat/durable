@@ -25,9 +25,12 @@ use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
 use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
+use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 
 final class ExecutionContext
 {
+    private ?QueryHandlerRegistry $queryHandlers = null;
+
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
     private array $pendingActivities = [];
 
@@ -67,6 +70,19 @@ final class ExecutionContext
          */
         private readonly array $pendingUpdates = [],
     ) {}
+
+    /**
+     * Les handlers de query de cette exécution.
+     *
+     * Porté ici parce qu'un workflow ne reçoit jamais le contexte : c'est ce qui met la
+     * plomberie des queries hors de sa portée sans la rendre inaccessible au moteur.
+     *
+     * @internal
+     */
+    public function queryHandlers(): QueryHandlerRegistry
+    {
+        return $this->queryHandlers ??= new QueryHandlerRegistry();
+    }
 
     public function executionId(): string
     {

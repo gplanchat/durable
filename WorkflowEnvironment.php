@@ -39,9 +39,6 @@ final class WorkflowEnvironment
 
     private ?WorkflowDefinitionLoader $workflowLoader = null;
 
-    /** @var array<string, callable> query type → handler */
-    private array $queryHandlers = [];
-
     /** @var array<string, callable> signal name → handler */
     private array $signalHandlers = [];
 
@@ -64,43 +61,18 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Registers a query handler callable for the given query type name.
-     * Called by WorkflowDefinitionLoader after instantiating the workflow.
-     */
-    public function registerQueryHandler(string $queryType, callable $handler): void
-    {
-        $this->queryHandlers[$queryType] = $handler;
-    }
-
-    /**
-     * Calls a registered query handler and returns its result.
-     *
-     * @param array<mixed> $args
-     *
-     * @throws \InvalidArgumentException if no handler is registered for the query type
-     */
-    public function callQueryHandler(string $queryType, array $args = []): mixed
-    {
-        $handler = $this->queryHandlers[$queryType] ?? null;
-        if (null === $handler) {
-            throw new \InvalidArgumentException(\sprintf('No query handler registered for query type: %s', $queryType));
-        }
-
-        return $handler(...$args);
-    }
-
-    public function hasQueryHandler(string $queryType): bool
-    {
-        return isset($this->queryHandlers[$queryType]);
-    }
-
-    /**
-     * Enregistre le handler d'un signal, comme {@see registerQueryHandler()} le fait d'une query.
+     * Enregistre le handler d'un signal.
      *
      * La forme déclarative est {@see \Gplanchat\Durable\Attribute\SignalMethod}, que le
      * chargeur traduit en cet appel. La forme impérative n'est pas un pis-aller : un workflow
      * écrit comme une callable ne porte pas d'attribut, et c'est ainsi que s'écrit la majorité
      * des tests de ce composant.
+     *
+     * Les queries, elles, ne s'enregistrent plus ici. La différence n'est pas de principe mais de
+     * lieu : un signal se distribue dans cette classe, pendant {@see await()}, par `dispatch()` ;
+     * une query se lit par le worker, hors de la fibre, dans
+     * {@see \Gplanchat\Durable\Workflow\QueryHandlerRegistry} que porte le contexte d'exécution.
+     * Ce qu'un workflow n'a pas à atteindre est ce que le moteur lit sans lui.
      *
      * Le handler reçoit la charge utile du signal et mute l'état que le corps observe, en
      * général à travers une condition passée à {@see await()}.
