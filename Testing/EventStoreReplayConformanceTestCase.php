@@ -1,0 +1,143 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Gplanchat\Durable\Testing;
+
+use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\InMemoryWorkflowRunner;
+use Gplanchat\Durable\RegistryActivityExecutor;
+use Gplanchat\Durable\Store\EventStoreHistorySource;
+use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\InMemoryEventStore;
+use Gplanchat\Durable\Transport\InMemoryActivityTransport;
+use Gplanchat\Durable\WorkflowEnvironment;
+use Gplanchat\Durable\WorkflowRegistry;
+
+/**
+ * Le palier « replay » de DUR041 : au lieu d'écrire des événements fabriqués, il en fait produire
+ * par un vrai workflow — activité, minuteur, deux effets de bord dont un payload imbriqué — puis
+ * compare ce que le replay relit de l'adaptateur à ce qu'il relit de la référence.
+ *
+ * Un adaptateur qui pilote un workflow en ligne étend cette classe et hérite des deux paliers. Un
+ * adaptateur adossé à un serveur — les deux stores Temporal — n'étend que
+ * {@see EventStoreConformanceTestCase} et rejoue ce palier dans la suite d'intégration. La coupure
+ * est dans la déclaration de classe, pour qu'un pont qui ne joue qu'une moitié de la suite soit un
+ * fait visible et non un oubli.
+ *
+ * La référence, elle, n'étend pas cette classe : on ne différencie pas un store d'avec lui-même.
+ *
+ * @see DUR041
+ */
+abstract class EventStoreReplayConformanceTestCase extends EventStoreConformanceTestCase
+{
+    public function testAWorkflowRunsIdenticallyAgainstTheReference(): void
+    {
+        $reference = new InMemoryEventStore();
+        $subject = $this->createEventStore();
+
+        $referenceResult = self::runConformanceWorkflow($reference, 'exec-reference');
+        $subjectResult = self::runConformanceWorkflow($subject, 'exec-subject');
+
+        self::assertSame($referenceResult, $subjectResult, 'le workflow doit rendre le même résultat');
+        self::assertSame(
+            self::journalShape($reference, 'exec-reference'),
+            self::journalShape($subject, 'exec-subject'),
+            'les deux journaux doivent enregistrer les mêmes événements, dans le même ordre',
+        );
+    }
+
+    /**
+     * `EventStoreHistorySource` relit le flux à chaque interrogation de slot — c'est le chemin que
+     * le replay emprunte réellement, et il est plus exigeant qu'une lecture unique.
+     */
+    public function testReplaySlotLookupsAgreeWithTheReference(): void
+    {
+        $reference = new InMemoryEventStore();
+        $subject = $this->createEventStore();
+
+        self::runConformanceWorkflow($reference, 'exec-reference');
+        self::runConformanceWorkflow($subject, 'exec-subject');
+
+        $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
+        $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
+
+        self::assertSame(
+            $fromReference->findActivitySlotResult(0)['result'],
+            $fromSubject->findActivitySlotResult(0)['result'],
+        );
+        self::assertNull($fromSubject->findActivitySlotResult(1), 'une seule activité a été planifiée');
+
+        // Les effets de bord portent un `mixed` : c'est là qu'un aller-retour JSON déforme.
+        self::assertSame($fromReference->findSideEffectForSlot(0), $fromSubject->findSideEffectForSlot(0));
+        self::assertSame($fromReference->findSideEffectForSlot(1), $fromSubject->findSideEffectForSlot(1));
+
+        self::assertNotNull($fromSubject->findScheduledTimerId(0), 'le minuteur doit être relu depuis le store');
+    }
+
+    private static function runConformanceWorkflow(EventStoreInterface $eventStore, string $executionId): mixed
+    {
+        $activityExecutor = new RegistryActivityExecutor();
+        $activityExecutor->register('durable.conformance.quote', static fn(array $payload): array => [
+            'total' => 42.5,
+            'currency' => 'EUR',
+            'lines' => $payload['lines'] ?? [],
+        ]);
+
+        $runner = new InMemoryWorkflowRunner(
+            $eventStore,
+            new InMemoryActivityTransport(),
+            $activityExecutor,
+            0,
+            new WorkflowRegistry(),
+        );
+
+        return $runner->run($executionId, static function (WorkflowEnvironment $wf): array {
+            $nested = $wf->sideEffect(static fn(): array => ['nested' => ['deep' => true], 'ratio' => 0.1]);
+            $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
+            $wf->sleep(Duration::seconds(0.001));
+            $flag = $wf->sideEffect(static fn(): string => 'after-timer');
+
+            return ['nested' => $nested, 'quote' => $quote, 'flag' => $flag];
+        });
+    }
+
+    /**
+     * @return list<array{string, array<string, mixed>}> type d'événement + payload, dans l'ordre
+     */
+    private static function journalShape(EventStoreInterface $store, string $executionId): array
+    {
+        $shape = [];
+        foreach ($store->readStream($executionId) as $event) {
+            $shape[] = [$event::class, self::scrub($event->payload())];
+        }
+
+        return $shape;
+    }
+
+    /**
+     * Deux exécutions distinctes tirent des identifiants et des horloges différents ; les
+     * neutraliser laisse exactement ce que la comparaison doit porter : la forme du journal.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
+     */
+    private static function scrub(array $payload): array
+    {
+        $volatile = [
+            'timerId', 'activityId', 'sideEffectId', 'childExecutionId', 'executionId',
+            'scheduledAt', 'queued_at', 'first_queued_at',
+        ];
+
+        foreach ($payload as $key => $value) {
+            if (\in_array($key, $volatile, true)) {
+                $payload[$key] = '<volatile>';
+            } elseif (\is_array($value)) {
+                $payload[$key] = self::scrub($value);
+            }
+        }
+
+        return $payload;
+    }
+}

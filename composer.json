@@ -11,7 +11,7 @@
         "phpunit/phpunit": "^11.0"
     },
     "suggest": {
-        "phpunit/phpunit": "Required by the shipped test helpers (Testing\\DurableTestCase, Testing\\WorkflowTestEnvironment)",
+        "phpunit/phpunit": "Required by the shipped test helpers (Testing\\DurableTestCase, Testing\\WorkflowTestEnvironment) and the conformance suites (Testing\\EventStoreConformanceTestCase, DUR041)",
         "gplanchat/durable-phpstan": "Optional PHPStan extension: resolves ActivityStub and ChildWorkflowStub calls from their typed contract (DUR038)",
         "gplanchat/durable-bridge-temporal": "Temporal gRPC backend (requires ext-grpc)",
         "gplanchat/durable-bridge-dbal": "SQL backend: durable execution on one database, no cluster (DUR030)"
