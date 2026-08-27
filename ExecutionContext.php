@@ -152,6 +152,12 @@ final class ExecutionContext
         ?NexusOperationHeaders $headers = null,
     ): Awaitable {
         $slotIndex = $this->nexusOperationSlotIndex++;
+        $this->refuseDivergence(
+            'Nexus operation',
+            $slotIndex,
+            $this->historySource->nexusOperationSignatureForSlot($slotIndex),
+            \sprintf('%s/%s/%s', $endpoint->name(), $service->name(), $operation->name()),
+        );
         $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
         $operationId = $scheduled ?? $this->uuid();
 
@@ -204,14 +210,29 @@ final class ExecutionContext
      */
     private function refuseActivityDivergence(int $slotIndex, string $requested): void
     {
-        $recorded = $this->historySource->activityNameForSlot($slotIndex);
+        $this->refuseDivergence('activity', $slotIndex, $this->historySource->activityNameForSlot($slotIndex), $requested);
+    }
+
+    /**
+     * La règle, une fois, pour les trois types de slot qui portent une identité.
+     *
+     * `$recorded` à null veut dire « l'historique n'a rien dit là » — soit le slot est neuf, soit
+     * le journal ne porte pas cette identité. Dans les deux cas il n'y a rien à comparer, et
+     * refuser casserait le cas normal. Les minuteurs sont dans ce cas par nature : leur échéance
+     * est absolue et leur libellé facultatif (sonde 1.4).
+     *
+     * @throws WorkflowTaskFailure si le code demande autre chose que ce que le journal tient
+     */
+    private function refuseDivergence(string $slotKind, int $slotIndex, ?string $recorded, string $requested): void
+    {
         if (null === $recorded || $recorded === $requested) {
             return;
         }
 
         throw new WorkflowTaskFailure(\sprintf(
-            'Replay divergence at activity slot %d of execution "%s": history recorded "%s", code scheduled "%s". '
+            'Replay divergence at %s slot %d of execution "%s": history recorded "%s", code scheduled "%s". '
             . 'This history was written by a different version of the workflow.',
+            $slotKind,
             $slotIndex,
             $this->executionId,
             $recorded,
@@ -276,6 +297,12 @@ final class ExecutionContext
         $options ??= ChildWorkflowOptions::defaults();
 
         $slotIndex = $this->childWorkflowSlotIndex++;
+        $this->refuseDivergence(
+            'child workflow',
+            $slotIndex,
+            $this->historySource->childWorkflowTypeForSlot($slotIndex),
+            $childWorkflowType,
+        );
         $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replay) {

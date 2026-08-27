@@ -88,6 +88,23 @@ interface WorkflowHistorySourceInterface
     public function findScheduledChildExecutionId(int $slot): ?string;
 
     /**
+     * Returns the workflow **type** of the child recorded at slot N, or null if none was.
+     *
+     * The type, and not the execution id: that id is generated, so comparing it would make a
+     * faithful replay diverge every time.
+     */
+    public function childWorkflowTypeForSlot(int $slot): ?string;
+
+    /**
+     * Returns the identity of the Nexus operation recorded at slot N, or null if none was.
+     *
+     * The identity is the **triple** — endpoint, service, operation — rendered as
+     * `endpoint/service/operation`. Routing the same service and operation to another endpoint is
+     * a different call, and comparing the operation name alone would let it through.
+     */
+    public function nexusOperationSignatureForSlot(int $slot): ?string;
+
+    /**
      * Returns the Nth recorded message, in recorded order, or null past the end.
      *
      * Signals and updates share one cursor: what orders them is their rank in the journal, not
