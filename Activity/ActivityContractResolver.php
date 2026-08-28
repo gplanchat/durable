@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Activity;
 
-use Gplanchat\Durable\Attribute\Activity;
-use Gplanchat\Durable\Attribute\ActivityMethod;
+use Gplanchat\Durable\Attribute\AsActivity;
+use Gplanchat\Durable\Attribute\AsActivityMethod;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -59,7 +59,7 @@ final class ActivityContractResolver
     {
         $reflection = new \ReflectionClass($contractClass);
         $activityPrefixName = null;
-        $activityAttrs = $reflection->getAttributes(Activity::class);
+        $activityAttrs = $reflection->getAttributes(AsActivity::class);
         if ([] !== $activityAttrs) {
             $activityPrefixName = $activityAttrs[0]->newInstance()->name;
         }
@@ -72,7 +72,7 @@ final class ActivityContractResolver
             if ($method->getDeclaringClass()->getName() !== $contractClass) {
                 continue;
             }
-            $attrs = $method->getAttributes(ActivityMethod::class);
+            $attrs = $method->getAttributes(AsActivityMethod::class);
             if ([] === $attrs) {
                 continue;
             }

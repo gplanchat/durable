@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
-use Gplanchat\Durable\Attribute\ActivityMethod;
+use Gplanchat\Durable\Attribute\AsActivityMethod;
 
 /**
  * Le contrat d'activité que {@see EventStoreReplayConformanceTestCase} planifie. Une seule méthode,
@@ -17,6 +17,6 @@ interface ConformanceActivities
     /**
      * @param list<string> $lines
      */
-    #[ActivityMethod('durable.conformance.quote')]
+    #[AsActivityMethod('durable.conformance.quote')]
     public function quote(array $lines): mixed;
 }

@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Workflow;
 
-use Gplanchat\Durable\Attribute\QueryMethod;
-use Gplanchat\Durable\Attribute\SignalMethod;
-use Gplanchat\Durable\Attribute\UpdateMethod;
-use Gplanchat\Durable\Attribute\Workflow;
-use Gplanchat\Durable\Attribute\WorkflowMethod;
+use Gplanchat\Durable\Attribute\AsQueryMethod;
+use Gplanchat\Durable\Attribute\AsSignalMethod;
+use Gplanchat\Durable\Attribute\AsUpdateMethod;
+use Gplanchat\Durable\Attribute\AsWorkflow;
+use Gplanchat\Durable\Attribute\AsWorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
- * Charge une définition de workflow depuis une classe avec attributs #[Workflow] et #[WorkflowMethod].
+ * Charge une définition de workflow depuis une classe avec attributs #[AsWorkflow] et #[AsWorkflowMethod].
  *
  * Produit une factory compatible avec WorkflowRegistry.
  */
@@ -36,7 +36,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Nom enregistré dans {@see WorkflowRegistry} : valeur de {@see Workflow} (1er argument) si présente, sinon {@see \ReflectionClass::getShortName()}.
+     * Nom enregistré dans {@see WorkflowRegistry} : valeur de {@see AsWorkflow} (1er argument) si présente, sinon {@see \ReflectionClass::getShortName()}.
      *
      * @param class-string $workflowClass
      */
@@ -91,7 +91,7 @@ final class WorkflowDefinitionLoader
      */
     private function resolveWorkflowType(\ReflectionClass $reflection): string
     {
-        $attrs = $reflection->getAttributes(Workflow::class);
+        $attrs = $reflection->getAttributes(AsWorkflow::class);
         if ([] !== $attrs) {
             return $attrs[0]->newInstance()->name;
         }
@@ -112,14 +112,14 @@ final class WorkflowDefinitionLoader
             if ($method->getDeclaringClass()->getName() !== $reflection->getName()) {
                 continue;
             }
-            $attrs = $method->getAttributes(WorkflowMethod::class);
+            $attrs = $method->getAttributes(AsWorkflowMethod::class);
             if ([] !== $attrs) {
                 $workflowMethods[] = $method;
             }
         }
 
         if (1 !== \count($workflowMethods)) {
-            throw new \InvalidArgumentException(\sprintf('Workflow class %s must have exactly one #[WorkflowMethod], found %d', $reflection->getName(), \count($workflowMethods)));
+            throw new \InvalidArgumentException(\sprintf('AsWorkflow class %s must have exactly one #[AsWorkflowMethod], found %d', $reflection->getName(), \count($workflowMethods)));
         }
 
         return $workflowMethods[0];
@@ -146,7 +146,7 @@ final class WorkflowDefinitionLoader
             } elseif ($param->isDefaultValueAvailable()) {
                 $args[] = $param->getDefaultValue();
             } else {
-                throw new \InvalidArgumentException(\sprintf('Workflow %s constructor parameter $%s must have a default or be WorkflowEnvironment', $workflowClass, $param->getName()));
+                throw new \InvalidArgumentException(\sprintf('AsWorkflow %s constructor parameter $%s must have a default or be WorkflowEnvironment', $workflowClass, $param->getName()));
             }
         }
 
@@ -180,7 +180,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Scans the workflow class for #[SignalMethod] attributes and registers them on WorkflowEnvironment.
+     * Scans the workflow class for #[AsSignalMethod] attributes and registers them on WorkflowEnvironment.
      *
      * Même traduction que pour les queries : l'attribut est la forme déclarative de
      * {@see WorkflowEnvironment::onSignal()}, et les deux produisent le même dispatch.
@@ -191,7 +191,7 @@ final class WorkflowDefinitionLoader
     {
         $reflection = new \ReflectionClass($workflowClass);
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            $attrs = $method->getAttributes(SignalMethod::class);
+            $attrs = $method->getAttributes(AsSignalMethod::class);
             if ($attrs === []) {
                 continue;
             }
@@ -200,7 +200,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Scans the workflow class for #[UpdateMethod] attributes and registers them on WorkflowEnvironment.
+     * Scans the workflow class for #[AsUpdateMethod] attributes and registers them on WorkflowEnvironment.
      *
      * @param class-string $workflowClass
      */
@@ -208,7 +208,7 @@ final class WorkflowDefinitionLoader
     {
         $reflection = new \ReflectionClass($workflowClass);
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            $attrs = $method->getAttributes(UpdateMethod::class);
+            $attrs = $method->getAttributes(AsUpdateMethod::class);
             if ($attrs === []) {
                 continue;
             }
@@ -217,7 +217,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Scans the workflow class for #[QueryMethod] attributes and registers them on WorkflowEnvironment.
+     * Scans the workflow class for #[AsQueryMethod] attributes and registers them on WorkflowEnvironment.
      *
      * @param class-string $workflowClass
      */
@@ -225,7 +225,7 @@ final class WorkflowDefinitionLoader
     {
         $reflection = new \ReflectionClass($workflowClass);
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            $attrs = $method->getAttributes(QueryMethod::class);
+            $attrs = $method->getAttributes(AsQueryMethod::class);
             if ($attrs === []) {
                 continue;
             }

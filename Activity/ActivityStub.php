@@ -9,7 +9,7 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 /**
  * Proxy de planification côté workflow.
  *
- * Expose uniquement les méthodes marquées #[ActivityMethod] du contrat ;
+ * Expose uniquement les méthodes marquées #[AsActivityMethod] du contrat ;
  * chaque appel retourne un Awaitable et délègue à {@see ActivitySchedulerInterface}.
  *
  * À initialiser dans le constructeur du workflow pour configurer retry et gestion d'erreur via ActivityOptions.
@@ -40,7 +40,7 @@ final class ActivityStub
     {
         $activityName = $this->methodToActivityName[$name] ?? null;
         if (null === $activityName) {
-            throw new \BadMethodCallException(\sprintf('Method %s::%s() is not an activity (missing #[ActivityMethod]) or does not exist.', $this->contractClass, $name));
+            throw new \BadMethodCallException(\sprintf('Method %s::%s() is not an activity (missing #[AsActivityMethod]) or does not exist.', $this->contractClass, $name));
         }
 
         $payload = $this->argumentsToPayload($name, $arguments);
