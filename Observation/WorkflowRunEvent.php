@@ -24,6 +24,15 @@ namespace Gplanchat\Durable\Observation;
  * backend, ce qui mérite un nom commun — un travail qui n'a de sens qu'une fois qu'on aura vu ce
  * que les exploitants y cherchent. En attendant, montrer la forme brute ne ment pas.
  *
+ * `actionKey` est **l'action** dont l'événement fait partie : une activité planifiée, démarrée puis
+ * terminée est une action et trois événements. Sans lui, une frise ne peut que ranger par nature —
+ * « les activités », « les signaux » — et l'exploitant qui veut savoir combien de temps *cette*
+ * activité a duré doit recoller trois lignes de l'œil. La clé n'a pas de sens hors de son exécution
+ * et n'en a pas besoin : elle sert à regrouper, pas à désigner.
+ *
+ * `null` veut dire « cet événement est à lui seul son action » — le démarrage d'une exécution, un
+ * signal reçu. C'est une réponse, pas une absence de réponse.
+ *
  * @phpstan-type Details array<string, mixed>
  */
 final readonly class WorkflowRunEvent
@@ -37,5 +46,6 @@ final readonly class WorkflowRunEvent
         public WorkflowRunEventKind $kind,
         public string $label,
         public array $details = [],
+        public ?string $actionKey = null,
     ) {}
 }

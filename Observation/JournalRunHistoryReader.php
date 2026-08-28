@@ -20,6 +20,9 @@ use Gplanchat\Durable\Event\NexusOperationCompleted;
 use Gplanchat\Durable\Event\NexusOperationFailed;
 use Gplanchat\Durable\Event\NexusOperationScheduled;
 use Gplanchat\Durable\Event\NexusOperationTimedOut;
+use Gplanchat\Durable\Event\TimerCancelled;
+use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -54,6 +57,9 @@ final class JournalRunHistoryReader
         // contrainte que pour les activités, même remède.
         /** @var array<int, string> $nexusNames */
         $nexusNames = [];
+        // Même contrainte que pour les activités : seule la planification connaît le résumé.
+        /** @var array<string, string> $timerNames */
+        $timerNames = [];
         $history = [];
         $sequence = 0;
 
@@ -63,6 +69,10 @@ final class JournalRunHistoryReader
 
             if ($event instanceof ActivityScheduled) {
                 $activityNames[$event->activityId()] = $event->activityName();
+            }
+
+            if ($event instanceof TimerScheduled && '' !== $event->summary()) {
+                $timerNames[$event->timerId()] = $event->summary();
             }
 
             if ($event instanceof NexusOperationScheduled) {
@@ -77,16 +87,47 @@ final class JournalRunHistoryReader
                 ++$sequence,
                 $recordedAt instanceof \DateTimeImmutable ? $recordedAt : new \DateTimeImmutable('@0'),
                 self::kindOf($event),
-                self::labelOf($event, $activityNames, $nexusNames),
+                self::labelOf($event, $activityNames, $nexusNames, $timerNames),
                 // `payload()` est sur l'interface `Event` : c'est la forme sérialisée que
                 // l'événement se donne déjà pour être écrit puis relu. Rien à traduire, et rien à
                 // choisir non plus — filtrer ici reviendrait à décider à la place de l'exploitant
                 // ce qui mérite d'être vu le jour où quelque chose ne va pas.
                 $event->payload(),
+                self::actionKeyOf($event),
             );
         }
 
         return $history;
+    }
+
+    /**
+     * L'action dont l'événement fait partie, ou `null` quand il est à lui seul la sienne.
+     *
+     * Le journal corrèle déjà : une activité par son `activityId`, un minuteur par son `timerId`,
+     * une opération Nexus par l'identifiant de sa planification. Il n'y a rien à inventer ici, juste
+     * à cesser de jeter le lien au moment de traduire.
+     */
+    private static function actionKeyOf(Event $event): ?string
+    {
+        $activityId = self::activityIdOf($event);
+        if (null !== $activityId) {
+            return 'activity:' . $activityId;
+        }
+
+        if ($event instanceof TimerScheduled
+            || $event instanceof TimerCompleted
+            || $event instanceof TimerCancelled
+        ) {
+            return 'timer:' . $event->timerId();
+        }
+
+        if ($event instanceof NexusOperationScheduled) {
+            return 'nexus:' . $event->scheduledEventId();
+        }
+
+        $scheduledEventId = self::nexusScheduledEventIdOf($event);
+
+        return null === $scheduledEventId ? null : 'nexus:' . $scheduledEventId;
     }
 
     private static function kindOf(Event $event): WorkflowRunEventKind
@@ -123,9 +164,10 @@ final class JournalRunHistoryReader
 
     /**
      * @param array<string, string> $activityNames
-     * @param array<int, string>     $nexusNames
+     * @param array<int, string>    $nexusNames
+     * @param array<string, string> $timerNames
      */
-    private static function labelOf(Event $event, array $activityNames, array $nexusNames): string
+    private static function labelOf(Event $event, array $activityNames, array $nexusNames, array $timerNames): string
     {
         if ($event instanceof NexusOperationScheduled) {
             return self::nexusLabel($event->endpoint(), $event->service(), $event->operation());
@@ -136,6 +178,15 @@ final class JournalRunHistoryReader
             // Sans la planification — un journal tronqué, une lecture partielle — mieux vaut
             // nommer l'identifiant que rendre une étiquette qui ne désigne rien.
             return $nexusNames[$scheduledEventId] ?? ('nexus #' . $scheduledEventId);
+        }
+
+        if ($event instanceof TimerScheduled
+            || $event instanceof TimerCompleted
+            || $event instanceof TimerCancelled
+        ) {
+            // Une voie de frise porte le nom de son action. « TimerScheduled » nomme la classe,
+            // pas l'attente : `timer 5s avant relance` dit ce qu'un exploitant est venu lire.
+            return $timerNames[$event->timerId()] ?? ('timer ' . $event->timerId());
         }
 
         if ($event instanceof WorkflowSignalReceived) {
