@@ -24,6 +24,13 @@ final class NexusOperationRegistry
     private array $handlers = [];
 
     /**
+     * Les opérations qu'un workflow remplit, déclarées plutôt qu'écrites.
+     *
+     * @var array<string, string> clé (service, opération) => type de workflow
+     */
+    private array $fulfilments = [];
+
+    /**
      * Le backend qui refuse, ou `null` quand il sait router.
      *
      * Le garde est **ici**, dans le cœur, et non seulement dans la passe de compilation du bundle
@@ -67,7 +74,29 @@ final class NexusOperationRegistry
 
     public function serves(NexusService $service, NexusOperationName $operation): bool
     {
-        return isset($this->handlers[self::key($service, $operation)]);
+        $key = self::key($service, $operation);
+
+        return isset($this->handlers[$key]) || isset($this->fulfilments[$key]);
+    }
+
+    /**
+     * Déclare qu'un workflow remplit une opération : son résultat deviendra celui de l'opération.
+     *
+     * Il n'y a pas de gestionnaire à appeler, et pas de corps à écrire. Le worker démarre ce
+     * workflow avec le `callback` de la tâche attaché, et le serveur livre son résultat à
+     * l'appelant — c'est ce que la sonde §3.1 a mesuré, et le jeton n'y est qu'un identifiant.
+     */
+    public function registerFulfilment(NexusService $service, NexusOperationName $operation, string $workflowType): void
+    {
+        if (null !== $this->refusingBackend) {
+            throw NexusUnsupportedByBackendException::forHandlerOn($this->refusingBackend);
+        }
+
+        if ('' === trim($workflowType)) {
+            throw new \InvalidArgumentException('A Nexus operation fulfilled by a workflow needs a workflow type.');
+        }
+
+        $this->fulfilments[self::key($service, $operation)] = $workflowType;
     }
 
     /**
@@ -75,7 +104,16 @@ final class NexusOperationRegistry
      */
     public function dispatch(NexusService $service, NexusOperationName $operation, mixed $payload): NexusOperationResponse
     {
-        $handler = $this->handlers[self::key($service, $operation)] ?? null;
+        $key = self::key($service, $operation);
+
+        $workflowType = $this->fulfilments[$key] ?? null;
+        if (null !== $workflowType) {
+            // Déclarée plutôt qu'écrite : la charge de l'appelant devient l'entrée du workflow,
+            // telle quelle. Aucun gestionnaire n'est appelé, et il n'y en a pas à écrire.
+            return NexusOperationResponse::fulfilledByWorkflow($workflowType, \is_array($payload) ? $payload : ['payload' => $payload]);
+        }
+
+        $handler = $this->handlers[$key] ?? null;
         if (null === $handler) {
             throw new NexusOperationNotHandledException($service, $operation);
         }
