@@ -21,10 +21,13 @@ use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Failure\FailureEnvelope;
+use Gplanchat\Durable\Nexus\ContextNexusOperationScheduler;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
+use Gplanchat\Durable\Nexus\NexusStub;
+use Gplanchat\Durable\Nexus\Serving\NexusContractResolver;
 use Gplanchat\Durable\Workflow\ChildWorkflowStub;
 use Gplanchat\Durable\Workflow\ContextChildWorkflowScheduler;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
@@ -39,6 +42,8 @@ final class WorkflowEnvironment
 
     private ?WorkflowDefinitionLoader $workflowLoader = null;
 
+    private ?NexusContractResolver $nexusResolver = null;
+
     /** @var array<string, callable> signal name → handler */
     private array $signalHandlers = [];
 
@@ -50,9 +55,13 @@ final class WorkflowEnvironment
         private readonly ExecutionRuntime $runtime,
         ?ActivityContractResolver $activityContractResolver = null,
         ?WorkflowDefinitionLoader $workflowLoader = null,
+        // En queue : le résolveur Nexus n'est utile qu'à `nexusStub()`, et l'ajouter ailleurs
+        // décalerait des arguments positionnels que le moteur passe déjà.
+        ?NexusContractResolver $nexusContractResolver = null,
     ) {
         $this->activityResolver = $activityContractResolver;
         $this->workflowLoader = $workflowLoader;
+        $this->nexusResolver = $nexusContractResolver;
     }
 
     public static function wrap(ExecutionContext $context, ExecutionRuntime $runtime): self
@@ -509,6 +518,33 @@ final class WorkflowEnvironment
         $resolver = $this->activityResolver ?? new ActivityContractResolver(null);
 
         return new ActivityStub(new ContextActivityScheduler($this->context), $contractClass, $resolver, $options);
+    }
+
+    /**
+     * Un proxy typé vers les opérations d'un contrat Nexus servi à `$endpoint`.
+     *
+     * L'endpoint est un paramètre du stub et non du contrat : il dit *où* le service est servi, ce
+     * qui relève du déploiement et change d'un environnement à l'autre, quand le contrat ne change
+     * pas.
+     *
+     * @template TContract of object
+     *
+     * @param class-string<TContract> $contractClass
+     *
+     * @return NexusStub<TContract>
+     */
+    public function nexusStub(
+        string $contractClass,
+        NexusEndpoint|string $endpoint,
+        ?NexusOperationTimeouts $timeouts = null,
+    ): NexusStub {
+        return new NexusStub(
+            new ContextNexusOperationScheduler($this->context),
+            $contractClass,
+            $this->nexusResolver ?? new NexusContractResolver(null),
+            NexusEndpoint::from($endpoint),
+            $timeouts,
+        );
     }
 
 

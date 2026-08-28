@@ -9,7 +9,7 @@ namespace Gplanchat\Durable\Workflow;
  *
  * Ils vivaient sur {@see \Gplanchat\Durable\WorkflowEnvironment} — l'objet que le moteur avait
  * sous la main, pas celui qui en avait besoin. Un auteur de workflow pouvait donc enregistrer,
- * sonder et invoquer un handler, c'est-à-dire court-circuiter la déclaration `#[QueryMethod]`
+ * sonder et invoquer un handler, c'est-à-dire court-circuiter la déclaration `#[AsQueryMethod]`
  * qu'il est censé écrire.
  *
  * Le registre est porté par {@see \Gplanchat\Durable\ExecutionContext}, qu'un workflow ne reçoit
