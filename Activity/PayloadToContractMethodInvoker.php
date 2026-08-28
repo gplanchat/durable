@@ -11,6 +11,11 @@ namespace Gplanchat\Durable\Activity;
  * mot pour mot — son conteneur n'a pas les tags, mais une fois le contrat résolu l'adaptation est
  * la même — et le recopier serait la duplication que ce dépôt refuse ailleurs. Il descend donc à
  * côté de {@see ActivityContractResolver}, qui le nourrit.
+ *
+ * Nexus s'en sert aussi, à travers {@see \Gplanchat\Durable\Nexus\Serving\NexusHandlerInvoker} :
+ * une opération servie et une activité posent le même problème — une charge clée par nom, une
+ * méthode de contrat à appeler. Il reste donc dans `Activity\` par son histoire, mais son texte ne
+ * dit plus « activité » là où il parle des deux.
  */
 final class PayloadToContractMethodInvoker
 {
@@ -37,7 +42,7 @@ final class PayloadToContractMethodInvoker
             } elseif ($param->isDefaultValueAvailable()) {
                 $args[] = $param->getDefaultValue();
             } else {
-                throw new \InvalidArgumentException(\sprintf('Missing payload key "%s" for activity method %s::%s()', $key, $this->contractClass, $this->contractMethodName));
+                throw new \InvalidArgumentException(\sprintf('Missing payload key "%s" for contract method %s::%s()', $key, $this->contractClass, $this->contractMethodName));
             }
         }
 
