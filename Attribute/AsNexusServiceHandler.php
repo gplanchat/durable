@@ -16,7 +16,7 @@ namespace Gplanchat\Durable\Attribute;
  * personne ne veut écrire.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
-final readonly class AsNexusHandler
+final readonly class AsNexusServiceHandler
 {
     /**
      * @param class-string $contract
