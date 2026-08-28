@@ -16,6 +16,22 @@ namespace Gplanchat\Durable\Nexus;
  */
 final class NexusUnsupportedByBackendException extends \RuntimeException
 {
+    /**
+     * Le refus **à l'enregistrement**, et il ne dit pas la même chose que celui de l'appel.
+     *
+     * Un appel sur un backend sans route échoue à l'appel : la faute devient visible au moment où
+     * elle est commise. Servir est l'inverse — un gestionnaire déclaré là n'est pas un appel qui
+     * échoue, c'est un service qui **ne reçoit jamais rien**, sans une ligne de log. Il n'y a
+     * aucune requête à faire échouer plus tard, donc le refus a lieu ici ou nulle part.
+     */
+    public static function forHandlerOn(string $backend): self
+    {
+        return new self(\sprintf(
+            'A Nexus handler cannot be served by the %s backend: it has no route, so a handler registered here never receives anything — no error, no log line, a task queue nobody polls. Use the Temporal backend to serve Nexus operations.',
+            $backend,
+        ));
+    }
+
     public static function forBackend(string $backend): self
     {
         return new self(\sprintf(

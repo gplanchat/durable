@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Nexus\Serving;
 
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusService;
+use Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException;
 
 /**
  * Les opérations Nexus que ce composant sert.
@@ -23,10 +24,44 @@ final class NexusOperationRegistry
     private array $handlers = [];
 
     /**
+     * Le backend qui refuse, ou `null` quand il sait router.
+     *
+     * Le garde est **ici**, dans le cœur, et non seulement dans la passe de compilation du bundle
+     * Symfony : celle-ci n'attrape que Symfony, alors que le module Magento et le pont Illuminate
+     * montent leurs services autrement et n'auraient rien eu. Un hôte qui oublie de garder est
+     * précisément celui dont l'utilisateur découvrira le silence en production.
+     */
+    private function __construct(
+        private readonly ?string $refusingBackend,
+    ) {}
+
+    /**
+     * Un backend qui sait router une opération Nexus vers l'endpoint qui la sert.
+     */
+    public static function routedBy(string $backend): self
+    {
+        unset($backend);
+
+        return new self(null);
+    }
+
+    /**
+     * Un backend qui n'a aucune route, et le dit dès qu'on lui déclare un gestionnaire.
+     */
+    public static function unavailableOn(string $backend): self
+    {
+        return new self($backend);
+    }
+
+    /**
      * @param callable(mixed): NexusOperationResponse $handler
      */
     public function register(NexusService $service, NexusOperationName $operation, callable $handler): void
     {
+        if (null !== $this->refusingBackend) {
+            throw NexusUnsupportedByBackendException::forHandlerOn($this->refusingBackend);
+        }
+
         $this->handlers[self::key($service, $operation)] = $handler;
     }
 
