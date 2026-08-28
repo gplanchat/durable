@@ -141,7 +141,7 @@ final class WorkflowTestEnvironment
      * Exécute un workflow **classe**, dans sa forme de production.
      *
      * L'environnement atteint le constructeur, l'input atteint la méthode marquée
-     * {@see \Gplanchat\Durable\Attribute\WorkflowMethod} — exactement comme sur un backend.
+     * {@see \Gplanchat\Durable\Attribute\AsWorkflowMethod} — exactement comme sur un backend.
      *
      * C'est la forme à préférer. {@see run()} prend une closure qui reçoit l'environnement : une
      * signature qu'aucun workflow n'a depuis que l'environnement est passé au constructeur. Elle
