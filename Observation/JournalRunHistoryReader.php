@@ -12,6 +12,9 @@ use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
+use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
+use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
@@ -41,6 +44,12 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  */
 final class JournalRunHistoryReader
 {
+    /**
+     * La clé de l'action que l'exécution est pour elle-même. Une seule par historique, et la
+     * première : c'est son démarrage qui ouvre le flux.
+     */
+    private const RUN_ACTION = 'workflow';
+
     public function __construct(
         private readonly EventStoreInterface $events,
     ) {}
@@ -48,7 +57,7 @@ final class JournalRunHistoryReader
     /**
      * @return list<WorkflowRunEvent>
      */
-    public function read(string $runId): array
+    public function read(string $runId, string $workflowName = ''): array
     {
         /** @var array<string, string> $activityNames */
         $activityNames = [];
@@ -60,6 +69,8 @@ final class JournalRunHistoryReader
         // Même contrainte que pour les activités : seule la planification connaît le résumé.
         /** @var array<string, string> $timerNames */
         $timerNames = [];
+        /** @var array<string, string> $childNames */
+        $childNames = [];
         $history = [];
         $sequence = 0;
 
@@ -69,6 +80,10 @@ final class JournalRunHistoryReader
 
             if ($event instanceof ActivityScheduled) {
                 $activityNames[$event->activityId()] = $event->activityName();
+            }
+
+            if ($event instanceof ChildWorkflowScheduled) {
+                $childNames[$event->childExecutionId()] = $event->childWorkflowType();
             }
 
             if ($event instanceof TimerScheduled && '' !== $event->summary()) {
@@ -87,7 +102,7 @@ final class JournalRunHistoryReader
                 ++$sequence,
                 $recordedAt instanceof \DateTimeImmutable ? $recordedAt : new \DateTimeImmutable('@0'),
                 self::kindOf($event),
-                self::labelOf($event, $activityNames, $nexusNames, $timerNames),
+                self::labelOf($event, $activityNames, $nexusNames, $timerNames, $childNames, $workflowName),
                 // `payload()` est sur l'interface `Event` : c'est la forme sérialisée que
                 // l'événement se donne déjà pour être écrit puis relu. Rien à traduire, et rien à
                 // choisir non plus — filtrer ici reviendrait à décider à la place de l'exploitant
@@ -109,6 +124,26 @@ final class JournalRunHistoryReader
      */
     private static function actionKeyOf(Event $event): ?string
     {
+        // L'exécution elle-même est une action : son démarrage, sa fin, son annulation. Un signal
+        // reçu ou une mise à jour n'en font pas partie — ce sont des actions à part entière, et
+        // c'est pour cela que la liste est écrite plutôt que dérivée de la voie `Execution`.
+        if ($event instanceof ExecutionStarted
+            || $event instanceof ExecutionCompleted
+            || $event instanceof WorkflowExecutionFailed
+            || $event instanceof WorkflowExecutionCancelled
+            || $event instanceof WorkflowCancellationRequested
+            || $event instanceof WorkflowContinuedAsNew
+        ) {
+            return self::RUN_ACTION;
+        }
+
+        if ($event instanceof ChildWorkflowScheduled
+            || $event instanceof ChildWorkflowCompleted
+            || $event instanceof ChildWorkflowFailed
+        ) {
+            return 'child:' . $event->childExecutionId();
+        }
+
         $activityId = self::activityIdOf($event);
         if (null !== $activityId) {
             return 'activity:' . $activityId;
@@ -166,9 +201,31 @@ final class JournalRunHistoryReader
      * @param array<string, string> $activityNames
      * @param array<int, string>    $nexusNames
      * @param array<string, string> $timerNames
+     * @param array<string, string> $childNames
      */
-    private static function labelOf(Event $event, array $activityNames, array $nexusNames, array $timerNames): string
-    {
+    private static function labelOf(
+        Event $event,
+        array $activityNames,
+        array $nexusNames,
+        array $timerNames,
+        array $childNames,
+        string $workflowName,
+    ): string {
+        // Une ligne de frise porte le nom de son action, et l'action de l'exécution est
+        // l'exécution : « ExecutionStarted » nomme une classe d'événement, pas ce qui tourne.
+        // Le journal ne connaît pas ce nom — il n'a qu'un flux — donc l'appelant le lui donne.
+        if ($event instanceof ExecutionStarted && '' !== $workflowName) {
+            return $workflowName;
+        }
+
+        if ($event instanceof ChildWorkflowScheduled) {
+            return $event->childWorkflowType();
+        }
+
+        if ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) {
+            return $childNames[$event->childExecutionId()] ?? ('child ' . $event->childExecutionId());
+        }
+
         if ($event instanceof NexusOperationScheduled) {
             return self::nexusLabel($event->endpoint(), $event->service(), $event->operation());
         }

@@ -117,7 +117,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
 
     public function readHistory(WorkflowRunDescription $run): array
     {
-        return (new JournalRunHistoryReader($this->events))->read($run->runId);
+        return (new JournalRunHistoryReader($this->events))->read($run->runId, $run->workflowName);
     }
 
     public function checkHealth(): BackendHealth
