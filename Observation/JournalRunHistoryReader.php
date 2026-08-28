@@ -15,6 +15,11 @@ use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
+use Gplanchat\Durable\Event\NexusOperationCancelled;
+use Gplanchat\Durable\Event\NexusOperationCompleted;
+use Gplanchat\Durable\Event\NexusOperationFailed;
+use Gplanchat\Durable\Event\NexusOperationScheduled;
+use Gplanchat\Durable\Event\NexusOperationTimedOut;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -44,6 +49,11 @@ final class JournalRunHistoryReader
     {
         /** @var array<string, string> $activityNames */
         $activityNames = [];
+        // Les événements terminaux d'une opération Nexus ne portent que le `scheduledEventId` :
+        // l'identité — endpoint, service, opération — n'est écrite que sur la planification. Même
+        // contrainte que pour les activités, même remède.
+        /** @var array<int, string> $nexusNames */
+        $nexusNames = [];
         $history = [];
         $sequence = 0;
 
@@ -55,11 +65,19 @@ final class JournalRunHistoryReader
                 $activityNames[$event->activityId()] = $event->activityName();
             }
 
+            if ($event instanceof NexusOperationScheduled) {
+                $nexusNames[$event->scheduledEventId()] = self::nexusLabel(
+                    $event->endpoint(),
+                    $event->service(),
+                    $event->operation(),
+                );
+            }
+
             $history[] = new WorkflowRunEvent(
                 ++$sequence,
                 $recordedAt instanceof \DateTimeImmutable ? $recordedAt : new \DateTimeImmutable('@0'),
                 self::kindOf($event),
-                self::labelOf($event, $activityNames),
+                self::labelOf($event, $activityNames, $nexusNames),
             );
         }
 
@@ -85,6 +103,12 @@ final class JournalRunHistoryReader
             $event instanceof ActivityTaskCompleted,
             $event instanceof ActivityTaskFailed => WorkflowRunEventKind::Activity,
 
+            $event instanceof NexusOperationScheduled,
+            $event instanceof NexusOperationCompleted,
+            $event instanceof NexusOperationFailed,
+            $event instanceof NexusOperationTimedOut,
+            $event instanceof NexusOperationCancelled => WorkflowRunEventKind::Nexus,
+
             $event instanceof WorkflowSignalReceived => WorkflowRunEventKind::Signal,
             $event instanceof WorkflowUpdateHandled => WorkflowRunEventKind::Update,
 
@@ -94,9 +118,21 @@ final class JournalRunHistoryReader
 
     /**
      * @param array<string, string> $activityNames
+     * @param array<int, string>     $nexusNames
      */
-    private static function labelOf(Event $event, array $activityNames): string
+    private static function labelOf(Event $event, array $activityNames, array $nexusNames): string
     {
+        if ($event instanceof NexusOperationScheduled) {
+            return self::nexusLabel($event->endpoint(), $event->service(), $event->operation());
+        }
+
+        $scheduledEventId = self::nexusScheduledEventIdOf($event);
+        if (null !== $scheduledEventId) {
+            // Sans la planification — un journal tronqué, une lecture partielle — mieux vaut
+            // nommer l'identifiant que rendre une étiquette qui ne désigne rien.
+            return $nexusNames[$scheduledEventId] ?? ('nexus #' . $scheduledEventId);
+        }
+
         if ($event instanceof WorkflowSignalReceived) {
             return $event->signalName();
         }
@@ -110,6 +146,22 @@ final class JournalRunHistoryReader
         }
 
         return self::shortName($event);
+    }
+
+    private static function nexusLabel(string $endpoint, string $service, string $operation): string
+    {
+        return \sprintf('%s/%s/%s', $endpoint, $service, $operation);
+    }
+
+    private static function nexusScheduledEventIdOf(Event $event): ?int
+    {
+        return match (true) {
+            $event instanceof NexusOperationCompleted,
+            $event instanceof NexusOperationFailed,
+            $event instanceof NexusOperationTimedOut,
+            $event instanceof NexusOperationCancelled => $event->scheduledEventId(),
+            default => null,
+        };
     }
 
     private static function activityIdOf(Event $event): ?string

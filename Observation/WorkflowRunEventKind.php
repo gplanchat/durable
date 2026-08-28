@@ -24,5 +24,13 @@ enum WorkflowRunEventKind: string
     case Signal = 'signal';
     case Update = 'update';
     case Query = 'query';
+
+    /**
+     * Le seul endroit d'une exécution où l'attente est **servie par quelqu'un d'autre** — autre
+     * équipe, autre espace de noms, autre déploiement. D'où sa voie propre plutôt que `Other` :
+     * un exploitant qui voit un workflow bloqué sans voir l'opération qu'il attend cherchera la
+     * panne dans son propre système, là où elle est à l'extérieur.
+     */
+    case Nexus = 'nexus';
     case Other = 'other';
 }
