@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
-use Gplanchat\Durable\Bundle\Messenger\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Exception\WorkflowStuckException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
 /**
@@ -143,7 +143,7 @@ final class InMemoryWorkflowRunner
      *
      * C'est ce qui rend `sleep(3600)` testable en une milliseconde, sans consommer de temps réel.
      * En production le worker fait l'inverse : il attend le réveil que lui planifie
-     * {@see \Gplanchat\Durable\Bundle\Messenger\TimerWakeDelayCalculator}.
+     * {@see \Gplanchat\Durable\Timer\TimerWakeDelayCalculator}.
      *
      * N'est appelé que lorsque plus rien d'autre ne progresse — sauter le temps tant qu'une
      * activité peut encore aboutir ferait gagner le minuteur de tout `any(activité, minuteur)`.

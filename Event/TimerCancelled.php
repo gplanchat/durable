@@ -9,7 +9,7 @@ namespace Gplanchat\Durable\Event;
  *
  * Marqueur de journal : le minuteur reste non résolu, comme aujourd'hui. Il sert à empêcher
  * {@see \Gplanchat\Durable\ExecutionRuntime::checkTimers()} et
- * {@see \Gplanchat\Durable\Bundle\Messenger\TimerWakeDelayCalculator} de réveiller
+ * {@see \Gplanchat\Durable\Timer\TimerWakeDelayCalculator} de réveiller
  * l'exécution pour une échéance morte.
  *
  * ponytail: le slot de replay reste consommé par le minuteur annulé — le régler comme
