@@ -78,6 +78,11 @@ final class JournalRunHistoryReader
                 $recordedAt instanceof \DateTimeImmutable ? $recordedAt : new \DateTimeImmutable('@0'),
                 self::kindOf($event),
                 self::labelOf($event, $activityNames, $nexusNames),
+                // `payload()` est sur l'interface `Event` : c'est la forme sérialisée que
+                // l'événement se donne déjà pour être écrit puis relu. Rien à traduire, et rien à
+                // choisir non plus — filtrer ici reviendrait à décider à la place de l'exploitant
+                // ce qui mérite d'être vu le jour où quelque chose ne va pas.
+                $event->payload(),
             );
         }
 

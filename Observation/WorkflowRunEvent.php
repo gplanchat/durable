@@ -13,13 +13,29 @@ namespace Gplanchat\Durable\Observation;
  *
  * `sequence` est l'ordre d'enregistrement, pas un identifiant : il sert à ranger, et deux backends
  * n'ont aucune raison de numéroter pareil.
+ *
+ * `details` est ce qu'une ligne ne tient pas : l'entrée d'une activité, son résultat, la classe et
+ * le message d'un échec, les délais d'une planification. Une frise sans lui répond « quoi » et
+ * jamais « avec quoi » — et c'est la deuxième question que se pose un exploitant, aussitôt après
+ * la première. Vide est une réponse valable : tous les événements n'ont pas de quoi la remplir.
+ *
+ * ⚠ Le contenu est **le vocabulaire du backend**, pas le nôtre : les clés d'un journal maison ne
+ * sont pas celles de l'historique Temporal. Le normaliser demanderait de décider, pour chaque
+ * backend, ce qui mérite un nom commun — un travail qui n'a de sens qu'une fois qu'on aura vu ce
+ * que les exploitants y cherchent. En attendant, montrer la forme brute ne ment pas.
+ *
+ * @phpstan-type Details array<string, mixed>
  */
 final readonly class WorkflowRunEvent
 {
+    /**
+     * @param array<string, mixed> $details
+     */
     public function __construct(
         public int $sequence,
         public \DateTimeImmutable $recordedAt,
         public WorkflowRunEventKind $kind,
         public string $label,
+        public array $details = [],
     ) {}
 }
