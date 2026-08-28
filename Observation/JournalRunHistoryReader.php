@@ -86,8 +86,8 @@ final class JournalRunHistoryReader
                 $childNames[$event->childExecutionId()] = $event->childWorkflowType();
             }
 
-            if ($event instanceof TimerScheduled && '' !== $event->summary()) {
-                $timerNames[$event->timerId()] = $event->summary();
+            if ($event instanceof TimerScheduled) {
+                $timerNames[$event->timerId()] = self::timerLabel($event, $recordedAt);
             }
 
             if ($event instanceof NexusOperationScheduled) {
@@ -109,10 +109,60 @@ final class JournalRunHistoryReader
                 // ce qui mérite d'être vu le jour où quelque chose ne va pas.
                 $event->payload(),
                 self::actionKeyOf($event),
+                // Même règle que le pont Temporal : l'événement par lequel le travail commence
+                // pour de bon. Ici il n'y en a que deux, et `ExecutionStarted` est inerte — il
+                // ouvre l'exécution, donc aucun intervalle ne le précède.
+                $event instanceof ActivityTaskStarted || $event instanceof ExecutionStarted,
+                self::isFailure($event),
             );
         }
 
         return $history;
+    }
+
+    /**
+     * Le nom d'un minuteur : son résumé s'il en a un, et **son délai dans tous les cas**.
+     *
+     * « TimerScheduled » nomme la classe, et un résumé seul dit pourquoi on attend sans dire
+     * combien de temps — or c'est le délai qu'un exploitant vient lire, et le déduire lui
+     * demanderait de soustraire deux horodatages de deux lignes.
+     *
+     * ⚠ `scheduledAt()` est l'**échéance**, pas l'instant de la planification : le délai est donc
+     * la différence avec l'horodatage d'enregistrement. Sans cet horodatage — un journal qui ne
+     * l'a pas gardé — le minuteur reste sans délai plutôt que d'en annoncer un compté depuis
+     * l'époque Unix, ce qui donnerait « 55 ans » sur une attente de cinq secondes.
+     */
+    private static function timerLabel(TimerScheduled $event, ?\DateTimeImmutable $recordedAt): string
+    {
+        $name = '' === $event->summary() ? 'timer' : $event->summary();
+        if (!$recordedAt instanceof \DateTimeImmutable) {
+            return $name;
+        }
+
+        $delay = $event->scheduledAt() - (float) $recordedAt->format('U.u');
+
+        return $delay <= 0.0 ? $name : $name . ' (' . ReadableDuration::of($delay) . ')';
+    }
+
+    /**
+     * Ce qui a mal tourné, et rien d'autre.
+     *
+     * ⚠ **Une annulation n'en est pas.** `ActivityCancelled`, `TimerCancelled`,
+     * `WorkflowExecutionCancelled` sont des issues demandées par quelqu'un ; les peindre comme des
+     * pannes enverrait chercher un incident là où il n'y a qu'une décision, et le rouge cesserait
+     * de vouloir dire quoi que ce soit. Le pont Temporal tient la même frontière, aux deux
+     * suffixes `_FAILED` et `_TIMED_OUT` — ⚠ et il écrit `CANCELED` à un seul « l » là où le
+     * journal écrit `Cancelled`, ce qui fait rater une règle écrite d'un seul côté.
+     */
+    private static function isFailure(Event $event): bool
+    {
+        return $event instanceof ActivityFailed
+            || $event instanceof ActivityTaskFailed
+            || $event instanceof ActivityCatastrophicFailure
+            || $event instanceof ChildWorkflowFailed
+            || $event instanceof WorkflowExecutionFailed
+            || $event instanceof NexusOperationFailed
+            || $event instanceof NexusOperationTimedOut;
     }
 
     /**

@@ -33,6 +33,19 @@ namespace Gplanchat\Durable\Observation;
  * `null` veut dire « cet événement est à lui seul son action » — le démarrage d'une exécution, un
  * signal reçu. C'est une réponse, pas une absence de réponse.
  *
+ * `started` dit que **le travail commence ici** : un worker a pris la tâche, l'exécution enfant a
+ * démarré, l'opération a débuté. Ce qui précède un tel événement dans son action n'est donc pas du
+ * travail mais une **attente de prise en charge** — la file. Deux barres de même longueur ne
+ * racontent pas la même chose selon que le temps a été passé à travailler ou à attendre que
+ * quelqu'un veuille bien commencer, et c'est la première question d'un exploitant devant une
+ * exécution lente : est-ce mon code, ou est-ce que personne n'a répondu ?
+ *
+ * `failed` marque **l'événement** qui a mal tourné, pas l'action ni l'exécution : une activité
+ * reprise après deux échecs porte du rouge et se termine bien, et c'est exactement ce qu'un
+ * exploitant doit pouvoir lire d'un coup d'œil. Une annulation et une interruption n'en sont pas :
+ * ce sont des issues, décidées par quelqu'un, et les peindre comme des pannes enverrait chercher
+ * une panne là où il n'y a qu'une décision.
+ *
  * @phpstan-type Details array<string, mixed>
  */
 final readonly class WorkflowRunEvent
@@ -47,5 +60,7 @@ final readonly class WorkflowRunEvent
         public string $label,
         public array $details = [],
         public ?string $actionKey = null,
+        public bool $started = false,
+        public bool $failed = false,
     ) {}
 }
