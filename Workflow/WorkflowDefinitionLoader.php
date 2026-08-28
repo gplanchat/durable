@@ -102,6 +102,28 @@ final class WorkflowDefinitionLoader
     /**
      * @param \ReflectionClass<object> $reflection
      */
+    /**
+     * Les paramètres de la méthode de workflow, dans l'ordre, avec ce qui les rend facultatifs.
+     *
+     * Publique parce que l'entrée d'un workflow est **clée par nom** : quiconque fabrique cette
+     * charge ailleurs — une opération Nexus remplie par ce workflow, par exemple — a besoin de
+     * savoir quels noms il doit écrire, et n'a pas à refaire la recherche de `#[AsWorkflowMethod]`
+     * pour l'apprendre.
+     *
+     * @param class-string $workflowClass
+     *
+     * @return array<string, bool> nom du paramètre => a une valeur par défaut
+     */
+    public function workflowMethodParameters(string $workflowClass): array
+    {
+        $parameters = [];
+        foreach ($this->resolveWorkflowMethod(new \ReflectionClass($workflowClass))->getParameters() as $parameter) {
+            $parameters[$parameter->getName()] = $parameter->isDefaultValueAvailable();
+        }
+
+        return $parameters;
+    }
+
     private function resolveWorkflowMethod(\ReflectionClass $reflection): \ReflectionMethod
     {
         $workflowMethods = [];
