@@ -14,11 +14,22 @@ namespace Gplanchat\Durable\Observation;
  *
  * Des **secondes**, jamais un pourcentage. Mettre à l'échelle demande de connaître la largeur d'une
  * colonne, et une surface qui ne rend aucun balisage n'en a pas.
+ *
+ * `title` est ce qu'un hôte affiche au survol du repère. Il est composé ici et non chez l'hôte pour
+ * que les deux surfaces le disent avec les mêmes mots : un exploitant qui passe de l'une à l'autre
+ * ne doit rien avoir à traduire.
+ *
+ * `renderedDetails` est {@see RecordedDetails::of()} appliqué une fois. `null` veut dire « rien à
+ * déplier » — et c'est ce qui permet à l'hôte de laisser une ligne simple plutôt qu'un dépliant qui
+ * s'ouvre sur du vide. Le fait brut reste sur `$event->details`, pour une surface qui sert des
+ * données plutôt qu'une page.
  */
 final readonly class TimelineEvent
 {
     public function __construct(
         public WorkflowRunEvent $event,
         public float $offset,
+        public string $title,
+        public ?string $renderedDetails,
     ) {}
 }

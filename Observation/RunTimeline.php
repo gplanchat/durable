@@ -79,6 +79,13 @@ final readonly class RunTimeline
                     static fn(WorkflowRunEvent $event): TimelineEvent => new TimelineEvent(
                         $event,
                         $moments[$event->sequence] - $first,
+                        \sprintf(
+                            '#%d · %s · %s',
+                            $event->sequence,
+                            $event->recordedAt->format('H:i:s.v'),
+                            $event->label,
+                        ),
+                        RecordedDetails::of($event->details),
                     ),
                     $group,
                 ),
@@ -118,6 +125,17 @@ final readonly class RunTimeline
                 $closing->started,
                 // Rouge sur l'intervalle qui **débouche** sur l'échec, pas sur l'action entière.
                 $closing->failed,
+                // La nature de l'intervalle est nommée : une hachure sans légende est une
+                // devinette, et celui qui survole la barre est celui qui veut savoir.
+                \sprintf(
+                    '%s%s · #%d → #%d · %s → %s',
+                    $closing->started ? 'waiting to be picked up · ' : '',
+                    ReadableDuration::of($to - $from),
+                    $opening->sequence,
+                    $closing->sequence,
+                    $opening->label,
+                    $closing->label,
+                ),
             );
         }
 

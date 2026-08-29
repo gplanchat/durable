@@ -21,6 +21,10 @@ namespace Gplanchat\Durable\Observation;
  * `failed` marque de même l'intervalle qui **débouche** sur un échec — le temps passé à échouer —
  * et non l'action : une activité reprise du deuxième coup porte du rouge et se termine bien.
  *
+ * `title` est ce qu'un hôte affiche au survol de la barre, composé ici pour que les deux surfaces
+ * le disent avec les mêmes mots. Une hachure sans légende est une devinette, et celui qui survole
+ * est justement celui qui veut savoir.
+ *
  * `from` et `to` sont les deux bouts, portés ici plutôt que retrouvés par rang dans la liste des
  * événements de l'action : un hôte qui compose une infobulle a besoin des deux noms, et un couplage
  * par index est exactement ce qu'on relit à trois heures du matin.
@@ -35,5 +39,6 @@ final readonly class TimelineSegment
         public string $durationLabel,
         public bool $waiting,
         public bool $failed,
+        public string $title,
     ) {}
 }
