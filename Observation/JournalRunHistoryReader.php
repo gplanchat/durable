@@ -176,7 +176,7 @@ final class JournalRunHistoryReader
     {
         // L'exécution elle-même est une action : son démarrage, sa fin, son annulation. Un signal
         // reçu ou une mise à jour n'en font pas partie — ce sont des actions à part entière, et
-        // c'est pour cela que la liste est écrite plutôt que dérivée de la voie `Execution`.
+        // c'est pour cela que la liste est écrite plutôt que dérivée de la nature `Execution`.
         if ($event instanceof ExecutionStarted
             || $event instanceof ExecutionCompleted
             || $event instanceof WorkflowExecutionFailed
@@ -291,7 +291,7 @@ final class JournalRunHistoryReader
             || $event instanceof TimerCompleted
             || $event instanceof TimerCancelled
         ) {
-            // Une voie de frise porte le nom de son action. « TimerScheduled » nomme la classe,
+            // Une ligne de frise porte le nom de son action. « TimerScheduled » nomme la classe,
             // pas l'attente : `timer 5s avant relance` dit ce qu'un exploitant est venu lire.
             return $timerNames[$event->timerId()] ?? ('timer ' . $event->timerId());
         }
