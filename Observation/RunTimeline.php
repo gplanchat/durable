@@ -86,6 +86,7 @@ final readonly class RunTimeline
                             $event->label,
                         ),
                         RecordedDetails::of($event->details),
+                        $opening->label,
                     ),
                     $group,
                 ),
@@ -93,6 +94,28 @@ final readonly class RunTimeline
         }
 
         return new self($span, ReadableDuration::of($span), $actions);
+    }
+
+    /**
+     * Les mêmes événements, déroulés dans l'ordre où ils ont été enregistrés.
+     *
+     * La frise groupe pour répondre « combien de temps » ; un journal déroule pour répondre « dans
+     * quel ordre », et c'est ce qu'un exploitant lit en premier. Rendre le second dans l'ordre du
+     * premier ferait mentir l'ordre. Chaque ligne garde le nom de son action, ce qui permet de
+     * retrouver dans l'un ce qu'on a repéré dans l'autre.
+     *
+     * @return list<TimelineEvent>
+     */
+    public function journal(): array
+    {
+        $rows = array_merge(...array_map(
+            static fn(TimelineAction $action): array => $action->events,
+            $this->actions,
+        ));
+
+        usort($rows, static fn(TimelineEvent $left, TimelineEvent $right): int => $left->event->sequence <=> $right->event->sequence);
+
+        return $rows;
     }
 
     /**

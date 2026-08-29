@@ -50,7 +50,7 @@ final class RunDashboard
                     'message' => 'No readable durable backend is configured for this application.',
                 ],
                 'runs' => [],
-                'kpis' => self::countBy([]),
+                'kpis' => self::outcomeCounters([]),
                 'pagination' => ['cursor' => $cursor, 'nextCursor' => null, 'hasNext' => false],
                 'status' => $status,
                 'selectedRun' => null,
@@ -70,7 +70,7 @@ final class RunDashboard
                     'checkedAt' => $health->checkedAt,
                 ],
                 'runs' => [],
-                'kpis' => self::countBy([]),
+                'kpis' => self::outcomeCounters([]),
                 'pagination' => ['cursor' => $cursor, 'nextCursor' => null, 'hasNext' => false],
                 'status' => $status,
                 'selectedRun' => null,
@@ -96,7 +96,7 @@ final class RunDashboard
                 'checkedAt' => $health->checkedAt,
             ],
             'runs' => array_map(self::describe(...), $page->runs),
-            'kpis' => self::countBy($page->runs),
+            'kpis' => self::outcomeCounters($page->runs),
             'pagination' => [
                 'cursor' => $cursor,
                 'nextCursor' => $page->nextCursor,
@@ -152,7 +152,12 @@ final class RunDashboard
     }
 
     /**
-     * Un compteur par issue, toutes les issues, **sur la page affichée**.
+     * Un compteur par issue, toutes les issues, sur **l'ensemble qu'on lui donne**.
+     *
+     * Publique parce qu'un hôte qui pagine autrement — la grille standard de Magento pagine par
+     * décalage dans une fenêtre bornée — compte le même ensemble avec les mêmes seaux. C'est
+     * précisément le trou qu'une liste figée creuse : l'appelant qui écrit ses seaux à la main en
+     * oublie un, et les compteurs cessent de s'additionner sans que rien ne le dise.
      *
      * La portée est assumée et doit être dite : compter la page est cohérent avec l'exigence que
      * les compteurs concordent avec ce que la liste montre, mais un intitulé « total » sous lequel
@@ -168,7 +173,7 @@ final class RunDashboard
      *
      * @return array<string, int>
      */
-    private static function countBy(array $runs): array
+    public static function outcomeCounters(array $runs): array
     {
         $kpis = ['total' => \count($runs)];
         foreach (WorkflowRunStatus::cases() as $case) {

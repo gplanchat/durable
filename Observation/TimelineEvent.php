@@ -19,6 +19,13 @@ namespace Gplanchat\Durable\Observation;
  * que les deux surfaces le disent avec les mêmes mots : un exploitant qui passe de l'une à l'autre
  * ne doit rien avoir à traduire.
  *
+ * `actionLabel` est le nom de l'**action** dont l'événement fait partie, et non le sien : seule la
+ * planification connaît le nom de l'activité, ses suites ne portent qu'un numéro. Une surface en
+ * tableau affichait donc `ACTIVITY TASK STARTED` sur deux lignes sur trois, là où l'exploitant
+ * cherchait `charge`. C'est la même chaîne que celle qui nomme la ligne de frise, si bien qu'une
+ * ligne de l'un se retrouve dans l'autre. Un événement qui est à lui seul son action se nomme
+ * lui-même : laisser la case vide ferait croire à un trou.
+ *
  * `renderedDetails` est {@see RecordedDetails::of()} appliqué une fois. `null` veut dire « rien à
  * déplier » — et c'est ce qui permet à l'hôte de laisser une ligne simple plutôt qu'un dépliant qui
  * s'ouvre sur du vide. Le fait brut reste sur `$event->details`, pour une surface qui sert des
@@ -31,5 +38,6 @@ final readonly class TimelineEvent
         public float $offset,
         public string $title,
         public ?string $renderedDetails,
+        public string $actionLabel,
     ) {}
 }
