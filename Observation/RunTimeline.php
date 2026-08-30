@@ -24,7 +24,7 @@ namespace Gplanchat\Durable\Observation;
  * savoir de plus.
  *
  * @see DUR037 l'observation d'un run est une projection
- * @see DUR048 une projection, plusieurs habillages : la présentation se décide à côté du modèle
+ * @see DUR049 une projection, plusieurs habillages : la présentation se décide à côté du modèle
  */
 final readonly class RunTimeline
 {

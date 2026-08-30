@@ -15,7 +15,7 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
  * dépend que du port et des faits d'observation. C'est un contrat de **données** : une surface qui
  * ne rend aucun balisage sert les mêmes panneaux.
  *
- * @see DUR048 une projection, plusieurs habillages
+ * @see DUR049 une projection, plusieurs habillages
  *
  * Le catalogue est nullable, et c'est le cas normal : le conteneur n'en enregistre aucun quand
  * aucun backend n'est lisible. La page dit alors qu'aucun backend n'est configuré — **sans nommer
