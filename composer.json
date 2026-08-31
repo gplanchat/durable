@@ -1,6 +1,16 @@
 {
     "name": "gplanchat/durable",
     "description": "PHP library for durable execution: workflows, activities, event journal, and transports (HttpKernel integration lives in the bundle).",
+    "keywords": [
+        "durable-execution",
+        "workflow",
+        "orchestration",
+        "long-running",
+        "saga",
+        "event-sourcing",
+        "fiber",
+        "activity"
+    ],
     "license": "MIT",
     "type": "library",
     "require": {
