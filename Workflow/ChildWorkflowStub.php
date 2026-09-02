@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\ChildWorkflowOptions;
+use Gplanchat\Durable\Stub\StubArguments;
 
 /**
  * Proxy de planification côté workflow pour exécuter un workflow enfant typé.
@@ -59,13 +60,6 @@ final class ChildWorkflowStub
      */
     private function argumentsToInput(array $arguments): array
     {
-        $params = $this->workflowMethod->getParameters();
-        $input = [];
-        foreach ($params as $i => $param) {
-            $key = $param->getName();
-            $input[$key] = $arguments[$i] ?? ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
-        }
-
-        return $input;
+        return StubArguments::toPayload($this->workflowMethod, $arguments);
     }
 }

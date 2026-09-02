@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
+use Gplanchat\Durable\Stub\StubArguments;
 
 /**
  * Proxy de planification côté workflow.
@@ -55,14 +56,6 @@ final class ActivityStub
      */
     private function argumentsToPayload(string $methodName, array $arguments): array
     {
-        $reflection = new \ReflectionMethod($this->contractClass, $methodName);
-        $params = $reflection->getParameters();
-        $payload = [];
-        foreach ($params as $i => $param) {
-            $key = $param->getName();
-            $payload[$key] = $arguments[$i] ?? ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
-        }
-
-        return $payload;
+        return StubArguments::toPayload(new \ReflectionMethod($this->contractClass, $methodName), $arguments);
     }
 }
