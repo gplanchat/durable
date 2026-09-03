@@ -81,7 +81,23 @@ interface WorkflowHistorySourceInterface
     public function findScheduledTimerId(int $slot): ?string;
 
     /**
-     * Returns the recorded side effect result at slot N, or null if not yet recorded.
+     * Whether slot N holds a recorded side effect.
+     *
+     * Presence is a fact about the history; the recorded value is data. They must be asked
+     * separately, because a side effect legitimately records `null` — and inferring "not recorded"
+     * from a `null` result re-runs a non-deterministic closure on every replay and appends a
+     * `SideEffectRecorded` per pass, which is the one guarantee `sideEffect()` exists to give.
+     *
+     * The same separation already exists on this port for timers, where {@see isTimerSettled()}
+     * answers the state and {@see findTimerSlotResult()} the value.
+     */
+    public function hasSideEffectForSlot(int $slot): bool;
+
+    /**
+     * Returns the recorded side effect result at slot N.
+     *
+     * Returns `null` both for a slot that recorded `null` and for a slot that recorded nothing;
+     * callers deciding whether to run a closure MUST ask {@see hasSideEffectForSlot()} first.
      */
     public function findSideEffectForSlot(int $slot): mixed;
 

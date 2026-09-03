@@ -311,10 +311,12 @@ final class ExecutionContext
     public function sideEffect(\Closure $closure): Awaitable
     {
         $slotIndex = $this->sideEffectSlotIndex++;
-        $replayResult = $this->historySource->findSideEffectForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $replayResult) {
-            $deferred->resolve($replayResult);
+
+        // La présence du slot, jamais la valeur qu'il porte : une closure qui rend `null` a bel et
+        // bien été exécutée, et la relire est exactement ce que `sideEffect()` promet.
+        if ($this->historySource->hasSideEffectForSlot($slotIndex)) {
+            $deferred->resolve($this->historySource->findSideEffectForSlot($slotIndex));
 
             return $deferred->awaitable();
         }

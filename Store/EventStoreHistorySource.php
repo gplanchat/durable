@@ -220,6 +220,21 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
+    public function hasSideEffectForSlot(int $slot): bool
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof SideEffectRecorded) {
+                if ($index === $slot) {
+                    return true;
+                }
+                ++$index;
+            }
+        }
+
+        return false;
+    }
+
     public function findSideEffectForSlot(int $slot): mixed
     {
         $index = 0;
