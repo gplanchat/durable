@@ -21,10 +21,16 @@ use Gplanchat\Durable\WorkflowRegistry;
  * compare ce que le replay relit de l'adaptateur à ce qu'il relit de la référence.
  *
  * Un adaptateur qui pilote un workflow en ligne étend cette classe et hérite des deux paliers. Un
- * adaptateur adossé à un serveur — les deux stores Temporal — n'étend que
- * {@see EventStoreConformanceTestCase} et rejoue ce palier dans la suite d'intégration. La coupure
- * est dans la déclaration de classe, pour qu'un pont qui ne joue qu'une moitié de la suite soit un
- * fait visible et non un oubli.
+ * adaptateur adossé à un serveur doit n'étendre que {@see EventStoreConformanceTestCase} et rejouer
+ * ce palier dans la suite d'intégration. La coupure est dans la déclaration de classe, pour qu'un
+ * pont qui ne joue qu'une moitié de la suite soit un fait visible et non un oubli.
+ *
+ * Ce docbloc affirmait que les deux stores Temporal étendaient le palier port. **C'est faux** : ni
+ * {@see \Gplanchat\Bridge\Temporal\TemporalJournalEventStore} ni
+ * {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore} n'étend quoi que ce
+ * soit, et aucun des deux paliers ne s'exécute contre eux. Un pont qui ne joue **aucune** moitié
+ * n'était pas prévu par la coupure, et c'est précisément l'oubli qu'elle devait rendre visible.
+ * Le change `backend-data-parity` le comble ; DUR041 porte l'état réel.
  *
  * La référence, elle, n'étend pas cette classe : on ne différencie pas un store d'avec lui-même.
  *
