@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\Stub\StubArguments;
 use Gplanchat\Durable\Nexus\Serving\NexusContractResolver;
+use Gplanchat\Durable\Stub\StubArguments;
 
 /**
  * Proxy de planification côté appelant.

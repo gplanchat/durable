@@ -22,15 +22,18 @@ namespace Gplanchat\Durable\Stub;
  * `null` à un paramètre nullable donnait sa valeur par défaut plutôt que `null` — c'est-à-dire
  * l'inverse de ce qui était demandé. D'où `array_key_exists` plutôt que `??`.
  *
- * **Et un argument nommé inconnu lève**, au lieu de disparaître. PHP fait de même sur un appel
- * ordinaire (`Unknown named parameter`) ; un stub qui l'avale rendrait une faute de frappe
- * indiscernable d'une valeur par défaut voulue.
+ * **Et ce que PHP refuse, le stub le refuse.** Sur un appel ordinaire, PHP lève sur un argument
+ * nommé inconnu (`Unknown named parameter`), sur un argument requis manquant (`ArgumentCountError`)
+ * et sur un paramètre servi deux fois, en positionnel puis en nommé (`Named parameter $x overwrites
+ * previous argument`). Un stub qui avale l'un des trois rend une faute indiscernable d'une valeur
+ * voulue — et la fait voyager jusque dans le journal, où elle sera rejouée à l'identique. Les trois
+ * lèvent donc ici aussi. Le type diffère de celui de PHP — `\BadMethodCallException` plutôt que
+ * `\Error` ou `\ArgumentCountError` — parce que l'appel passe par `__call` : c'est l'exception que
+ * la SPL réserve à une méthode appelée de travers, et elle reste rattrapable.
  */
 final class StubArguments
 {
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * @param array<int|string, mixed> $arguments tels que `__call` les a reçus : les positionnels
@@ -38,7 +41,9 @@ final class StubArguments
      *
      * @return array<string, mixed> la charge nommée, un paramètre du contrat par clé
      *
-     * @throws \BadMethodCallException si un argument nommé ne correspond à aucun paramètre
+     * @throws \BadMethodCallException si un argument nommé ne correspond à aucun paramètre, si un
+     *                                 paramètre requis n'est pas fourni, ou si un paramètre est
+     *                                 servi à la fois en positionnel et en nommé
      */
     public static function toPayload(\ReflectionFunctionAbstract $method, array $arguments): array
     {
@@ -49,19 +54,49 @@ final class StubArguments
             $name = $param->getName();
             $connus[$name] = true;
 
-            if (\array_key_exists($i, $arguments)) {
+            // Un variadique n'a ni valeur par défaut ni obligation : il ne peut pas manquer, et
+            // il n'a pas de place à lui dans une charge nommée.
+            if ($param->isVariadic()) {
+                continue;
+            }
+
+            $parPosition = \array_key_exists($i, $arguments);
+            $parNom = \array_key_exists($name, $arguments);
+
+            if ($parPosition && $parNom) {
+                throw new \BadMethodCallException(\sprintf(
+                    'Parameter $%s of %s() was given both positionally and by name.',
+                    $name,
+                    self::describe($method),
+                ));
+            }
+
+            if ($parPosition) {
                 $payload[$name] = $arguments[$i];
 
                 continue;
             }
 
-            if (\array_key_exists($name, $arguments)) {
+            if ($parNom) {
                 $payload[$name] = $arguments[$name];
 
                 continue;
             }
 
-            $payload[$name] = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : null;
+            if ($param->isDefaultValueAvailable()) {
+                $payload[$name] = $param->getDefaultValue();
+
+                continue;
+            }
+
+            // Le retomber-sur-`null` d'ici traversait le journal sans un mot, et se rejouait à
+            // l'identique à chaque passe : le paramètre est requis, son absence est une faute
+            // d'appel, et un type non nullable l'aurait de toute façon refusée à l'arrivée.
+            throw new \BadMethodCallException(\sprintf(
+                'Missing required argument $%s for %s().',
+                $name,
+                self::describe($method),
+            ));
         }
 
         foreach ($arguments as $key => $_) {
@@ -70,7 +105,7 @@ final class StubArguments
                     'Unknown named parameter $%s for %s(); known parameters: %s.',
                     $key,
                     self::describe($method),
-                    implode(', ', array_map(static fn (string $n): string => '$' . $n, array_keys($connus))),
+                    implode(', ', array_map(static fn(string $n): string => '$' . $n, array_keys($connus))),
                 ));
             }
         }
