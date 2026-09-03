@@ -239,17 +239,20 @@ final class ExecutionContext
      * Déduit, donc déterministe : deux replays de la même histoire répondent pareil, ce qui est la
      * seule propriété dont le versioning a besoin.
      *
-     * Les effets de bord ne sont pas consultés : `findSideEffectForSlot()` rend `mixed`, et une
-     * valeur enregistrée peut légitimement être `null` — on ne peut pas distinguer « rien ici » de
-     * « ici, la valeur null ». Un workflow dont le seul travail avant un point de changement est
-     * un effet de bord sera donc traité comme neuf. C'est le trou, il est étroit, et il est écrit.
+     * Les effets de bord comptent comme les autres depuis que le port sait dire leur présence
+     * sans passer par leur valeur. Ils ne le pouvaient pas tant que `findSideEffectForSlot()`
+     * rendait `mixed` : une valeur enregistrée peut légitimement être `null`, et « rien ici » ne
+     * s'y distinguait pas de « ici, la valeur null ». Un workflow dont le seul travail avant un
+     * point de changement était un effet de bord basculait alors sur la branche neuve, en plein
+     * rejeu — le trou est fermé avec celui de `sideEffect()`, dont il était la même cause.
      */
     private function hasRecordedWorkAhead(): bool
     {
         return null !== $this->historySource->findScheduledActivityId($this->activitySlotIndex)
             || null !== $this->historySource->findScheduledTimerId($this->timerSlotIndex)
             || null !== $this->historySource->findScheduledChildExecutionId($this->childWorkflowSlotIndex)
-            || null !== $this->historySource->findScheduledNexusOperation($this->nexusOperationSlotIndex);
+            || null !== $this->historySource->findScheduledNexusOperation($this->nexusOperationSlotIndex)
+            || $this->historySource->hasSideEffectForSlot($this->sideEffectSlotIndex);
     }
 
     /**

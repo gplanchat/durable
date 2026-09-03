@@ -88,8 +88,10 @@ interface WorkflowHistorySourceInterface
      * from a `null` result re-runs a non-deterministic closure on every replay and appends a
      * `SideEffectRecorded` per pass, which is the one guarantee `sideEffect()` exists to give.
      *
-     * The same separation already exists on this port for timers, where {@see isTimerSettled()}
-     * answers the state and {@see findTimerSlotResult()} the value.
+     * The same separation already exists on this port for timers, where
+     * {@see findScheduledTimerId()} answers the state and {@see findTimerSlotResult()} the value,
+     * and for activities, child workflows and Nexus operations, whose three sibling methods wrap
+     * their result in an `array{result: mixed, ...}` for exactly this reason.
      */
     public function hasSideEffectForSlot(int $slot): bool;
 
