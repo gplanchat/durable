@@ -122,6 +122,19 @@ interface WorkflowHistorySourceInterface
     public function childWorkflowTypeForSlot(int $slot): ?string;
 
     /**
+     * Returns the input recorded for child workflow slot N, or null if there is nothing to compare.
+     *
+     * Same null/`[]` rule as {@see activityPayloadForSlot()}: only null waives the guard.
+     *
+     * The type identifies the child; this is what it was started with. A replay that keeps the
+     * type and changes the input starts nothing new — the journal already holds the child's
+     * outcome — so the divergence would otherwise never surface.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function childWorkflowInputForSlot(int $slot): ?array;
+
+    /**
      * Returns the identity of the Nexus operation recorded at slot N, or null if none was.
      *
      * The identity is the **triple** — endpoint, service, operation — rendered as
@@ -129,6 +142,19 @@ interface WorkflowHistorySourceInterface
      * a different call, and comparing the operation name alone would let it through.
      */
     public function nexusOperationSignatureForSlot(int $slot): ?string;
+
+    /**
+     * Returns the payload recorded for Nexus operation slot N, or null if there is nothing to compare.
+     *
+     * Same null/`[]` rule as {@see activityPayloadForSlot()}: only null waives the guard.
+     *
+     * The identity above answers "which service"; this one answers "with what". Getting it wrong
+     * costs more here than anywhere else — a duplicated activity lands on a worker of one's own, a
+     * Nexus operation lands on a third party, where the duplicate is theirs.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function nexusOperationPayloadForSlot(int $slot): ?array;
 
     /**
      * Returns the Nth recorded message, in recorded order, or null past the end.

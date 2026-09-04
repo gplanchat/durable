@@ -103,7 +103,13 @@ final class ExecutionContext
     {
         $slotIndex = $this->activitySlotIndex++;
         $this->refuseActivityDivergence($slotIndex, $name);
-        $this->refuseActivityPayloadDivergence($slotIndex, $name, $payload);
+        $this->refusePayloadDivergence(
+            'activity',
+            $slotIndex,
+            $name,
+            $this->historySource->activityPayloadForSlot($slotIndex),
+            $payload,
+        );
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
@@ -162,6 +168,13 @@ final class ExecutionContext
             $slotIndex,
             $this->historySource->nexusOperationSignatureForSlot($slotIndex),
             \sprintf('%s/%s/%s', $endpoint->name(), $service->name(), $operation->name()),
+        );
+        $this->refusePayloadDivergence(
+            'Nexus operation',
+            $slotIndex,
+            \sprintf('%s/%s/%s', $endpoint->name(), $service->name(), $operation->name()),
+            $this->historySource->nexusOperationPayloadForSlot($slotIndex),
+            $payload,
         );
         $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
         $operationId = $scheduled ?? $this->uuid();
@@ -279,7 +292,7 @@ final class ExecutionContext
     }
 
     /**
-     * Refuse un slot dont le **nom** concorde mais dont les **arguments** ont changé au replay.
+     * Refuse un slot dont l'**identité** concorde mais dont la **charge** a changé au replay.
      *
      * Le nom seul laissait passer la moitié du problème : le journal servait l'ancien résultat, la
      * charge fraîchement calculée partait à la poubelle, et l'exécution se terminait en succès en
@@ -291,13 +304,23 @@ final class ExecutionContext
      * dont le journal ne retient rien ne doit pas faire diverger un replay fidèle, sous peine
      * d'arrêter en production des exécutions parfaitement saines.
      *
-     * @param array<string, mixed> $requested
+     * La règle, une fois, pour les trois types de slot qui portent une charge — comme
+     * {@see refuseDivergence()} le fait pour les trois qui portent une identité. Le `$slotKind` et
+     * l'`$identity` viennent de l'appelant parce que ce qui identifie un slot n'est pas de même
+     * nature partout : un nom pour une activité, un type pour un enfant, un triplet pour Nexus.
      *
-     * @throws WorkflowTaskFailure si le code redemande la même activité avec une autre charge
+     * @param array<string, mixed>|null $recorded
+     * @param array<string, mixed>      $requested
+     *
+     * @throws WorkflowTaskFailure si le code redemande le même appel avec une autre charge
      */
-    private function refuseActivityPayloadDivergence(int $slotIndex, string $name, array $requested): void
-    {
-        $recorded = $this->historySource->activityPayloadForSlot($slotIndex);
+    private function refusePayloadDivergence(
+        string $slotKind,
+        int $slotIndex,
+        string $identity,
+        ?array $recorded,
+        array $requested,
+    ): void {
         if (null === $recorded) {
             // Rien d'enregistré ici : slot neuf, ou histoire écrite avant que la charge soit
             // lisible. Refuser laisserait sans garde exactement les exécutions qu'elle protège.
@@ -314,16 +337,18 @@ final class ExecutionContext
         $at = self::firstDifference($recordedPrint, $requestedPrint);
 
         throw new WorkflowTaskFailure(\sprintf(
-            'Replay divergence at activity slot %d of execution "%s": the activity name "%s" matches, '
+            'Replay divergence at %s slot %d of execution "%s": "%s" is still the same %s, '
             . 'but its payload changed at byte %d. History recorded %s, code scheduled %s '
             . '(%d and %d bytes). '
             . 'This is non-deterministic workflow code — the payload is rebuilt on every replay pass, '
             . 'so something in it reads the clock, draws a random value, or is resolved from outside '
             . 'the journal. This is not a version skew: a declared change point would have changed '
-            . 'the name or the slot, not the arguments alone.',
+            . 'the identity or the slot, not the payload alone.',
+            $slotKind,
             $slotIndex,
             $this->executionId,
-            $name,
+            $identity,
+            $slotKind,
             $at,
             self::windowAround($recordedPrint, $at),
             self::windowAround($requestedPrint, $at),
@@ -502,6 +527,13 @@ final class ExecutionContext
             $slotIndex,
             $this->historySource->childWorkflowTypeForSlot($slotIndex),
             $childWorkflowType,
+        );
+        $this->refusePayloadDivergence(
+            'child workflow',
+            $slotIndex,
+            $childWorkflowType,
+            $this->historySource->childWorkflowInputForSlot($slotIndex),
+            $input,
         );
         $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
