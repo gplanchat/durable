@@ -31,6 +31,9 @@ use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 
 final class ExecutionContext
 {
+    /** Ce qu'un message de divergence montre d'une empreinte de charge avant de la couper. */
+    private const DIVERGENCE_PRINT_LIMIT = 256;
+
     private ?QueryHandlerRegistry $queryHandlers = null;
 
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
@@ -100,6 +103,7 @@ final class ExecutionContext
     {
         $slotIndex = $this->activitySlotIndex++;
         $this->refuseActivityDivergence($slotIndex, $name);
+        $this->refuseActivityPayloadDivergence($slotIndex, $name, $payload);
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
@@ -272,6 +276,141 @@ final class ExecutionContext
     private function refuseActivityDivergence(int $slotIndex, string $requested): void
     {
         $this->refuseDivergence('activity', $slotIndex, $this->historySource->activityNameForSlot($slotIndex), $requested);
+    }
+
+    /**
+     * Refuse un slot dont le **nom** concorde mais dont les **arguments** ont changé au replay.
+     *
+     * Le nom seul laissait passer la moitié du problème : le journal servait l'ancien résultat, la
+     * charge fraîchement calculée partait à la poubelle, et l'exécution se terminait en succès en
+     * ayant menti sur ce qu'elle avait demandé. Mesuré : neuf charges calculées, trois
+     * journalisées, six divergences avalées sans un mot.
+     *
+     * La comparaison passe par {@see canonicalPayload()}, qui fait voir aux deux côtés **ce que le
+     * journal sait tenir** et rien de plus. C'est la règle qui évite les faux positifs : un objet
+     * dont le journal ne retient rien ne doit pas faire diverger un replay fidèle, sous peine
+     * d'arrêter en production des exécutions parfaitement saines.
+     *
+     * @param array<string, mixed> $requested
+     *
+     * @throws WorkflowTaskFailure si le code redemande la même activité avec une autre charge
+     */
+    private function refuseActivityPayloadDivergence(int $slotIndex, string $name, array $requested): void
+    {
+        $recorded = $this->historySource->activityPayloadForSlot($slotIndex);
+        if (null === $recorded) {
+            // Rien d'enregistré ici : slot neuf, ou histoire écrite avant que la charge soit
+            // lisible. Refuser laisserait sans garde exactement les exécutions qu'elle protège.
+            return;
+        }
+
+        $recordedPrint = $this->canonicalPayload($recorded);
+        $requestedPrint = $this->canonicalPayload($requested);
+        if (null === $recordedPrint || null === $requestedPrint || $recordedPrint === $requestedPrint) {
+            // Une charge que le journal ne sait pas rendre comparable ne prouve rien : on se tait.
+            return;
+        }
+
+        $at = self::firstDifference($recordedPrint, $requestedPrint);
+
+        throw new WorkflowTaskFailure(\sprintf(
+            'Replay divergence at activity slot %d of execution "%s": the activity name "%s" matches, '
+            . 'but its payload changed at byte %d. History recorded %s, code scheduled %s '
+            . '(%d and %d bytes). '
+            . 'This is non-deterministic workflow code — the payload is rebuilt on every replay pass, '
+            . 'so something in it reads the clock, draws a random value, or is resolved from outside '
+            . 'the journal. This is not a version skew: a declared change point would have changed '
+            . 'the name or the slot, not the arguments alone.',
+            $slotIndex,
+            $this->executionId,
+            $name,
+            $at,
+            self::windowAround($recordedPrint, $at),
+            self::windowAround($requestedPrint, $at),
+            \strlen($recordedPrint),
+            \strlen($requestedPrint),
+        ));
+    }
+
+    /**
+     * Rend d'une charge l'empreinte que le journal en retiendrait, ou null si elle n'en a pas.
+     *
+     * Les deux côtés passent par ici, et c'est tout l'intérêt : le côté enregistré a fait
+     * l'aller-retour JSON du magasin, le côté frais non. Sans cette normalisation, un objet à
+     * propriétés privées — le style de la maison — rend `{}` à gauche et `[]` à droite, et toute
+     * exécution qui en porte un divergerait à chaque reprise. Mesuré avant d'être écrit.
+     *
+     * Les clés sont triées parce qu'un objet JSON n'a pas d'ordre : le voir changer ne prouve rien.
+     * Les listes gardent le leur, où l'ordre est l'information.
+     *
+     * Null veut dire « incomparable » — une ressource, un NAN, une récursion. La garde se tait
+     * alors, plutôt que d'accuser une charge qu'elle ne sait pas lire.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function canonicalPayload(array $payload): ?string
+    {
+        try {
+            $throughTheJournal = json_decode(
+                json_encode($payload, \JSON_THROW_ON_ERROR),
+                true,
+                512,
+                \JSON_THROW_ON_ERROR,
+            );
+
+            self::sortKeysDeeply($throughTheJournal);
+
+            return json_encode($throughTheJournal, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+    }
+
+    private static function sortKeysDeeply(mixed &$value): void
+    {
+        if (!\is_array($value)) {
+            return;
+        }
+
+        ksort($value);
+        foreach ($value as &$nested) {
+            self::sortKeysDeeply($nested);
+        }
+    }
+
+    /**
+     * Le premier octet où les deux empreintes cessent de coïncider.
+     *
+     * C'est ce qui rend le message utilisable : une charge d'agent pèse des kilo-octets, et deux
+     * préfixes identiques n'apprennent rien à qui lit. Mesuré avant d'être écrit — le premier
+     * message montrait 256 octets de tête et les deux côtés se ressemblaient trait pour trait.
+     */
+    private static function firstDifference(string $recorded, string $requested): int
+    {
+        $shortest = min(\strlen($recorded), \strlen($requested));
+        $at = 0;
+        while ($at < $shortest && $recorded[$at] === $requested[$at]) {
+            ++$at;
+        }
+
+        return $at;
+    }
+
+    /**
+     * Rend la fenêtre d'empreinte autour de la divergence, avec de quoi la situer de chaque côté.
+     */
+    private static function windowAround(string $print, int $at): string
+    {
+        $margin = intdiv(self::DIVERGENCE_PRINT_LIMIT, 4);
+        $from = max(0, $at - $margin);
+        $window = substr($print, $from, self::DIVERGENCE_PRINT_LIMIT);
+
+        return \sprintf(
+            '%s%s%s',
+            $from > 0 ? '…' : '',
+            $window,
+            $from + \strlen($window) < \strlen($print) ? '…' : '',
+        );
     }
 
     /**

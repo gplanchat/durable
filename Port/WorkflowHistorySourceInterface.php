@@ -43,6 +43,22 @@ interface WorkflowHistorySourceInterface
     public function activityNameForSlot(int $slot): ?string;
 
     /**
+     * Returns the payload recorded for activity slot N, or null if there is nothing to compare.
+     *
+     * Null and `[]` are different answers, and callers rely on it: `[]` is an activity that was
+     * genuinely scheduled with no arguments, null is "this journal says nothing here" — an empty
+     * slot, or a history written before the payload was readable. Only null waives the guard.
+     * Conflating the two is the {@see findSideEffectForSlot()} trap one file over.
+     *
+     * The name answers "what was this"; this one answers "with what". A replay that keeps the
+     * name and changes the arguments is non-deterministic workflow code, and without this the
+     * journal serves the old result while the freshly computed payload is dropped in silence.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function activityPayloadForSlot(int $slot): ?array;
+
+    /**
      * Returns the version this execution recorded for a declared change point, or null if it has
      * not reached that point yet.
      *

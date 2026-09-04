@@ -127,6 +127,25 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
+    public function activityPayloadForSlot(int $slot): ?array
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ActivityScheduled) {
+                if ($index === $slot) {
+                    // `payload()` rend l'enveloppe de l'événement ; les arguments de l'activité en
+                    // sont une case. Un non-tableau vaut « rien à comparer », pas « tableau vide ».
+                    $arguments = $event->payload()['payload'] ?? null;
+
+                    return \is_array($arguments) ? $arguments : null;
+                }
+                ++$index;
+            }
+        }
+
+        return null;
+    }
+
     public function childWorkflowTypeForSlot(int $slot): ?string
     {
         $index = 0;
