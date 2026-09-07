@@ -23,10 +23,10 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\NoopActivityTransport;
 
 /**
- * Traite un {@see ActivityMessage} : timeouts, exécution, journal, reprise workflow, retry.
+ * Processes an {@see ActivityMessage}: timeouts, execution, journal, workflow resume, retry.
  *
- * Réutilisable par le bundle Symfony ({@see \Gplanchat\Durable\Bundle\Handler\ActivityRunHandler})
- * et par d’autres runtimes (workers consommant la même abstraction transport).
+ * Reusable by the Symfony bundle ({@see \Gplanchat\Durable\Bundle\Handler\ActivityRunHandler})
+ * and by other runtimes (workers consuming the same transport abstraction).
  */
 final class ActivityMessageProcessor
 {
@@ -147,24 +147,24 @@ final class ActivityMessageProcessor
                     $e::class,
                 );
             }
-            // La borne de l'activité et le plafond de l'application se composent : la plus
-            // stricte des deux l'emporte.
+            // The activity's bound and the application's ceiling compose: the stricter of the
+            // two wins.
             $retryLimit = (null !== $options ? $options->retryLimit : RetryLimit::unlimited())
                 ->narrowedTo(RetryLimit::ofRetries($this->maxRetries));
 
             $nonRetryable = null !== $options && $options->isNonRetryable($e);
             $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt + 1);
 
-            // Le transport ne retente pas côté PHP (worker Temporal natif) : l'autorité sur les
-            // retentatives appartient entièrement au serveur, donc le décompte de tentatives PHP
-            // n'y veut rien dire — seule la non-retryabilité, sur laquelle le serveur s'aligne via
-            // nonRetryableErrorTypes, reste terminale. On journalise le VRAI échec en `InProgress` :
-            // un échec terminal court-circuiterait la tentative suivante côté worker.
+            // The transport does not retry on the PHP side (native Temporal worker): authority
+            // over retries belongs entirely to the server, so the PHP attempt count means nothing
+            // there — only non-retryability, on which the server aligns via nonRetryableErrorTypes,
+            // stays terminal. The REAL failure is journalled as `InProgress`: a terminal failure
+            // would short-circuit the next attempt on the worker side.
             $delegatedToTransport = !$nonRetryable && $this->activityTransport instanceof NoopActivityTransport;
 
             $retryState = match (true) {
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
-                // (l'ordre compte : `InProgress` l'emporte sur le décompte local)
+                // (order matters: `InProgress` wins over the local count)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
                 default => ActivityRetryState::MaximumAttemptsReached,
             };

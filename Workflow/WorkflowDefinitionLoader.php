@@ -12,14 +12,14 @@ use Gplanchat\Durable\Attribute\AsWorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
- * Charge une définition de workflow depuis une classe avec attributs #[AsWorkflow] et #[AsWorkflowMethod].
+ * Loads a workflow definition from a class carrying #[AsWorkflow] and #[AsWorkflowMethod] attributes.
  *
- * Produit une factory compatible avec WorkflowRegistry.
+ * Produces a factory compatible with WorkflowRegistry.
  */
 final class WorkflowDefinitionLoader
 {
     /**
-     * Résout les métadonnées pour un child workflow stub (type + méthode d'entrée).
+     * Resolves the metadata for a child workflow stub (type + entry method).
      *
      * @param class-string $workflowClass
      *
@@ -36,7 +36,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Nom enregistré dans {@see WorkflowRegistry} : valeur de {@see AsWorkflow} (1er argument) si présente, sinon {@see \ReflectionClass::getShortName()}.
+     * Name registered in {@see WorkflowRegistry}: value of {@see AsWorkflow} (1st argument) if present, otherwise {@see \ReflectionClass::getShortName()}.
      *
      * @param class-string $workflowClass
      */
@@ -46,9 +46,9 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Nom à l’usage de Temporal (type de workflow côté serveur) et du journal : **jamais le FQCN**.
-     * Si la chaîne est un {@code class-string} existant, résout comme {@see workflowTypeForClass} ;
-     * sinon la valeur est déjà un alias et est renvoyée telle quelle.
+     * Name for Temporal's use (server-side workflow type) and for the journal: **never the FQCN**.
+     * If the string is an existing {@code class-string}, resolves as {@see workflowTypeForClass};
+     * otherwise the value is already an alias and is returned as is.
      */
     public function aliasForTemporalInterop(string $workflowTypeOrFqcn): string
     {
@@ -60,7 +60,7 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * Produit workflowType et factory pour une classe workflow.
+     * Produces workflowType and factory for a workflow class.
      *
      * @param class-string $workflowClass
      *
@@ -103,16 +103,15 @@ final class WorkflowDefinitionLoader
      * @param \ReflectionClass<object> $reflection
      */
     /**
-     * Les paramètres de la méthode de workflow, dans l'ordre, avec ce qui les rend facultatifs.
+     * The workflow method's parameters, in order, with what makes them optional.
      *
-     * Publique parce que l'entrée d'un workflow est **clée par nom** : quiconque fabrique cette
-     * charge ailleurs — une opération Nexus remplie par ce workflow, par exemple — a besoin de
-     * savoir quels noms il doit écrire, et n'a pas à refaire la recherche de `#[AsWorkflowMethod]`
-     * pour l'apprendre.
+     * Public because a workflow's input is **keyed by name**: whoever builds that payload
+     * elsewhere — a Nexus operation fulfilled by this workflow, for instance — needs to know which
+     * names to write, and should not have to redo the `#[AsWorkflowMethod]` lookup to learn them.
      *
      * @param class-string $workflowClass
      *
-     * @return array<string, bool> nom du paramètre => a une valeur par défaut
+     * @return array<string, bool> parameter name => has a default value
      */
     public function workflowMethodParameters(string $workflowClass): array
     {
@@ -204,8 +203,8 @@ final class WorkflowDefinitionLoader
     /**
      * Scans the workflow class for #[AsSignalMethod] attributes and registers them on WorkflowEnvironment.
      *
-     * Même traduction que pour les queries : l'attribut est la forme déclarative de
-     * {@see WorkflowEnvironment::onSignal()}, et les deux produisent le même dispatch.
+     * Same translation as for queries: the attribute is the declarative form of
+     * {@see WorkflowEnvironment::onSignal()}, and both produce the same dispatch.
      *
      * @param class-string $workflowClass
      */

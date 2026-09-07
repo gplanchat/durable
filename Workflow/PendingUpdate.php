@@ -7,15 +7,15 @@ namespace Gplanchat\Durable\Workflow;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
 /**
- * Un update qui n'est pas encore dans le journal, remis à l'exécution pour la passe en cours.
+ * An update that is not in the journal yet, handed to the execution for the current pass.
  *
- * La sonde de la tâche 1.3 l'a montré : un update entrant n'atteint pas le worker par
- * l'historique. Il arrive à côté, sur la tâche, et le worker l'accepte *et* y répond sur cette
- * même tâche. C'est donc pour la première passe seulement — l'acceptation écrit la requête dans
- * l'historique, et dès le replay suivant l'update est positionné comme n'importe quel signal.
+ * The task 1.3 probe showed it: an incoming update does not reach the worker through the
+ * history. It arrives alongside, on the task, and the worker accepts it *and* answers it on that
+ * same task. So this is for the first pass only — acceptance writes the request into the
+ * history, and from the next replay onwards the update is positioned like any other signal.
  *
- * L'issue est déposée ici plutôt que journalisée par l'exécution : c'est l'appelant de la passe
- * qui répond, comme le worker renvoie sa `Response` au serveur, et lui qui consigne.
+ * The outcome is deposited here rather than journalled by the execution: it is the caller of the
+ * pass that answers, the way the worker returns its `Response` to the server, and that records.
  */
 final class PendingUpdate
 {

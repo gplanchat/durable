@@ -5,36 +5,36 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Versioning;
 
 /**
- * Les constantes d'un point de changement déclaré.
+ * The constants of a declared change point.
  *
- * Le nom de marqueur et les clés de `details` ne sont pas des choix : ils ont été relevés sur
- * l'historique qu'un workflow versionné du SDK Go produit, puis réémis depuis ce pont et acceptés
- * par le serveur (tâches 1.1–1.2). Les changer romprait la lisibilité d'une exécution Durable dans
- * l'UI Temporal, et l'interopérabilité avec les autres SDK.
+ * The marker name and the `details` keys are not choices: they were read off the history that a
+ * versioned Go SDK workflow produces, then re-emitted from this bridge and accepted by the server
+ * (tasks 1.1–1.2). Changing them would break the readability of a Durable execution in the Temporal
+ * UI, and interoperability with the other SDKs.
  */
 final class ChangePoint
 {
     /**
-     * Ce que reçoit une exécution qui a dépassé ce point **avant** qu'il ne soit déclaré.
+     * What an execution that went past this point **before** it was declared receives.
      *
-     * `-1`, comme dans les SDK officiels : le comportement d'origine n'a pas de numéro parce qu'à
-     * l'époque il n'y avait rien à numéroter.
+     * `-1`, as in the official SDKs: the original behaviour has no number because at the time there
+     * was nothing to number.
      */
     public const DEFAULT_VERSION = -1;
 
-    /** Le nom que le serveur et l'UI Temporal reconnaissent. */
+    /** The name the server and the Temporal UI recognize. */
     public const MARKER_NAME = 'Version';
 
-    /** Les deux clés de `details`, relevées sur l'historique du SDK Go. */
+    /** The two `details` keys, read off the Go SDK's history. */
     public const DETAIL_CHANGE_ID = 'change-id';
     public const DETAIL_VERSION = 'version';
 
-    /** L'attribut de recherche standard qui rend « qui est encore sur la version N » interrogeable. */
+    /** The standard search attribute that makes "who is still on version N" queryable. */
     public const SEARCH_ATTRIBUTE = 'TemporalChangeVersion';
 
     private function __construct() {}
 
-    /** La valeur que le SDK Go met dans `TemporalChangeVersion` : `<change-id>-<version>`. */
+    /** The value the Go SDK puts in `TemporalChangeVersion`: `<change-id>-<version>`. */
     public static function searchAttributeValue(string $changeId, int $version): string
     {
         return \sprintf('%s-%d', $changeId, $version);

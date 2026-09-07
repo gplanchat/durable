@@ -9,11 +9,10 @@ use Gplanchat\Durable\ChildWorkflowOptions;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Le port de démarrage d'enfant, câblé sur le contexte d'exécution.
+ * The child-start port, wired onto the execution context.
  *
- * Construit par {@see \Gplanchat\Durable\WorkflowEnvironment::childWorkflowStub()} et jamais
- * rendu : un workflow ne reçoit jamais le contexte, donc il ne peut pas nommer un type d'enfant
- * par une chaîne.
+ * Built by {@see \Gplanchat\Durable\WorkflowEnvironment::childWorkflowStub()} and never
+ * returned: a workflow never receives the context, so it cannot name a child type by a string.
  *
  * @internal
  */
@@ -25,8 +24,8 @@ final class ContextChildWorkflowScheduler implements ChildWorkflowSchedulerInter
 
     public function startChildWorkflow(string $childWorkflowType, array $input, ?ChildWorkflowOptions $options): Awaitable
     {
-        // `ExecutionContext::executeChildWorkflow()` planifie et rend un awaitable malgré son nom :
-        // c'est l'environnement qui attendait par-dessus.
+        // `ExecutionContext::executeChildWorkflow()` schedules and returns an awaitable despite
+        // its name: it was the environment that awaited on top of it.
         return $this->context->executeChildWorkflow($childWorkflowType, $input, $options);
     }
 }
