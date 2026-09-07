@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Une activité planifiée a été retirée de la file sans exécution (ex. perdante d'un race / any).
+ * A scheduled activity has been taken off the queue without executing (e.g. loser of a race / any).
  */
 final readonly class ActivityCancelled implements Event
 {

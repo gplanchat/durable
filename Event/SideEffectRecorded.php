@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Résultat d'un appel {@see \Gplanchat\Durable\ExecutionContext::sideEffect()} persisté dans le journal.
+ * Result of a {@see \Gplanchat\Durable\ExecutionContext::sideEffect()} call persisted in the journal.
  *
- * Au replay, la closure du side effect n'est pas ré-exécutée ; la valeur enregistrée ici est réutilisée
- * (aligné sur Temporal {@link https://docs.temporal.io/develop/php/side-effects}).
+ * On replay, the side effect closure is not re-executed; the value recorded here is reused
+ * (aligned with Temporal {@link https://docs.temporal.io/develop/php/side-effects}).
  */
 final readonly class SideEffectRecorded implements Event
 {

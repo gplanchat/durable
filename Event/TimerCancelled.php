@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Un minuteur planifié ne partira pas (ex. perdant d'un {@see \Gplanchat\Durable\WorkflowEnvironment::any()}).
+ * A scheduled timer will not fire (e.g. loser of a {@see \Gplanchat\Durable\WorkflowEnvironment::any()}).
  *
- * Marqueur de journal : le minuteur reste non résolu, comme aujourd'hui. Il sert à empêcher
- * {@see \Gplanchat\Durable\ExecutionRuntime::checkTimers()} et
- * {@see \Gplanchat\Durable\Timer\TimerWakeDelayCalculator} de réveiller
- * l'exécution pour une échéance morte.
+ * A journal marker: the timer stays unresolved, as it does today. It serves to prevent
+ * {@see \Gplanchat\Durable\ExecutionRuntime::checkTimers()} and
+ * {@see \Gplanchat\Durable\Timer\TimerWakeDelayCalculator} from waking
+ * the execution for a dead deadline.
  *
- * ponytail: le slot de replay reste consommé par le minuteur annulé — le régler comme
- * « terminé » le ferait apparaître comme *parti* au replay et pourrait désigner le mauvais
- * gagnant d'un `any()`. Réclamer le slot demanderait un slotting nommé, pas positionnel.
+ * ponytail: the replay slot stays consumed by the cancelled timer — settling it as "completed"
+ * would make it appear as having *fired* on replay and could designate the wrong winner of an
+ * `any()`. Reclaiming the slot would call for named slotting, not positional.
  */
 final readonly class TimerCancelled implements Event
 {

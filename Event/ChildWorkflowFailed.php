@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Échec d’un workflow enfant (journal du **parent**).
+ * Failure of a child workflow (journal of the **parent**).
  */
 final readonly class ChildWorkflowFailed implements Event
 {
