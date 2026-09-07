@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Le namespace : la frontière d'isolation dans laquelle vivent exécutions, files et attributs de
- * recherche.
+ * The namespace: the isolation boundary inside which executions, queues and search attributes
+ * live.
  *
- * Nommé `WorkflowNamespace` faute de mieux — `namespace` est un mot réservé du langage.
+ * Named `WorkflowNamespace` for want of anything better — `namespace` is a reserved word of the
+ * language.
  *
- * Contrairement à {@see TaskQueue}, une erreur ici ne passe pas inaperçue : le serveur répond
- * `NOT_FOUND, Namespace "…" is not found`, un namespace devant exister avant usage. Cet objet
- * apporte donc surtout du **typage** — namespace et file de tâches sont deux chaînes voisines
- * dans les mêmes constructeurs, et les intervertir ne se voyait qu'à l'exécution.
+ * Unlike {@see TaskQueue}, a mistake here does not go unnoticed: the server answers
+ * `NOT_FOUND, Namespace "…" is not found`, a namespace having to exist before use. So what this
+ * object mostly brings is **typing** — namespace and task queue are two neighbouring strings in
+ * the same constructors, and swapping them only showed at run time.
  *
- * Sondé : le serveur n'exige que « non vide ». Il accepte espaces, majuscules, accents,
- * tabulations et plus de 255 caractères. Il est en revanche **sensible à la casse** et aux
- * blancs : `DURABLE-TEST` et `durable-test ` sont des namespaces distincts de `durable-test`,
- * et donc introuvables.
+ * Probed: the server only requires "not empty". It accepts spaces, capitals, accents, tabs and
+ * more than 255 characters. It is on the other hand **case sensitive**, and sensitive to
+ * whitespace: `DURABLE-TEST` and `durable-test ` are namespaces distinct from `durable-test`,
+ * and therefore not found.
  */
 final readonly class WorkflowNamespace
 {
-    /** Namespace système du serveur ; il n'accueille pas de workflow applicatif. */
+    /** The server's system namespace; it hosts no application workflow. */
     public const SYSTEM = 'temporal-system';
 
     private function __construct(
@@ -54,7 +55,7 @@ final readonly class WorkflowNamespace
     }
 
     /**
-     * Coercition de frontière : accepte ce que l'appelant a sous la main.
+     * Boundary coercion: accepts whatever the caller has at hand.
      */
     public static function from(self|string $value): self
     {
@@ -72,7 +73,7 @@ final readonly class WorkflowNamespace
     }
 
     /**
-     * Le namespace système du serveur, où aucun workflow applicatif n'a sa place.
+     * The server's system namespace, where no application workflow belongs.
      */
     public function isSystem(): bool
     {
@@ -80,7 +81,7 @@ final readonly class WorkflowNamespace
     }
 
     /**
-     * Comparaison sensible à la casse, comme le serveur.
+     * Case-sensitive comparison, like the server's.
      */
     public function equals(self $other): bool
     {
