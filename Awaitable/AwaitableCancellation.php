@@ -7,13 +7,13 @@ namespace Gplanchat\Durable\Awaitable;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Retire de la file les opérations encore en attente sous un awaitable.
+ * Takes the operations still pending under an awaitable off the queue.
  *
- * Deux appelants en avaient besoin — l'annulation du workflow, qui vide ce sur quoi le fiber
- * était suspendu, et un composite qui a atteint son verdict et n'a plus rien à faire de ses
- * branches perdantes. Ils en avaient chacun leur version, et elles ne descendaient pas à la même
- * profondeur : celle du composite s'arrêtait au premier niveau, si bien qu'un `all()` borné par
- * une échéance laissait ses activités tourner. Une seule marche, appelée des deux côtés.
+ * Two callers needed it — the workflow cancellation, which empties whatever the fiber was
+ * suspended on, and a composite that has reached its verdict and has no further use for its
+ * losing branches. Each had its own version, and they did not descend to the same depth: the
+ * composite's stopped at the first level, so that an `all()` bounded by a deadline left its
+ * activities running. A single traversal, called from both sides.
  */
 final class AwaitableCancellation
 {
@@ -21,9 +21,9 @@ final class AwaitableCancellation
 
     /**
      * @param Awaitable<mixed> $awaitable
-     * @param string           $reason une constante de {@see \Gplanchat\Durable\ActivityCancellationReason}
+     * @param string           $reason a constant of {@see \Gplanchat\Durable\ActivityCancellationReason}
      *
-     * @return list<string> identifiants des opérations retirées
+     * @return list<string> ids of the operations taken off the queue
      */
     public static function cancelUnsettled(
         ExecutionContext $context,

@@ -5,34 +5,34 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 /**
- * Jusqu'où l'on est prêt à réessayer une activité.
+ * How far we are willing to retry an activity.
  *
- * Remplace l'entier `maxAttempts` où 0 signifiait « illimité » : une valeur magique que chaque
- * site d'appel devait retraduire, et qui laissait l'arithmétique de comparaison se disperser
- * dans le processeur d'activité et le runtime. La question du domaine — « cette tentative
- * est-elle encore permise ? » — se pose désormais à l'objet lui-même
+ * Replaces the `maxAttempts` integer where 0 meant "unlimited": a magic value every call site
+ * had to translate back, and which let the comparison arithmetic scatter across the activity
+ * processor and the runtime. The domain question — "is this attempt still allowed?" — is now
+ * put to the object itself
  * ({@see allowsAttempt()}).
  *
- * Sur le fil, la représentation reste l'entier Temporal (`maximum_attempts`, 0 = illimité) :
- * c'est le langage du serveur, et il voyage dans l'historique des exécutions en cours.
+ * On the wire, the representation stays the Temporal integer (`maximum_attempts`, 0 = unlimited):
+ * that is the server's language, and it travels in the history of in-flight executions.
  */
 final readonly class RetryLimit
 {
-    /** Valeur de fil pour « illimité », alignée sur `RetryPolicy.maximum_attempts`. */
+    /** Wire value for "unlimited", aligned with `RetryPolicy.maximum_attempts`. */
     private const WIRE_UNLIMITED = 0;
 
     private function __construct(
-        /** Nombre total de tentatives permises, ou null quand rien ne les borne. */
+        /** Total number of attempts allowed, or null when nothing bounds them. */
         private ?int $maxAttempts,
     ) {}
 
     /**
-     * Réessayer sans borne de nombre.
+     * Retry with no bound on the count.
      *
-     * Ce qui arrête alors les tentatives : une exception déclarée non-retryable, un timeout
-     * (schedule-to-start, schedule-to-close, start-to-close), ou l'annulation de l'exécution.
-     * C'est le comportement d'une RetryPolicy Temporal sans `maximum_attempts`, et celui d'une
-     * activité planifiée sans options.
+     * What stops the attempts then: an exception declared non-retryable, a timeout
+     * (schedule-to-start, schedule-to-close, start-to-close), or the cancellation of the
+     * execution. That is the behaviour of a Temporal RetryPolicy with no `maximum_attempts`, and
+     * that of an activity scheduled with no options.
      */
     public static function unlimited(): self
     {
@@ -40,7 +40,7 @@ final readonly class RetryLimit
     }
 
     /**
-     * Borner à un nombre **total** de tentatives, première comprise.
+     * Bound to a **total** number of attempts, the first one included.
      */
     public static function ofAttempts(int $attempts): self
     {
@@ -55,11 +55,11 @@ final readonly class RetryLimit
     }
 
     /**
-     * Borner à un nombre de **retentatives** : la tentative initiale s'y ajoute.
+     * Bound to a number of **retries**: the initial attempt adds to it.
      *
-     * Vocabulaire du plafond bundle (`max_activity_retries`), qui compte les reprises et non les
-     * tentatives. Zéro retentative n'y a jamais voulu dire « une seule tentative » mais
-     * « aucun plafond » — d'où {@see unlimited()}.
+     * The vocabulary of the bundle ceiling (`max_activity_retries`), which counts the retries and
+     * not the attempts. Zero retries there never meant "a single attempt" but
+     * "no ceiling at all" — hence {@see unlimited()}.
      */
     public static function ofRetries(int $retries): self
     {
@@ -67,7 +67,7 @@ final readonly class RetryLimit
     }
 
     /**
-     * Une seule tentative : tout échec est définitif.
+     * A single attempt: any failure is final.
      */
     public static function once(): self
     {
@@ -92,7 +92,7 @@ final readonly class RetryLimit
     }
 
     /**
-     * Nombre total de tentatives permises, ou null si rien ne les borne.
+     * Total number of attempts allowed, or null if nothing bounds them.
      */
     public function maxAttempts(): ?int
     {
@@ -100,7 +100,7 @@ final readonly class RetryLimit
     }
 
     /**
-     * La tentative n° {@code $attempt} (1-based) est-elle encore permise ?
+     * Is attempt no. {@code $attempt} (1-based) still allowed?
      */
     public function allowsAttempt(int $attempt): bool
     {
@@ -108,8 +108,8 @@ final readonly class RetryLimit
     }
 
     /**
-     * La borne la plus stricte des deux : une activité qui fixe la sienne n'échappe pas au
-     * plafond de l'application, et réciproquement.
+     * The stricter bound of the two: an activity that sets its own does not escape the
+     * application's ceiling, and the other way round.
      */
     public function narrowedTo(self $other): self
     {

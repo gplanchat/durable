@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Le nom d'une file de tâches : où le travail est déposé, et donc où un worker doit venir le
- * chercher.
+ * The name of a task queue: where the work is dropped off, and therefore where a worker has to
+ * come and pick it up.
  *
- * Le serveur n'exige presque rien — non vide, mille caractères au plus. Sondé, il accepte `" "`,
- * les espaces en bord, les tabulations et les sauts de ligne. Or une file mal nommée ne produit
- * aucune erreur : le travail y est déposé et personne ne vient le chercher. L'exécution reste
- * simplement en attente, sans rien dans les logs.
+ * The server requires almost nothing — not empty, a thousand characters at most. Probed, it
+ * accepts `" "`, edge spaces, tabs and newlines. Yet a badly named queue produces no error at
+ * all: the work is dropped there and nobody comes for it. The execution simply stays pending,
+ * with nothing in the logs.
  *
- * Cet objet est donc **plus strict que le serveur** sur ce qui ne peut être qu'une faute :
- * blancs en bord, nom entièrement blanc, caractères de contrôle. Il n'attrape pas la faute de
- * frappe qui reste un nom valide (`durable-activites` pour `durable-activities`) — seul un
- * registre des files réellement servies le pourrait.
+ * So this object is **stricter than the server** about what can only be a mistake: whitespace
+ * at the edges, an all-blank name, control characters. It does not catch the typo that stays a
+ * valid name (`durable-activites` for `durable-activities`) — only a registry of the queues
+ * actually served could.
  */
 final readonly class TaskQueue
 {
-    /** Limite du serveur, sondée : 1000 accepté, 1001 refusé (« taskQueue length exceeds limit »). */
+    /** The server's limit, probed: 1000 accepted, 1001 refused ("taskQueue length exceeds limit"). */
     public const MAX_LENGTH = 1000;
 
     private function __construct(
@@ -59,7 +59,7 @@ final readonly class TaskQueue
     }
 
     /**
-     * Coercition de frontière : accepte ce que l'appelant a sous la main.
+     * Boundary coercion: accepts whatever the caller has at hand.
      */
     public static function from(self|string $value): self
     {
@@ -67,7 +67,7 @@ final readonly class TaskQueue
     }
 
     /**
-     * Depuis une valeur de configuration éventuellement absente.
+     * From a configuration value that may be absent.
      */
     public static function fromNullable(self|string|null $value): ?self
     {

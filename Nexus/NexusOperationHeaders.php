@@ -5,29 +5,29 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 /**
- * Les en-têtes portés jusqu'au handler d'une opération Nexus.
+ * The headers carried through to the handler of a Nexus operation.
  *
- * **Cet objet n'est pas plus strict que le serveur**, sauf sur un point, et l'écart est mesuré.
- * Sondé sur Temporal 1.31.2, le serveur accepte tel quel une clé vide, une valeur vide, des
- * blancs en bord, un saut de ligne, un espace dans la clé, mille caractères. Refuser tout cela
- * rejetterait des en-têtes qu'il porte sans broncher — l'erreur inverse de celle que
- * {@see \Gplanchat\Durable\TaskQueue} évite.
+ * **This object is not stricter than the server**, save on one point, and the gap is measured.
+ * Probed on Temporal 1.31.2, the server accepts as they are an empty key, an empty value,
+ * whitespace at the edges, a line break, a space inside the key, a thousand characters. Refusing
+ * all of that would reject headers it carries without blinking — the opposite mistake to the one
+ * {@see \Gplanchat\Durable\TaskQueue} avoids.
  *
- * Une seule chose lui échappe, et elle est muette : **il minuscule les clés**. Deux clés qui ne
- * diffèrent que par la casse entrent donc en collision — deux en-têtes entrent, un seul sort, sans
- * erreur et sans rien dans l'historique pour dire lequel a sauté.
+ * One single thing escapes it, and it is silent: **it lowercases keys**. Two keys that differ only
+ * by case therefore collide — two headers go in, one comes out, with no error and nothing in the
+ * history to say which one was dropped.
  *
- * D'où les deux seules règles d'ici, toutes deux tirées de cette observation :
+ * Hence the only two rules here, both drawn from that observation:
  *
- * - **la clé est minusculée à la construction**, pour que ce que l'appelant tient soit ce que le
- *   serveur gardera. C'est une coercition, pas un refus : `X-Correlation` est un en-tête
- *   parfaitement valide, il *est* simplement `x-correlation` ;
- * - **une collision est refusée**, parce que l'appelant demande là quelque chose que le serveur ne
- *   sait pas faire et ne dira pas.
+ * - **the key is lowercased at construction**, so that what the caller holds is what the server
+ *   will keep. It is a coercion, not a refusal: `X-Correlation` is a perfectly valid header, it
+ *   simply *is* `x-correlation`;
+ * - **a collision is refused**, because there the caller is asking for something the server does
+ *   not know how to do and will not say.
  */
 final readonly class NexusOperationHeaders
 {
-    /** @param array<string, string> $headers déjà minusculés et sans collision */
+    /** @param array<string, string> $headers already lowercased and free of collisions */
     private function __construct(
         private array $headers,
     ) {}

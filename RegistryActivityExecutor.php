@@ -12,15 +12,15 @@ final class RegistryActivityExecutor implements ActivityExecutor
     private array $handlers = [];
 
     /**
-     * @param ContainerInterface|null $lazyHandlers gestionnaires indexés par nom d'activité, résolus
-     *                                             à l'appel et non à la construction
+     * @param ContainerInterface|null $lazyHandlers handlers indexed by activity name, resolved at
+     *                                             call time rather than at construction
      */
     public function __construct(
         private readonly ?ContainerInterface $lazyHandlers = null,
     ) {}
 
     /**
-     * Enregistrement direct, pour les hôtes qui n'ont pas de conteneur de services à offrir.
+     * Direct registration, for hosts with no service container to offer.
      */
     public function register(string $activityName, callable $handler): void
     {

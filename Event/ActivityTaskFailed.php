@@ -7,13 +7,13 @@ namespace Gplanchat\Durable\Event;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 
 /**
- * Worker-side marker: **une** tentative d'activité a échoué, avant la décision de retry.
+ * Worker-side marker: **one** activity attempt failed, before the retry decision.
  *
- * Complète le trio {@see ActivityTaskStarted} / {@see ActivityTaskCompleted} : sans cet événement,
- * l'erreur d'une tentative suivie d'un succès disparaît complètement du journal.
+ * Completes the trio {@see ActivityTaskStarted} / {@see ActivityTaskCompleted}: without this
+ * event, the error of an attempt followed by a success disappears from the journal entirely.
  *
- * **Non terminal** : n'entre pas dans {@see \Gplanchat\Durable\Store\ActivityEventJournal::hasTerminalOutcomeForActivity()}.
- * L'issue définitive reste {@see ActivityCompleted} / {@see ActivityFailed} / {@see ActivityCancelled}.
+ * **Not terminal**: does not enter {@see \Gplanchat\Durable\Store\ActivityEventJournal::hasTerminalOutcomeForActivity()}.
+ * The definitive outcome remains {@see ActivityCompleted} / {@see ActivityFailed} / {@see ActivityCancelled}.
  */
 final readonly class ActivityTaskFailed implements Event
 {
@@ -24,7 +24,7 @@ final readonly class ActivityTaskFailed implements Event
         private int $attempt,
         private string $failureClass,
         private string $failureMessage,
-        /** Prochaine tentative planifiée ({@see ActivityRetryState::InProgress}) ou raison de l'arrêt. */
+        /** Next attempt scheduled ({@see ActivityRetryState::InProgress}) or reason for stopping. */
         private ActivityRetryState $retryState = ActivityRetryState::InProgress,
     ) {}
 

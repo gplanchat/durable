@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Le backend répond-il, maintenant.
+ * Is the backend answering, right now.
  *
- * Distinct de « un backend est configuré » : un catalogue enregistré dont la base est tombée
- * afficherait sinon un tableau de bord vide et serein, ce qui est la pire des deux erreurs
- * possibles — l'exploitant conclut qu'il n'y a rien à voir.
+ * Distinct from "a backend is configured": a registered catalog whose database has gone down would
+ * otherwise show an empty, serene dashboard, which is the worse of the two possible errors — the
+ * operator concludes there is nothing to see.
  *
- * `backend` nomme ce qui a été sondé — « SQL database », « Temporal » — parce qu'un exploitant qui
- * lit « injoignable » a besoin de savoir quoi aller rallumer. C'est l'inverse exact du cas où
- * *aucun* backend n'est configuré : là, nommer un serveur qui n'a jamais été de la partie
- * l'enverrait sur une fausse piste.
+ * `backend` names what was probed — "SQL database", "Temporal" — because an operator who reads
+ * "unreachable" needs to know what to go and switch back on. It is the exact opposite of the case
+ * where *no* backend is configured: there, naming a server that was never part of the picture
+ * would send them down a false trail.
  *
- * `ephemeral` est le **troisième** état, et il ne se déduit d'aucun des deux autres : le backend
- * répond, et sa réponse est vide parce que son journal ne survit pas au processus qui l'écrit. Sous
- * PHP-FPM, la requête qui rend le tableau de bord n'a jamais exécuté le moindre workflow. Rangé
- * sous « joignable », ce cas apprend à l'exploitant qu'aucun workflow n'a tourné, ce qui est faux ;
- * rangé sous « injoignable », il l'envoie rallumer un serveur qui n'existe pas.
+ * `ephemeral` is the **third** state, and it follows from neither of the other two: the backend
+ * answers, and its answer is empty because its journal does not survive the process that writes it.
+ * Under PHP-FPM, the request that renders the dashboard has never run a single workflow. Filed
+ * under "reachable", this case teaches the operator that no workflow has ever run, which is false;
+ * filed under "unreachable", it sends them to switch back on a server that does not exist.
  *
- * Le défaut est `false` : les trois catalogues qui écrivent hors du processus — SQL, Illuminate,
- * Temporal — n'ont pas à déclarer ce qui est vrai d'eux par construction.
+ * The default is `false`: the three catalogs that write outside the process — SQL, Illuminate,
+ * Temporal — have no need to declare what is true of them by construction.
  */
 final readonly class BackendHealth
 {

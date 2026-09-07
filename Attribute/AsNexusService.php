@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 /**
- * Déclare qu'une interface est le contrat d'un service Nexus.
+ * Declares that an interface is the contract of a Nexus service.
  *
- * Le nom porté ici est celui que le serveur route : c'est lui, et le nom porté par chaque
- * {@see AsNexusOperation}, qui adressent une tâche entrante. Rien d'autre ne l'identifie.
+ * The name carried here is the one the server routes on: it, together with the name carried by
+ * each {@see AsNexusOperation}, is what addresses an incoming task. Nothing else identifies it.
  *
- * Le contrat s'écrit **une fois** et sert les deux rôles. L'appelant en dérive un stub typé ; le
- * gestionnaire implémente celui des deux contrats qui porte ce qu'il sait faire tout de suite.
+ * The contract is written **once** and serves both roles. The caller derives a typed stub from it;
+ * the handler implements whichever of the two contracts carries what it can serve right away.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class AsNexusService

@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Une durée, dite comme un exploitant la lit.
+ * A duration, said the way an operator reads it.
  *
- * Le seuil à partir duquel une seconde vaut mieux qu'une milliseconde est une décision, pas un
- * détail de gabarit : si chaque surface la prend pour elle, la même exécution se lit « 2.0 s » sur
- * l'une et « 2004 ms » sur l'autre, et l'exploitant qui passe de Magento à Sylius doit convertir de
- * tête. Elle se prend donc une fois, à côté du modèle d'observation dont elle décrit les faits.
+ * The threshold above which a second is worth more than a millisecond is a decision, not a template
+ * detail: if every surface takes it upon itself, the same execution reads "2.0 s" on one and
+ * "2004 ms" on the other, and the operator moving from Magento to Sylius has to convert in their
+ * head. So it is taken once, next to the observation model whose facts it describes.
  *
- * C'est de la mise en forme dans le cœur, et c'est assumé : `WorkflowRunEvent::$label` en est déjà,
- * pour la même raison — ce que plusieurs hôtes doivent dire pareil se décide en un seul endroit.
+ * This is formatting inside the core, and it is deliberate: `WorkflowRunEvent::$label` already is
+ * some, for the same reason — what several hosts must say the same way is decided in a single
+ * place.
  */
 final class ReadableDuration
 {

@@ -7,36 +7,36 @@ namespace Gplanchat\Durable\Nexus;
 use Gplanchat\Durable\Duration;
 
 /**
- * Les bornes temporelles d'une opération Nexus, prises ensemble.
+ * The time bounds of a Nexus operation, taken together.
  *
- *     planifiée ──schedule-to-start──▶ démarrée ──start-to-close──▶ terminée
- *     └────────────────── schedule-to-close ─────────────────────────┘
+ *     scheduled ──schedule-to-start──▶ started ──start-to-close──▶ closed
+ *     └────────────────── schedule-to-close ──────────────────────┘
  *
- * Même découpage que {@see \Gplanchat\Durable\Activity\ActivityTimeouts}, à ceci près qu'il n'y a
- * pas de battement de cœur : une opération Nexus est servie par un autre système, qui ne rend pas
- * de signe de vie intermédiaire.
+ * Same breakdown as {@see \Gplanchat\Durable\Activity\ActivityTimeouts}, except that there is no
+ * heartbeat: a Nexus operation is served by another system, which gives no intermediate sign of
+ * life.
  *
- * **Cet objet est plus strict que le serveur, et sur un point précis.** Sondé (§1.3), le serveur
- * accepte une sous-borne plus grande que `schedule-to-close` et la **rabote en silence** : demander
- * 60 s de `start-to-close` sous 10 s d'enveloppe fait enregistrer 10 s, sans erreur, sans trace.
- * L'appelant garde une borne qu'il croit avoir. La combinaison est donc refusée ici, à la
- * construction, où elle se lit.
+ * **This object is stricter than the server, and on one precise point.** Probed (§1.3), the server
+ * accepts a sub-bound larger than `schedule-to-close` and **clamps it down silently**: asking for
+ * 60 s of `start-to-close` under a 10 s envelope records 10 s, with no error, no trace. The caller
+ * keeps a bound it believes it has. The combination is therefore refused here, at construction,
+ * where it can be read.
  *
- * Une enveloppe **infinie** ne rabote rien : sur le fil elle s'écrit `0`, que Temporal lit « pas de
- * borne » et non « zéro seconde ». {@see Duration::infinity()} le dit sans ce déguisement.
+ * An **infinite** envelope clamps nothing: on the wire it is written `0`, which Temporal reads as
+ * "no bound" and not "zero seconds". {@see Duration::infinity()} says it without that disguise.
  *
- * Pas d'`executionBoundOr()` ici, contrairement aux activités : §2.2 le conditionnait à ce que le
- * serveur exige une borne de fermeture, et la sonde a montré qu'il n'en exige aucune — une
- * commande sans aucune des trois est acceptée, et l'événement n'en enregistre aucune.
+ * No `executionBoundOr()` here, unlike activities: §2.2 made it conditional on the server requiring
+ * a closing bound, and the probe showed that it requires none — a command with none of the three is
+ * accepted, and the event records none.
  */
 final readonly class NexusOperationTimeouts
 {
     public function __construct(
-        /** De la planification à la fin : l'enveloppe, qui borne les deux autres. */
+        /** From scheduling to close: the envelope, which bounds the other two. */
         public ?Duration $scheduleToClose = null,
-        /** De la planification au démarrage effectif chez le gestionnaire. */
+        /** From scheduling to the actual start at the handler. */
         public ?Duration $scheduleToStart = null,
-        /** Du démarrage à la fin. */
+        /** From start to close. */
         public ?Duration $startToClose = null,
     ) {
         $this->refuseSilentClamp('schedule-to-start', $scheduleToStart);
@@ -44,8 +44,7 @@ final readonly class NexusOperationTimeouts
     }
 
     /**
-     * Aucune borne : le serveur n'en applique aucune non plus, il enregistre la commande telle
-     * quelle.
+     * No bound at all: the server applies none either, it records the command as it stands.
      */
     public static function none(): self
     {
@@ -53,7 +52,7 @@ final readonly class NexusOperationTimeouts
     }
 
     /**
-     * Le cas courant : borner l'opération de bout en bout.
+     * The common case: bounding the operation end to end.
      */
     public static function within(Duration $scheduleToClose): self
     {

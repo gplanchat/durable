@@ -13,12 +13,12 @@ use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
 /**
- * Exécute des workflows avec stack in-memory en reproduisant la suspension.
+ * Runs workflows on an in-memory stack while reproducing suspension.
  *
- * Simule le flux distribué : à chaque await() sur une activité non complétée,
- * le workflow suspend, le "worker" exécute les activités de la file, puis
- * le workflow reprend (replay). Permet de tester le comportement de suspension
- * sans processus externes ni Messenger.
+ * Simulates the distributed flow: on every await() over an activity that has not
+ * completed, the workflow suspends, the "worker" runs the activities in the queue,
+ * then the workflow resumes (replay). Lets suspension behaviour be tested without
+ * external processes or Messenger.
  */
 final class InMemoryWorkflowRunner
 {
@@ -30,30 +30,30 @@ final class InMemoryWorkflowRunner
         private readonly ActivityExecutor $activityExecutor,
         private readonly int $maxActivityRetries = 0,
         /**
-         * Requis pour exécuter des workflows enfants : sans registre, aucun type enfant n'est
-         * résoluble et {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} lève.
+         * Required to run child workflows: without a registry no child type can be resolved
+         * and {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} throws.
          */
         private readonly ?WorkflowRegistry $workflowRegistry = null,
         /**
-         * Budget total d'une exécution. Les tentatives d'activité étant illimitées par défaut
-         * (sémantique Temporal), un harnais en ligne a besoin d'une borne : sans elle, une
-         * activité durablement en échec ferait tourner ce runner sans fin.
+         * Total budget of an execution. Activity attempts being unlimited by default
+         * (Temporal semantics), an inline harness needs a bound: without one, an activity
+         * that keeps failing would spin this runner forever.
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
     ) {}
 
     /**
-     * Lance un workflow et boucle suspend/resume jusqu'à complétion.
+     * Starts a workflow and loops suspend/resume until completion.
      *
-     * @return mixed Résultat du handler
+     * @return mixed the handler's result
      */
     public function run(string $executionId, callable $handler): mixed
     {
-        // Horloge virtuelle : un harnais en ligne n'a personne pour livrer un réveil de
-        // minuteur, et attendre une échéance pour de vrai rendrait intestable tout workflow qui
-        // dort. Elle n'avance que d'échéance en échéance, jamais toute seule.
-        // Un objet, pas une variable : une fonction fléchée capture par valeur, l'horloge ne
-        // bougerait jamais.
+        // Virtual clock: an inline harness has nobody to deliver a timer wake-up, and waiting
+        // out a due time for real would make every workflow that sleeps untestable. It only
+        // moves from one due time to the next, never on its own.
+        // An object, not a variable: an arrow function captures by value, and the clock would
+        // never move.
         $clock = new class {
             public float $now;
         };
@@ -67,9 +67,9 @@ final class InMemoryWorkflowRunner
             static fn(): float => $clock->now,
             true, // distributed = true => suspension
         );
-        // Le moteur était construit sans runner d'enfant ni coordinateur parent/enfant :
-        // un workflow à enfants levait une LogicException et ParentClosePolicy ne cascadait
-        // jamais — deux comportements de production absents du harness de test.
+        // The engine was built without a child runner or a parent/child coordinator:
+        // a workflow with children threw a LogicException and ParentClosePolicy never
+        // cascaded — two production behaviours missing from the test harness.
         $engine = new ExecutionEngine(
             $this->eventStore,
             $runtime,
@@ -85,8 +85,8 @@ final class InMemoryWorkflowRunner
             new ParentChildWorkflowCoordinator($this->eventStore),
         );
 
-        // Ce que la dernière suspension attendait, quand ça se nomme : c'est tout ce qui
-        // distingue « bloqué » de « bloqué sur cette condition-là » dans le diagnostic.
+        // What the last suspension was waiting on, when that has a name: it is all that
+        // separates "stuck" from "stuck on that particular condition" in the diagnosis.
         $waitingOn = null;
 
         try {
@@ -105,7 +105,7 @@ final class InMemoryWorkflowRunner
 
             $before = $this->eventStore->countEventsInStream($executionId);
             $this->runActivityWorker($executionId, $runtime, max(0.0, $deadline - microtime(true)));
-            // Les minuteurs déjà échus partent à chaque tour ; le temps, lui, ne bouge pas encore.
+            // Timers already due fire on every round; time itself does not move yet.
             $runtime->checkTimers($this->timerContext($executionId, $runtime));
 
             try {
@@ -115,22 +115,22 @@ final class InMemoryWorkflowRunner
                 $waitingOn = $e->waitingOn();
             }
 
-            // Un tour qui n'ajoute rien au journal ne peut pas en ajouter au suivant : le
-            // workflow attend quelque chose que ce runner ne produira jamais (signal non
-            // délivré, update, minuteur lointain). Sans ce garde, la boucle tournait à vide
-            // indéfiniment — un test qui oublie de délivrer son signal gelait la suite.
-            // ponytail: détection par absence de progrès ; un vrai ordonnanceur de minuteurs
-            // demanderait une horloge virtuelle.
+            // A round that adds nothing to the log cannot add anything on the next one: the
+            // workflow is waiting for something this runner will never produce (an undelivered
+            // signal, an update, a distant timer). Without this guard the loop spun empty
+            // forever — a test that forgets to deliver its signal froze everything after it.
+            // ponytail: detection by absence of progress; a real timer scheduler would call
+            // for a virtual clock.
             if ($this->eventStore->countEventsInStream($executionId) === $before) {
-                // Plus rien ne bouge : c'est seulement maintenant qu'on a le droit d'avancer le
-                // temps. Le faire plus tôt ferait gagner le minuteur d'une course que l'activité
-                // était en train de remporter.
+                // Nothing moves any more: only now are we allowed to move time forward. Doing
+                // it sooner would hand the timer a race the activity was in the middle of
+                // winning.
                 if ($this->skipToNextTimer($executionId, $runtime, $clock)) {
                     continue;
                 }
 
-                // Une tentative encore en file distingue les deux causes : le workflow retente
-                // toujours (budget épuisé), plutôt qu'il attend un événement qui ne viendra pas.
+                // An attempt still queued tells the two causes apart: the workflow is still
+                // retrying (budget exhausted), rather than waiting for an event that will not come.
                 throw null !== $this->activityTransport->nextDueAt()
                     ? WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds)
                     : WorkflowStuckException::noProgress($executionId, $waitingOn);
@@ -139,16 +139,16 @@ final class InMemoryWorkflowRunner
     }
 
     /**
-     * Avance l'horloge virtuelle jusqu'à la prochaine échéance et fait partir le minuteur.
+     * Moves the virtual clock to the next due time and fires the timer.
      *
-     * C'est ce qui rend `sleep(3600)` testable en une milliseconde, sans consommer de temps réel.
-     * En production le worker fait l'inverse : il attend le réveil que lui planifie
+     * This is what makes `sleep(3600)` testable in a millisecond, without burning real time.
+     * In production the worker does the opposite: it waits for the wake-up scheduled for it by
      * {@see \Gplanchat\Durable\Timer\TimerWakeDelayCalculator}.
      *
-     * N'est appelé que lorsque plus rien d'autre ne progresse — sauter le temps tant qu'une
-     * activité peut encore aboutir ferait gagner le minuteur de tout `any(activité, minuteur)`.
+     * Only called when nothing else is making progress — skipping time while an activity can
+     * still succeed would hand the timer every `any(activity, timer)`.
      *
-     * @return bool true si le temps a été avancé
+     * @return bool true when time was moved forward
      */
     private function skipToNextTimer(string $executionId, ExecutionRuntime $runtime, object $clock): bool
     {

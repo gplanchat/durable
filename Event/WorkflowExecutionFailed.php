@@ -8,8 +8,8 @@ use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\DurableNexusOperationFailedException;
 
 /**
- * Le handler de workflow n'a pas géré une erreur (ex. échec d'activité non attrapé) :
- * défaillance d'algorithme / d'intégration côté workflow.
+ * The workflow handler did not handle an error (e.g. an uncaught activity failure):
+ * an algorithm / integration failure on the workflow side.
  */
 final readonly class WorkflowExecutionFailed implements Event
 {
@@ -50,10 +50,10 @@ final readonly class WorkflowExecutionFailed implements Event
     }
 
     /**
-     * Une opération Nexus non rattrapée, avec le site d'appel qui l'a émise.
+     * An uncaught Nexus operation, with the call site that emitted it.
      *
-     * Le triplet est dans le contexte plutôt que fondu dans le message : un échec qui ne nomme pas
-     * son endpoint laisse chercher lequel des trois a lâché.
+     * The triplet is in the context rather than melted into the message: a failure that does not
+     * name its endpoint leaves you looking for which of the three gave up.
      */
     public static function unhandledNexusOperationFailure(string $executionId, DurableNexusOperationFailedException $cause): self
     {
@@ -113,8 +113,8 @@ final readonly class WorkflowExecutionFailed implements Event
     }
 
     /**
-     * Échéance workflow non rattrapée : distincte d'un échec de handler, elle dit *quelle*
-     * attente n'a pas abouti (ADR DUR032).
+     * An uncaught workflow deadline: distinct from a handler failure, it says *which* wait did
+     * not succeed (ADR DUR032).
      */
     public static function deadlineExceeded(string $executionId, DeadlineExceededException $cause): self
     {

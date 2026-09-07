@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Enveloppe d'un awaitable issu de la planification d'une opération Nexus, pour permettre son
- * annulation — celle d'un perdant de {@see any()} / {@see race()} comme celle d'un workflow annulé.
+ * Wrapper for an awaitable produced by scheduling a Nexus operation, so that it can be cancelled
+ * — the loser of an {@see any()} / {@see race()} as much as a cancelled workflow.
  *
- * Même rôle que {@see ActivityAwaitable}, et pour la même raison : sans identité transportée,
- * {@see AwaitableCancellation} n'a rien à quoi s'adresser et l'opération continue chez le
- * fournisseur alors que plus personne n'attend son résultat. Une opération Nexus est servie par un
- * autre système, souvent une autre équipe : l'y laisser tourner coûte plus qu'une activité qu'on
- * oublie chez soi.
+ * Same role as {@see ActivityAwaitable}, and for the same reason: with no identity carried,
+ * {@see AwaitableCancellation} has nothing to address and the operation keeps running at the
+ * provider while nobody is waiting for its result any more. A Nexus operation is served by
+ * another system, often another team: leaving it running there costs more than an activity
+ * forgotten at home.
  *
- * L'identité portée est celle du domaine. Le pont Temporal la traduit en `scheduledEventId` réel,
- * lu dans l'historique, au moment d'émettre `RequestCancelNexusOperation` — un compteur inventé
- * localement a déjà fait taire cette commande une fois, pour les activités.
+ * The identity carried is the domain one. The Temporal bridge translates it into the real
+ * `scheduledEventId`, read from the history, when emitting `RequestCancelNexusOperation` — a
+ * counter invented locally has already silenced that command once, for activities.
  *
  * @implements Awaitable<mixed>
  */

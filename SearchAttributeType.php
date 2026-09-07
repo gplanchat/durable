@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Type d'un attribut de recherche, tel que le namespace l'a enregistré.
+ * The type of a search attribute, as the namespace registered it.
  *
- * Le serveur **ignore** le type porté par la charge utile et applique celui de son registre : une
- * valeur qui ne lui correspond pas est refusée au démarrage
- * (« invalid value for search attribute … of type Int »). Ce type sert donc à valider la valeur
- * **avant** l'aller-retour, et à annoncer l'intention dans les métadonnées.
+ * The server **ignores** the type carried by the payload and applies the one from its registry:
+ * a value that does not match it is refused at start time
+ * ("invalid value for search attribute … of type Int"). So this type serves to validate the
+ * value **before** the round trip, and to state the intent in the metadata.
  */
 enum SearchAttributeType: string
 {
@@ -23,7 +23,7 @@ enum SearchAttributeType: string
     case KeywordList = 'KeywordList';
 
     /**
-     * Normalise une valeur PHP vers sa forme JSON attendue, ou refuse.
+     * Normalises a PHP value into its expected JSON form, or refuses it.
      */
     public function normalize(string $attribute, mixed $value): mixed
     {

@@ -7,29 +7,29 @@ namespace Gplanchat\Durable\Activity;
 use Gplanchat\Durable\Duration;
 
 /**
- * Les bornes temporelles d'une activité, prises ensemble.
+ * The time bounds of an activity, taken together.
  *
- * Elles ne se lisent pas isolément — chacune borne un segment différent de la vie d'une
- * activité, et c'est leur composition qui a un sens :
+ * They do not read in isolation — each one bounds a different segment of an activity's life, and
+ * it is their composition that means something:
  *
- *     planifiée ──schedule-to-start──▶ démarrée ──start-to-close──▶ terminée
- *     └────────────────── schedule-to-close ─────────────────────────┘
- *                              heartbeat : silence maximal pendant l'exécution
+ *     scheduled ──schedule-to-start──▶ started ──start-to-close──▶ closed
+ *     └─────────────────────── schedule-to-close ───────────────────────┘
+ *                              heartbeat: maximum silence during execution
  *
- * Les quatre champs étaient quatre `?float` indépendants dans {@see ActivityOptions}, que chaque
- * lecteur retestait un par un. Les regrouper permet aussi de nommer la règle du serveur :
- * une activité doit avoir une borne de fermeture ({@see executionBoundOr()}).
+ * The four fields were four independent `?float` in {@see ActivityOptions}, which every reader
+ * retested one by one. Grouping them also makes it possible to name the server's rule:
+ * an activity must have a closing bound ({@see executionBoundOr()}).
  */
 final readonly class ActivityTimeouts
 {
     public function __construct(
-        /** De la planification au démarrage effectif : combien de temps accepter d'attendre en file. */
+        /** From scheduling to the actual start: how long to accept waiting in the queue. */
         public ?Duration $scheduleToStart = null,
-        /** Du démarrage à la fin : combien de temps accorder à **une** tentative. */
+        /** From start to close: how much time to grant **one** attempt. */
         public ?Duration $startToClose = null,
-        /** De la planification à la fin, retentatives comprises : la borne de bout en bout. */
+        /** From scheduling to close, retries included: the end-to-end bound. */
         public ?Duration $scheduleToClose = null,
-        /** Silence maximal toléré pendant l'exécution, pour les activités qui battent le cœur. */
+        /** Longest silence tolerated during execution, for activities that send heartbeats. */
         public ?Duration $heartbeat = null,
     ) {
         if (null !== $heartbeat && null !== $startToClose && $heartbeat->isLongerThan($startToClose)) {
@@ -42,7 +42,7 @@ final readonly class ActivityTimeouts
     }
 
     /**
-     * Aucune borne : le backend applique ses défauts.
+     * No bound at all: the backend applies its defaults.
      */
     public static function none(): self
     {
@@ -50,7 +50,7 @@ final readonly class ActivityTimeouts
     }
 
     /**
-     * Le cas courant : borner une tentative.
+     * The common case: bounding one attempt.
      */
     public static function attempt(Duration $startToClose): self
     {
@@ -78,11 +78,11 @@ final readonly class ActivityTimeouts
     }
 
     /**
-     * Borne d'**une** exécution, ou le défaut fourni.
+     * The bound of **one** execution, or the fallback given.
      *
-     * Temporal refuse une activité sans borne de fermeture : le pont doit en produire une. Cette
-     * méthode nomme ce repli, au lieu de le laisser sous forme d'un `?: 30.0` au milieu de la
-     * construction de commande.
+     * Temporal refuses an activity with no closing bound: the bridge has to produce one. This
+     * method names that fallback, instead of leaving it as a `?: 30.0` in the middle of building
+     * a command.
      */
     public function executionBoundOr(Duration $fallback): Duration
     {
@@ -90,7 +90,7 @@ final readonly class ActivityTimeouts
     }
 
     /**
-     * Vrai si aucune borne n'est posée.
+     * True if no bound is set.
      */
     public function areUnbounded(): bool
     {

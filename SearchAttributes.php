@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Les attributs de recherche d'une exécution : ce sur quoi on pourra la retrouver.
+ * The search attributes of an execution: what it will be findable by.
  *
- * C'était un `?array` libre — et, plus grave, un tableau qui n'atteignait jamais le serveur : il
- * était journalisé dans les métadonnées puis oublié, aucune commande ne le posant.
+ * This used to be a free-form `?array` — and, worse, an array that never reached the server: it
+ * was logged in the metadata then forgotten, no command ever setting it.
  *
- * Trois règles serveur, sondées une par une, dont deux sont vérifiables ici :
- * - la valeur doit correspondre au type enregistré ({@see SearchAttributeType}) — vérifié ;
- * - certains attributs système sont en lecture seule ({@see READ_ONLY}) — vérifié ;
- * - l'attribut doit être enregistré dans le namespace — **non** vérifiable localement, cela
- *   demanderait de lire le registre du namespace. Le serveur répond alors
- *   « has no mapping defined for search attribute ».
+ * Three server rules, probed one by one, two of which are checkable here:
+ * - the value must match the registered type ({@see SearchAttributeType}) — checked;
+ * - some system attributes are read-only ({@see READ_ONLY}) — checked;
+ * - the attribute must be registered in the namespace — **not** checkable locally, that would
+ *   require reading the namespace registry. The server then answers
+ *   "has no mapping defined for search attribute".
  */
 final readonly class SearchAttributes
 {
     /**
-     * Attributs que le serveur renseigne lui-même et refuse en écriture, relevés un par un :
-     * « … attribute can't be set in SearchAttributes ».
+     * Attributes the server fills in itself and refuses on write, collected one by one:
+     * "… attribute can't be set in SearchAttributes".
      */
     public const READ_ONLY = [
         'CloseTime', 'ExecutionDuration', 'ExecutionStatus', 'ExecutionTime', 'HistoryLength',
@@ -110,7 +110,7 @@ final readonly class SearchAttributes
     }
 
     /**
-     * @return array<string, mixed> valeurs normalisées, indexées par nom
+     * @return array<string, mixed> normalised values, keyed by name
      */
     public function toValues(): array
     {

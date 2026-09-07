@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 /**
- * Déclare qu'une méthode de contrat est une opération Nexus.
+ * Declares that a contract method is a Nexus operation.
  *
- * **Pas de suffixe `Method`, contrairement aux cinq autres attributs de méthode du dépôt.** C'est
- * l'exception assumée, et sa raison est le vocabulaire : « opération » est le mot que Nexus emploie
- * partout — dans le protocole, dans la documentation de Temporal, dans les SDK des autres langages.
- * Quelqu'un qui arrive du SDK Go cherche une opération, pas une méthode de service. Le triplet
- * `AsNexusService` / `AsNexusOperation` / `AsNexusServiceHandler` dit donc ce que Nexus désigne,
- * plutôt que la structure PHP qui le porte.
+ * **No `Method` suffix, unlike the five other method attributes in the repository.** It is the
+ * deliberate exception, and its reason is vocabulary: "operation" is the word Nexus uses
+ * everywhere — in the protocol, in Temporal's documentation, in the other languages' SDKs. Someone
+ * arriving from the Go SDK looks for an operation, not a service method. The triplet
+ * `AsNexusService` / `AsNexusOperation` / `AsNexusServiceHandler` therefore says what Nexus names,
+ * rather than the PHP structure that carries it.
  */
 #[\Attribute(\Attribute::TARGET_METHOD)]
 final readonly class AsNexusOperation

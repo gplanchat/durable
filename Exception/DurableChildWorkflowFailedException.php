@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Échec d’un workflow enfant observé par le parent (journal {@see \Gplanchat\Durable\Event\ChildWorkflowFailed}).
+ * Failure of a child workflow observed by the parent (journal {@see \Gplanchat\Durable\Event\ChildWorkflowFailed}).
  *
- * Les champs {@see $workflowFailureKind}, {@see $workflowFailureClass} et {@see $workflowFailureContext}
- * reflètent le dernier {@see \Gplanchat\Durable\Event\WorkflowExecutionFailed} enfant lorsqu’ils ont été
- * projetés sur le journal parent (async Messenger) ou relus au replay.
+ * The {@see $workflowFailureKind}, {@see $workflowFailureClass} and {@see $workflowFailureContext}
+ * fields reflect the last child {@see \Gplanchat\Durable\Event\WorkflowExecutionFailed} when they
+ * were projected onto the parent journal (async Messenger) or re-read on replay.
  */
 final class DurableChildWorkflowFailedException extends \RuntimeException
 {

@@ -5,27 +5,27 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Les bornes temporelles d'un workflow, prises ensemble.
+ * The time bounds of a workflow, taken together.
  *
- * Comme pour les activités, chacune borne un segment différent — et c'est leur emboîtement qui
- * a un sens :
+ * As with activities, each one bounds a different segment — and it is the way they nest that
+ * carries the meaning:
  *
- *     exécution ─┬─ run 1 ─┬─ run 2 (continue-as-new, retry) ─ …
- *                │         └─ tâche : un aller-retour worker
- *                └────────────── execution : toute la chaîne
+ *     execution ─┬─ run 1 ─┬─ run 2 (continue-as-new, retry) ─ …
+ *                │         └─ task: one worker round trip
+ *                └────────────── execution: the whole chain
  *
- * Les trois champs étaient trois `?float` répétés à l'identique dans {@see ChildWorkflowOptions},
- * {@see WorkflowStartOptions} et {@see ContinueAsNewOptions}, avec la même sérialisation copiée
- * trois fois.
+ * The three fields were three `?float` repeated identically in {@see ChildWorkflowOptions},
+ * {@see WorkflowStartOptions} and {@see ContinueAsNewOptions}, with the same serialisation
+ * copied three times.
  */
 final readonly class WorkflowTimeouts
 {
     public function __construct(
-        /** Toute la chaîne d'exécutions, retentatives et continue-as-new compris. */
+        /** The whole chain of executions, retries and continue-as-new included. */
         public ?Duration $execution = null,
-        /** Un run pris isolément. */
+        /** A single run, taken on its own. */
         public ?Duration $run = null,
-        /** Une tâche de workflow : un aller-retour de décision côté worker. */
+        /** A workflow task: one decision round trip on the worker side. */
         public ?Duration $task = null,
     ) {
         if (null !== $run && null !== $execution && $run->isLongerThan($execution)) {
@@ -44,7 +44,7 @@ final readonly class WorkflowTimeouts
     }
 
     /**
-     * Borner un run.
+     * Bound a run.
      */
     public static function run(Duration $run): self
     {
@@ -72,12 +72,12 @@ final readonly class WorkflowTimeouts
     }
 
     /**
-     * Sans la borne d'exécution.
+     * Without the execution bound.
      *
-     * Un continue-as-new ouvre un nouveau run **dans** l'exécution en cours : la borne
-     * d'exécution est héritée, la reposer n'aurait aucun sens
-     * ({@see \Temporal\Api\Command\V1\ContinueAsNewWorkflowExecutionCommandAttributes} n'a pas
-     * ce champ).
+     * A continue-as-new opens a new run **within** the current execution: the execution bound
+     * is inherited, and setting it again would make no sense
+     * ({@see \Temporal\Api\Command\V1\ContinueAsNewWorkflowExecutionCommandAttributes} has no
+     * such field).
      */
     public function withoutExecutionBound(): self
     {

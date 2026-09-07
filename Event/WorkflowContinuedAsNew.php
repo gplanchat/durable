@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Le run courant se termine pour enchaîner un nouveau run avec payload / type donnés.
+ * The current run ends in order to chain a new run with the given payload / type.
  *
- * L’historique du **nouveau** `executionId` doit être vide ; le dispatch est à la charge du
- * {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} ou de l’appelant.
+ * The history of the **new** `executionId` must be empty; the dispatch is the responsibility of
+ * {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} or of the caller.
  */
 final readonly class WorkflowContinuedAsNew implements Event
 {
     /**
      * @param array<string, mixed> $nextPayload
-     * @param array<string, mixed> $continuationMetadata Équivalent {@see \Temporal\Workflow\ContinueAsNewOptions} sérialisé (task_queue, timeouts, …)
+     * @param array<string, mixed> $continuationMetadata Serialised {@see \Temporal\Workflow\ContinueAsNewOptions} equivalent (task_queue, timeouts, …)
      */
     public function __construct(
         private string $executionId,

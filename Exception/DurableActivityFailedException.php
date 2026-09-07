@@ -85,7 +85,7 @@ final class DurableActivityFailedException extends \Exception
     }
 
     /**
-     * Exception à propager vers {@see \Gplanchat\Durable\WorkflowEnvironment::await()} : restauration déclarée ou enveloppe durable.
+     * Exception to propagate towards {@see \Gplanchat\Durable\WorkflowEnvironment::await()}: declared restore or durable wrapper.
      */
     public static function toThrowable(ActivityFailed $event): \Throwable
     {

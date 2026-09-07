@@ -5,31 +5,31 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Une récurrence : quand relancer une exécution.
+ * A recurrence: when to start an execution again.
  *
- * Une expression cron est une grammaire, pas une chaîne. Passée telle quelle, une faute de
- * frappe ne se manifeste qu'au retour du serveur — c'est-à-dire en production, à la première
- * tentative de démarrage. Elle est donc validée à la construction.
+ * A cron expression is a grammar, not a string. Passed through as it is, a typo only shows up
+ * in the server's answer — that is, in production, on the first attempt to start. So it is
+ * validated at construction time.
  *
- * Trois formes, celles que le serveur Temporal accepte :
- * - cinq champs — `minute heure jour-du-mois mois jour-de-semaine` ;
- * - un raccourci — `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly` ;
- * - un intervalle — `@every 90s`, `@every 1h30m`.
+ * Three forms, the ones the Temporal server accepts:
+ * - five fields — `minute hour day-of-month month day-of-week`;
+ * - a shortcut — `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`;
+ * - an interval — `@every 90s`, `@every 1h30m`.
  *
- * Chacune peut être préfixée d'un fuseau : `CRON_TZ=Europe/Paris 0 9 * * 1-5`.
+ * Each of them can be prefixed with a time zone: `CRON_TZ=Europe/Paris 0 9 * * 1-5`.
  *
- * La validation reproduit celle du serveur, sondée expression par expression : nombre de champs,
- * caractères, bornes, et **atteignabilité** — le serveur refuse `0 0 31 4 *` (« no time can be
- * found to satisfy the schedule »), avril n'ayant que trente jours.
+ * The validation reproduces the server's, probed expression by expression: number of fields,
+ * characters, bounds, and **reachability** — the server refuses `0 0 31 4 *` ("no time can be
+ * found to satisfy the schedule"), April having only thirty days.
  *
- * `?` y est un synonyme de `*`, accepté dans n'importe quel champ. Le jour de semaine va de 0 à
- * 6 : `7` pour dimanche est refusé.
+ * `?` is a synonym of `*` there, accepted in any field. The day of week runs from 0 to
+ * 6: `7` for Sunday is refused.
  */
 final readonly class CronSchedule
 {
     private const SHORTCUTS = ['@yearly', '@annually', '@monthly', '@weekly', '@daily', '@midnight', '@hourly'];
 
-    /** Bornes des cinq champs, dans l'ordre. */
+    /** Bounds of the five fields, in order. */
     private const FIELDS = [
         'minute' => [0, 59],
         'hour' => [0, 23],
@@ -60,7 +60,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Coercition de frontière : accepte ce que l'appelant a sous la main.
+     * Boundary coercion: accepts whatever the caller has at hand.
      */
     public static function from(self|string $value): self
     {
@@ -93,7 +93,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Toutes les {@code $interval}. Le serveur ne descend pas sous la seconde.
+     * Every {@code $interval}. The server does not go below the second.
      */
     public static function every(Duration $interval): self
     {
@@ -106,7 +106,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Chaque jour à l'heure dite.
+     * Every day at the stated time.
      */
     public static function dailyAt(int $hour, int $minute = 0): self
     {
@@ -117,10 +117,10 @@ final readonly class CronSchedule
     }
 
     /**
-     * Le même horaire, lu dans un autre fuseau.
+     * The same schedule, read in another time zone.
      *
-     * Sans fuseau, le serveur interprète l'expression en UTC — ce qui n'est presque jamais ce
-     * qu'on veut d'un « tous les jours à 9 h ».
+     * Without a time zone the server reads the expression in UTC — which is almost never what
+     * "every day at 9am" is meant to say.
      */
     public function inTimeZone(\DateTimeZone|string $timeZone): self
     {
@@ -152,7 +152,7 @@ final readonly class CronSchedule
     // -------------------------------------------------------------------------
 
     /**
-     * @return array{0: string, 1: string} préfixe de fuseau (vide ou `CRON_TZ=… `), puis l'horaire
+     * @return array{0: string, 1: string} time zone prefix (empty or `CRON_TZ=… `), then the schedule
      */
     private static function splitTimeZone(string $expression): array
     {
@@ -202,7 +202,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Développe un champ en l'ensemble des valeurs qu'il désigne, ou null s'il les couvre toutes.
+     * Expands a field into the set of values it names, or null when it covers them all.
      *
      * @return list<int>|null
      */
@@ -225,7 +225,7 @@ final readonly class CronSchedule
                 $step = (int) $stepText;
             }
 
-            // `?` est un synonyme de `*` côté serveur, dans n'importe quel champ.
+            // `?` is a synonym of `*` on the server side, in any field.
             if ('*' === $part || '?' === $part) {
                 if (1 === $step) {
                     $coversAll = true;
@@ -254,7 +254,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Nombre de jours du mois, février compté bissextile : une échéance au 29 février existe.
+     * Number of days per month, February counted as a leap one: a February 29th due time exists.
      */
     private const DAYS_IN_MONTH = [1 => 31, 2 => 29, 3 => 31, 4 => 30, 5 => 31, 6 => 30, 7 => 31, 8 => 31, 9 => 30, 10 => 31, 11 => 30, 12 => 31];
 
@@ -283,7 +283,7 @@ final readonly class CronSchedule
     }
 
     /**
-     * Un nom de mois ou de jour vaut son rang ; le serveur les accepte dans leur champ.
+     * A month or day name stands for its rank; the server accepts them in their own field.
      */
     private static function toNumber(string $name, string $value): int
     {

@@ -7,23 +7,23 @@ namespace Gplanchat\Durable\Observation;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 
 /**
- * Ce que la page a besoin de savoir, tiré du port et de rien d'autre — **pour toutes les surfaces**.
+ * What the page needs to know, drawn from the port and from nothing else — **for every surface**.
  *
- * Ce modèle vivait dans le greffon Sylius, et Magento en dérivait sa propre moitié : la santé du
- * backend d'un côté, la frise placée dans le temps de l'autre, et le même run se lisait donc
- * différemment selon l'application ouverte. Il n'a rien de Sylius, et n'en avait déjà rien — il ne
- * dépend que du port et des faits d'observation. C'est un contrat de **données** : une surface qui
- * ne rend aucun balisage sert les mêmes panneaux.
+ * This model used to live in the Sylius plugin, and Magento derived its own half of it: backend
+ * health on one side, the frieze placed in time on the other, and the same run therefore read
+ * differently depending on which application you opened. There is nothing Sylius about it, and
+ * there already was nothing — it depends only on the port and on observation facts. It is a
+ * **data** contract: a surface that renders no markup serves the same panels.
  *
- * @see DUR049 une projection, plusieurs habillages
+ * @see DUR049 one projection, several chromes
  *
- * Le catalogue est nullable, et c'est le cas normal : le conteneur n'en enregistre aucun quand
- * aucun backend n'est lisible. La page dit alors qu'aucun backend n'est configuré — **sans nommer
- * Temporal**, qui peut n'avoir jamais été de la partie sur cette application.
+ * The catalog is nullable, and that is the normal case: the container registers none when no
+ * backend is readable. The page then says that no backend is configured — **without naming
+ * Temporal**, which may never have been part of the picture on this application.
  *
- * Un fait que le backend n'a pas est **absent** du modèle, pas rendu en chaîne vide : une colonne
- * « file de tâches » vide apprend à l'exploitant que l'exécution n'a pas de file, alors que c'est le
- * backend qui n'a pas la notion. Une clé absente ne raconte rien de faux.
+ * A fact the backend does not have is **absent** from the model, not rendered as an empty string:
+ * an empty "task queue" column teaches the operator that the execution has no queue, when in fact
+ * it is the backend that has no such notion. A missing key tells nothing false.
  */
 final class RunDashboard
 {
@@ -59,9 +59,9 @@ final class RunDashboard
             ];
         }
 
-        // « Un catalogue est enregistré » et « le backend répond » sont deux questions distinctes.
-        // Sans cette seconde, une base tombée donnerait une page vide et sereine — la pire des deux
-        // erreurs possibles, puisque l'exploitant en conclut qu'il n'y a rien à voir.
+        // "A catalog is registered" and "the backend answers" are two distinct questions. Without
+        // this second one, a downed database would give an empty, serene page — the worse of the
+        // two possible errors, since the operator concludes there is nothing to see.
         $health = $this->catalog->checkHealth();
         if (!$health->reachable) {
             return [
@@ -79,8 +79,8 @@ final class RunDashboard
             ];
         }
 
-        // Un filtre venu d'une URL est une chaîne quelconque : l'ignorer vaut mieux que refuser une
-        // page à quelqu'un qui a mal recopié un lien.
+        // A filter coming from a URL is an arbitrary string: ignoring it is worth more than
+        // refusing a page to someone who mistyped a link.
         $filter = WorkflowRunStatus::tryFrom($status);
         $page = $this->catalog->listRuns($filter, $cursor, self::PAGE_SIZE);
 
@@ -89,9 +89,9 @@ final class RunDashboard
         return [
             'backend' => [
                 'available' => true,
-                // Le troisième état : il répond, et sa réponse est vide par construction parce que
-                // son journal ne survit pas au processus. Vide est alors la bonne réponse, pas une
-                // panne — et une surface a besoin de le **lire** pour le dire.
+                // The third state: it answers, and its answer is empty by construction because
+                // its journal does not survive the process. Empty is then the right answer, not a
+                // breakdown — and a surface needs to **read** it in order to say so.
                 'ephemeral' => $health->ephemeral,
                 'message' => $health->message,
                 'name' => $health->backend,
@@ -106,9 +106,10 @@ final class RunDashboard
             ],
             'status' => $status,
             'selectedRun' => null === $selected ? null : self::describe($selected) + [
-                // La frise se calcule dans le cœur, à côté des faits qu'elle projette : grouper en
-                // actions, placer dans le temps et distinguer la file du travail ne sont pas
-                // l'affaire de l'hôte, sans quoi le même run se lit différemment selon la surface.
+                // The frieze is computed in the core, next to the facts it projects: grouping
+                // into actions, placing in time and telling the queue apart from the work are not
+                // the host's business, otherwise the same run reads differently from one surface
+                // to the next.
                 'timeline' => RunTimeline::of($this->catalog->readHistory($selected)),
             ],
         ];
@@ -125,7 +126,7 @@ final class RunDashboard
             'status' => $run->status->value,
         ];
 
-        // Chaque fait n'entre que s'il existe. C'est la règle de tout ce modèle.
+        // Each fact goes in only if it exists. That is the rule of this whole model.
         if (null !== $run->startedAt) {
             $described['startedAt'] = $run->startedAt;
         }
@@ -154,22 +155,22 @@ final class RunDashboard
     }
 
     /**
-     * Un compteur par issue, toutes les issues, sur **l'ensemble qu'on lui donne**.
+     * One counter per outcome, every outcome, over **the set it is given**.
      *
-     * Publique parce qu'un hôte qui pagine autrement — la grille standard de Magento pagine par
-     * décalage dans une fenêtre bornée — compte le même ensemble avec les mêmes seaux. C'est
-     * précisément le trou qu'une liste figée creuse : l'appelant qui écrit ses seaux à la main en
-     * oublie un, et les compteurs cessent de s'additionner sans que rien ne le dise.
+     * Public because a host that paginates differently — Magento's standard grid paginates by
+     * offset within a bounded window — counts the same set with the same buckets. This is
+     * precisely the hole a hard-coded list digs: the caller who writes its buckets by hand forgets
+     * one, and the counters stop adding up without anything saying so.
      *
-     * La portée est assumée et doit être dite : compter la page est cohérent avec l'exigence que
-     * les compteurs concordent avec ce que la liste montre, mais un intitulé « total » sous lequel
-     * on lit vingt apprend à l'exploitant qu'une application qui a enregistré cinq cents exécutions
-     * en a vingt. La clé `total` est donc le total **de la page**, et les surfaces l'intitulent
-     * ainsi.
+     * The scope is accepted and must be stated: counting the page is consistent with the
+     * requirement that the counters agree with what the list shows, but a "total" label under
+     * which you read twenty teaches the operator that an application which has recorded five
+     * hundred executions has twenty. The `total` key is therefore the total **of the page**, and
+     * the surfaces label it as such.
      *
-     * Énumérer les cas plutôt que les écrire à la main évite le trou qu'une liste figée creuse
-     * fatalement : `continued_as_new` comptait dans le total et dans aucun seau, si bien qu'une
-     * application faite de workflows longs affichait des compteurs qui ne s'additionnaient pas.
+     * Enumerating the cases rather than writing them by hand avoids the hole a hard-coded list
+     * inevitably digs: `continued_as_new` counted in the total and in no bucket, so that an
+     * application made of long-running workflows displayed counters that did not add up.
      *
      * @param list<WorkflowRunDescription> $runs
      *

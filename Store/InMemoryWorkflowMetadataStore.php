@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 /**
- * Implémentation in-memory du WorkflowMetadataStore (tests).
+ * In-memory implementation of the WorkflowMetadataStore (tests).
  */
 final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
 {

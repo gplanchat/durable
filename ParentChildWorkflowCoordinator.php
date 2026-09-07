@@ -15,7 +15,7 @@ use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Applique {@see ParentClosePolicy} sur les enfants encore actifs lorsque le parent se ferme.
+ * Applies {@see ParentClosePolicy} to the children still active when the parent closes.
  */
 final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordinatorInterface
 {

@@ -16,7 +16,7 @@ use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 
 /**
- * Cron / message : fait progresser les timers d'un run puis relance si besoin.
+ * Cron / message: advances a run's timers, then resumes it if needed.
  *
  * If no timers fire on this pass (because the transport delivered the message before
  * the scheduled time elapsed — typically the in-memory transport in tests ignores

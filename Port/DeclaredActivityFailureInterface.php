@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 /**
- * Exception métier émise par une activité, conçue pour être persistée dans l'event store
- * et reconstituée à l'appel {@see \Gplanchat\Durable\WorkflowEnvironment::await()} (replay déterministe).
+ * Business exception raised by an activity, designed to be persisted in the event store
+ * and rebuilt at the {@see \Gplanchat\Durable\WorkflowEnvironment::await()} call (deterministic replay).
  *
- * Le payload retourné par {@see self::toActivityFailureContext()} doit être entièrement
- * JSON-sérialisable (pas de ressources, objets, closures).
+ * The payload returned by {@see self::toActivityFailureContext()} must be entirely
+ * JSON-serialisable (no resources, objects, closures).
  */
 interface DeclaredActivityFailureInterface extends \Throwable
 {
@@ -19,7 +19,7 @@ interface DeclaredActivityFailureInterface extends \Throwable
     public function toActivityFailureContext(): array;
 
     /**
-     * @param array<string, mixed> $context Valeurs issues de l'historique (payload persisté)
+     * @param array<string, mixed> $context Values taken from the history (persisted payload)
      */
     public static function restoreFromActivityFailureContext(array $context): static;
 }

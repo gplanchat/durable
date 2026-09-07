@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Message Messenger pour reprendre un workflow suspendu.
+ * Messenger message for resuming a suspended workflow.
  *
- * Pour démarrer un nouveau workflow, utiliser {@see WorkflowResumeDispatcher::dispatchNewWorkflowRun}
- * qui persiste les métadonnées et dispatch ce message.
+ * To start a new workflow, use {@see WorkflowResumeDispatcher::dispatchNewWorkflowRun}, which
+ * persists the metadata and dispatches this message.
  *
  * @see \Gplanchat\Durable\Port\WorkflowResumeDispatcher
  */
 final readonly class ResumeWorkflowMessage
 {
     /**
-     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates à
-     *        remettre à l'exécution pour cette passe. Ils n'ont pas encore de position dans le
-     *        journal : c'est la passe qui les applique qui les y inscrit, avant ce que le workflow
-     *        en fait. Des tableaux et non des objets, parce que ce message est sérialisé.
+     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates to
+     *        hand to the execution for this pass. They have no position in the journal yet: it is
+     *        the pass that applies them that writes them there, ahead of what the workflow makes of
+     *        them. Arrays and not objects, because this message is serialized.
      */
     public function __construct(
         public string $executionId,
