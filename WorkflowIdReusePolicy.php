@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Politique de réutilisation d’identifiant de workflow enfant (équivalent Temporal {@see IdReusePolicy}).
+ * Reuse policy for a child workflow identifier (the Temporal equivalent, {@see IdReusePolicy}).
  */
 enum WorkflowIdReusePolicy: string
 {
-    /** Autoriser un nouvel run avec le même ID. */
+    /** Allow a new run with the same ID. */
     case AllowDuplicate = 'allow_duplicate';
-    /** Autoriser seulement si l’exécution précédente a échoué ou été annulée. */
+    /** Allow only if the previous execution failed or was cancelled. */
     case AllowDuplicateFailedOnly = 'allow_duplicate_failed_only';
-    /** Rejeter si un run avec cet ID existe déjà (déduplication stricte). */
+    /** Reject if a run with that ID already exists (strict deduplication). */
     case RejectDuplicate = 'reject_duplicate';
 }

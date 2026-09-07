@@ -7,7 +7,7 @@ namespace Gplanchat\Durable;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
 
 /**
- * Identifiant d'exécution de workflow (value object).
+ * Workflow execution identifier (value object).
  */
 final readonly class ExecutionId implements \Stringable
 {

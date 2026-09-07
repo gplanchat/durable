@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Raisons standard d'annulation d'une opération encore en attente (activité ou minuteur).
+ * Standard reasons for cancelling an operation still pending (activity or timer).
  */
 final class ActivityCancellationReason
 {
-    /** Perdante d'un {@see \Gplanchat\Durable\WorkflowEnvironment::any()}. */
+    /** Loser of a {@see \Gplanchat\Durable\WorkflowEnvironment::any()}. */
     public const RACE_SUPERSEDED = 'race_superseded';
 
     /**
-     * Retirée parce que l'annulation de l'exécution a été demandée. Distincte de
-     * {@see RACE_SUPERSEDED} : elle rejette l'attente avec
-     * {@see \Gplanchat\Durable\Exception\WorkflowCancelledFailure} et fait office de trace
-     * « annulation déjà livrée » pour ne pas la livrer deux fois.
+     * Withdrawn because cancellation of the execution was requested. Distinct from
+     * {@see RACE_SUPERSEDED}: it rejects the wait with
+     * {@see \Gplanchat\Durable\Exception\WorkflowCancelledFailure} and doubles as a
+     * "cancellation already delivered" marker, so that it is not delivered twice.
      */
     public const WORKFLOW_CANCELLED = 'workflow_cancelled';
 

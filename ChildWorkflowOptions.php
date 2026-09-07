@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Options pour {@see ExecutionContext::executeChildWorkflow()} (équivalent {@see \Temporal\Workflow\ChildWorkflowOptions}).
+ * Options for {@see ExecutionContext::executeChildWorkflow()} (the equivalent of {@see \Temporal\Workflow\ChildWorkflowOptions}).
  *
- * Les champs supplémentaires sont journalisés pour observabilité ; le moteur inline n’applique
- * pas encore tous les timeouts côté exécution.
+ * The extra fields are logged for observability; the inline engine does not yet enforce all
+ * the timeouts on the execution side.
  */
 final readonly class ChildWorkflowOptions
 {
-    /** Les bornes temporelles de l'enfant, prises ensemble. */
+    /** The time bounds of the child, taken together. */
     public WorkflowTimeouts $timeouts;
 
-    /** Ce sur quoi l'enfant pourra être retrouvé. */
+    /** What the child will be findable by. */
     public SearchAttributes $searchAttributes;
 
     public function __construct(
         /**
-         * Identifiant d’exécution enfant (clé du journal enfant). Si null, un UUID est généré.
+         * Child execution identifier (the key of the child log). If null, a UUID is generated.
          */
         public ?string $workflowId = null,
         public ParentClosePolicy $parentClosePolicy = ParentClosePolicy::Terminate,

@@ -11,11 +11,11 @@ use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Exécute un workflow enfant sur son propre `executionId` (journal distinct du parent).
+ * Runs a child workflow on its own `executionId` (a log distinct from the parent's).
  *
- * Mode **inline** (défaut) : {@see InMemoryWorkflowRunner} jusqu’à complétion.
- * Mode **async_messenger** : dispatch {@see Transport\WorkflowRunMessage} uniquement ;
- * le parent reprend via {@see Bundle\Handler\WorkflowRunHandler} qui append
+ * **inline** mode (the default): {@see InMemoryWorkflowRunner} until completion.
+ * **async_messenger** mode: dispatches {@see Transport\WorkflowRunMessage} only;
+ * the parent resumes through {@see Bundle\Handler\WorkflowRunHandler}, which appends
  * {@see Event\ChildWorkflowCompleted} / {@see Event\ChildWorkflowFailed}.
  */
 final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
@@ -39,7 +39,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     }
 
     /**
-     * Indique si le démarrage d’enfant passe par Messenger (pas d’exécution inline dans {@see runChild}).
+     * Whether the child start goes through Messenger (no inline execution in {@see runChild}).
      */
     public function defersChildStart(): bool
     {
@@ -49,7 +49,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     /**
      * @param array<string, mixed> $input
      *
-     * @throws ChildWorkflowStartDeferred si {@see $asyncMessengerStart} : pas d’append ChildWorkflowCompleted ici
+     * @throws ChildWorkflowStartDeferred when {@see $asyncMessengerStart}: no ChildWorkflowCompleted appended here
      */
     public function runChild(string $childExecutionId, string $workflowType, array $input, ?string $parentExecutionId = null): mixed
     {
@@ -63,7 +63,7 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             throw new ChildWorkflowStartDeferred();
         }
 
-        // Le registre est repassé pour que l'enfant puisse lui-même démarrer des petits-enfants.
+        // The registry is passed along so the child can itself start grandchildren.
         $runner = new InMemoryWorkflowRunner(
             $this->eventStore,
             $this->runtime->getActivityTransport(),

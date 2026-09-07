@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Options pour {@see ExecutionContext::continueAsNew()} (équivalent {@see \Temporal\Workflow\ContinueAsNewOptions}).
+ * Options for {@see ExecutionContext::continueAsNew()} (the equivalent of {@see \Temporal\Workflow\ContinueAsNewOptions}).
  *
- * Un continue-as-new ouvre un nouveau run **dans** l'exécution en cours : la borne d'exécution
- * est héritée et ne se repose pas ici.
+ * A continue-as-new opens a new run **within** the current execution: the execution bound is
+ * inherited and is not set again here.
  */
 final readonly class ContinueAsNewOptions
 {
-    /** Bornes du prochain run ; la borne d'exécution y est refusée. */
+    /** Bounds of the next run; the execution bound is refused here. */
     public WorkflowTimeouts $timeouts;
 
     public function __construct(

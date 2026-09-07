@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Raison de la fin du run parent pour {@see ParentChildWorkflowCoordinatorInterface}.
+ * Reason for the end of the parent run, for {@see ParentChildWorkflowCoordinatorInterface}.
  */
 enum ParentClosureReason
 {
