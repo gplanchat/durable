@@ -291,7 +291,7 @@ final class WorkflowEnvironment
         }
 
         if ($timer->isSettled()) {
-            // Relève si le minuteur a été rejeté (annulation du workflow) : ce n'est pas une échéance.
+            // Throws if the timer was rejected (the workflow was cancelled): that is not a deadline.
             $timer->getResult();
 
             throw new DeadlineExceededException($deadline, $awaited);
@@ -318,19 +318,19 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Un assemblage réglé quand **tous** ses membres ont abouti, dans l'ordre de déclaration
+     * A composite that settles when **all** of its members have succeeded, in declaration order
      * (ADR DUR033).
      *
-     * Rend un {@see Awaitable} et n'attend rien : c'est {@see await()} qui bloque, et lui seul.
-     * Un assembleur qui attendrait à votre place ne se composerait pas — impossible d'en border
-     * un par une échéance, ou d'en mettre un dans un autre, alors que ce sont là les deux seules
-     * raisons de l'écrire.
+     * It returns an {@see Awaitable} and waits for nothing: {@see await()} is what blocks, and it
+     * alone. A combinator that waited on your behalf would not compose — there would be no way to
+     * bound one by a deadline, or to put one inside another, and those are the only two reasons to
+     * write one.
      *
      *     [$a, $b] = $env->await($env->all($x, $y));
      *     $env->await($env->all($x, $y), Duration::seconds(30));
      *
-     * L'échec d'un membre est l'échec de l'ensemble : le quorum est plein, donc plus rien ne
-     * peut l'atteindre dès qu'un seul manque.
+     * One member failing is the whole thing failing: the quorum is full, so nothing can reach it
+     * any more as soon as a single member is missing.
      *
      * @param Awaitable<mixed> $awaitables
      *
@@ -342,12 +342,11 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Un assemblage réglé dès qu'**un** membre l'est, quel qu'en soit le sort, et qui rend la
-     * valeur de ce gagnant.
+     * A composite that settles as soon as **one** member does, whatever its fate, and that returns
+     * that winner's value.
      *
-     * Les branches perdantes encore en vol — activités comme minuteurs — sont retirées de la
-     * file : sans cela, un `any(timer, timer)` laissait une échéance morte réveiller
-     * l'exécution.
+     * The losing branches still in flight — activities as well as timers — are taken off the queue:
+     * without that, an `any(timer, timer)` used to let a dead deadline wake the execution.
      *
      * @param Awaitable<mixed> $awaitables
      *
@@ -363,18 +362,18 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Un assemblage réglé quand **$count** membres ont abouti — trois prix sur huit suffisent à
-     * décider, et les cinq autres ne coûtent plus que leur latence.
+     * A composite that settles when **$count** members have succeeded — three quotes out of eight
+     * are enough to decide, and the other five then cost nothing but their latency.
      *
      *     $prices = $env->await($env->some(3, ...$providers), Duration::seconds(2));
      *
-     * Rend les résultats des $count premiers aboutis, **indexés par leur position de
-     * déclaration** : c'est ainsi que l'appelant sait lesquels ont répondu. Les membres encore
-     * en course quand le quorum tombe sont retirés de la file.
+     * It returns the results of the first $count to succeed, **indexed by their declaration
+     * position**: that is how the caller knows which ones answered. Members still racing when the
+     * quorum lands are taken off the queue.
      *
-     * Seuls les membres **aboutis** comptent ; un membre qui échoue ne rapproche pas du quorum,
-     * il l'éloigne. Quand il en reste trop peu pour l'atteindre, l'attente est réglée par le
-     * premier échec plutôt que de ne se régler jamais.
+     * Only members that **succeed** count; one that fails does not bring the quorum closer, it
+     * pushes it away. When too few are left to reach it, the wait settles on the first failure
+     * rather than never settling at all.
      *
      * @param Awaitable<mixed> $awaitables
      *
@@ -391,15 +390,14 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Minuteur, à attendre avec {@see await()} ou à composer avec {@see any()} / {@see parallel()}.
+     * A timer, to be awaited with {@see await()} or composed with {@see any()} / {@see parallel()}.
      *
-     * Rend un awaitable comme {@see activity()} : les deux méthodes de cette façade se
-     * comportent pareil. Pour simplement attendre une échéance, {@see sleep()} le dit dans son
-     * nom.
+     * It returns an awaitable like {@see activity()} does: the two methods of this facade behave
+     * alike. To simply wait out a delay, {@see sleep()} says so in its name.
      *
-     * Le minuteur perdant d'un {@see any()} est annulé
-     * ({@see \Gplanchat\Durable\Event\TimerCancelled}) pour ne pas réveiller l'exécution sur
-     * une échéance morte.
+     * The losing timer of an {@see any()} is cancelled
+     * ({@see \Gplanchat\Durable\Event\TimerCancelled}) so that a dead deadline does not wake the
+     * execution.
      *
      * @return Awaitable<mixed>
      */
@@ -421,27 +419,27 @@ final class WorkflowEnvironment
      * @return T
      */
     /**
-     * Déclare que le comportement de ce workflow a changé ici, et rend celui qui concerne
-     * l'exécution en cours.
+     * Declares that this workflow's behaviour changed here, and returns the one that applies to the
+     * execution in progress.
      *
      * ```php
-     * if ($this->environment->version('ajout-remise', ChangePoint::DEFAULT_VERSION, 1) === ChangePoint::DEFAULT_VERSION) {
-     *     $total = $this->await($this->facturation->totalSansRemise($panier));
+     * if ($this->environment->version('add-discount', ChangePoint::DEFAULT_VERSION, 1) === ChangePoint::DEFAULT_VERSION) {
+     *     $total = $this->await($this->billing->totalWithoutDiscount($basket));
      * } else {
-     *     $total = $this->await($this->facturation->totalAvecRemise($panier));
+     *     $total = $this->await($this->billing->totalWithDiscount($basket));
      * }
      * ```
      *
-     * La réponse est figée à la première rencontre et relue du journal ensuite : une exécution
-     * déjà partie garde son comportement quoi qu'on déploie après elle, et c'est le seul endroit
-     * où la garde de divergence (DUR042) accepte que le code s'écarte de l'historique.
+     * The answer is fixed on first encounter and read back from the journal afterwards: an execution
+     * already under way keeps its behaviour whatever is deployed after it, and this is the one place
+     * where the divergence guard (DUR042) accepts that the code departs from the history.
      *
-     * Deux points de changement sont indépendants : une exécution peut être du vieux côté de l'un
-     * et du neuf côté de l'autre.
+     * Two change points are independent: one execution can be on the old side of one and on the new
+     * side of the other.
      *
-     * @param string $changeId     le nom de ce point, stable dans le temps — il vit dans l'historique
-     * @param int    $minSupported la plus ancienne version que ce code sait encore jouer
-     * @param int    $maxSupported la plus récente, celle qu'une exécution neuve prendra
+     * @param string $changeId     this point's name, stable over time — it lives in the history
+     * @param int    $minSupported the oldest version this code still knows how to play
+     * @param int    $maxSupported the most recent one, which a fresh execution will take
      */
     public function version(string $changeId, int $minSupported, int $maxSupported): int
     {
@@ -456,7 +454,7 @@ final class WorkflowEnvironment
 
 
     /**
-     * Retourne un stub typé pour un workflow enfant.
+     * Returns a typed stub for a child workflow.
      *
      * @template TWorkflow of object
      *
@@ -473,19 +471,19 @@ final class WorkflowEnvironment
 
 
     /**
-     * Appelle une opération Nexus : une opération servie par une autre équipe, un autre namespace,
-     * un autre déploiement — et qu'on attend comme une activité.
+     * Calls a Nexus operation: one served by another team, another namespace, another deployment —
+     * and awaited like an activity.
      *
-     * Les trois noms sont des objets-valeurs parce que le serveur ne protège que le premier :
-     * sondé, il refuse net un endpoint mal formé, et accepte sans broncher un service ou une
-     * opération vides, blancs ou truffés de caractères de contrôle. Une opération ainsi nommée est
-     * enregistrée telle quelle puis attend un gestionnaire qui ne correspondra jamais.
+     * The three names are value objects because the server only protects the first: probed, it flatly
+     * refuses a malformed endpoint, and accepts without blinking a service or an operation that is
+     * empty, blank or riddled with control characters. An operation named that way is registered as
+     * it stands and then waits for a handler that will never match.
      *
      * @param array<string, mixed> $payload
      *
      * @return Awaitable<mixed>
      *
-     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend configuré ne sait pas router l'appel
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException if the configured backend cannot route the call
      */
     public function nexusOperation(
         NexusEndpoint|string $endpoint,
@@ -504,7 +502,7 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Retourne un stub typé pour le contrat d'activité.
+     * Returns a typed stub for the activity contract.
      *
      * @template TActivity of object
      *
@@ -520,11 +518,11 @@ final class WorkflowEnvironment
     }
 
     /**
-     * Un proxy typé vers les opérations d'un contrat Nexus servi à `$endpoint`.
+     * A typed proxy onto the operations of a Nexus contract served at `$endpoint`.
      *
-     * L'endpoint est un paramètre du stub et non du contrat : il dit *où* le service est servi, ce
-     * qui relève du déploiement et change d'un environnement à l'autre, quand le contrat ne change
-     * pas.
+     * The endpoint is a parameter of the stub and not of the contract: it says *where* the service is
+     * served, which is a deployment matter and changes from one environment to the next, while the
+     * contract does not.
      *
      * @template TContract of object
      *
