@@ -62,7 +62,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
 
         $store->markCompleted('exec-1');
 
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'), 'une exécution terminée ne se reprend plus');
+        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'), 'a finished execution is not resumable any more');
 
         $stored = $store->get('exec-1');
         self::assertNotNull($stored, 'terminer ne supprime pas : le profiler lit encore le type');
@@ -104,7 +104,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
         self::assertSame(['v' => 2], $stored['payload']);
         self::assertTrue(
             $store->hasActiveWorkflowMetadata('exec-1'),
-            'réécrire les métadonnées repart d\'une exécution reprenable',
+            'writing the metadata again starts from a resumable execution',
         );
     }
 

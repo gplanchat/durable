@@ -53,7 +53,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         $page = $this->catalogUnderTest()->listRuns();
 
         self::assertSame([], $page->runs);
-        self::assertNull($page->nextCursor, 'rien à lire ensuite');
+        self::assertNull($page->nextCursor, 'nothing left to read');
     }
 
     public function testADescriptionCarriesWhatAViewNeeds(): void
@@ -184,7 +184,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         foreach ($history as $event) {
             self::assertInstanceOf(WorkflowRunEvent::class, $event);
             if (null !== $previous) {
-                self::assertGreaterThan($previous, $event->sequence, 'les séquences doivent croître');
+                self::assertGreaterThan($previous, $event->sequence, 'sequences must grow');
             }
             $previous = $event->sequence;
         }
@@ -198,7 +198,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     {
         $health = $this->catalogUnderTest()->checkHealth();
 
-        self::assertNotSame('', $health->backend, 'une santé doit dire de quel backend elle parle');
+        self::assertNotSame('', $health->backend, 'a health report must say which backend it speaks of');
         self::assertNotSame('', $health->message);
         self::assertTrue($health->reachable, 'le stockage du test est joignable par construction');
     }

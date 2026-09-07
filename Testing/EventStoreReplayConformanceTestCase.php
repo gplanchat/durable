@@ -46,11 +46,11 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $referenceResult = self::runConformanceWorkflow($reference, 'exec-reference');
         $subjectResult = self::runConformanceWorkflow($subject, 'exec-subject');
 
-        self::assertSame($referenceResult, $subjectResult, 'le workflow doit rendre le même résultat');
+        self::assertSame($referenceResult, $subjectResult, 'the workflow must return the same result');
         self::assertSame(
             self::journalShape($reference, 'exec-reference'),
             self::journalShape($subject, 'exec-subject'),
-            'les deux journaux doivent enregistrer les mêmes événements, dans le même ordre',
+            'both journals must record the same events, in the same order',
         );
     }
 
@@ -73,13 +73,13 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
             $fromReference->findActivitySlotResult(0)['result'],
             $fromSubject->findActivitySlotResult(0)['result'],
         );
-        self::assertNull($fromSubject->findActivitySlotResult(1), 'une seule activité a été planifiée');
+        self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
 
         // Les effets de bord portent un `mixed` : c'est là qu'un aller-retour JSON déforme.
         self::assertSame($fromReference->findSideEffectForSlot(0), $fromSubject->findSideEffectForSlot(0));
         self::assertSame($fromReference->findSideEffectForSlot(1), $fromSubject->findSideEffectForSlot(1));
 
-        self::assertNotNull($fromSubject->findScheduledTimerId(0), 'le minuteur doit être relu depuis le store');
+        self::assertNotNull($fromSubject->findScheduledTimerId(0), 'the timer must be read back from the store');
     }
 
     /**
@@ -108,9 +108,9 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         self::assertSame(
             $fromReference->activityNameForSlot(0),
             $fromSubject->activityNameForSlot(0),
-            "l'identité du slot d'activité doit survivre à l'aller-retour dans le store",
+            'the identity of the activity slot must survive the round trip through the store',
         );
-        self::assertNotNull($fromSubject->activityNameForSlot(0), 'et ne pas être perdue en route');
+        self::assertNotNull($fromSubject->activityNameForSlot(0), 'and must not be lost on the way');
 
         // Un slot que le workflow n'a pas atteint : null des deux côtés. C'est ce qui distingue
         // « rien à comparer » de « divergence », et un adaptateur qui répondrait la chaîne vide
@@ -145,7 +145,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
         $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
 
-        self::assertSame(1, $fromSubject->versionForChangeId('conformance-change'), 'la version enregistrée revient telle quelle');
+        self::assertSame(1, $fromSubject->versionForChangeId('conformance-change'), 'the recorded version comes back unchanged');
         self::assertSame(
             $fromReference->versionForChangeId('conformance-change'),
             $fromSubject->versionForChangeId('conformance-change'),

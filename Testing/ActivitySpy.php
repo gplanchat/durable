@@ -130,7 +130,7 @@ final class ActivitySpy
      */
     public function assertCalledWith(array $expectedArgs): void
     {
-        Assert::assertNotEmpty($this->calls, 'L\'activité spy n\'a pas été appelée.');
+        Assert::assertNotEmpty($this->calls, 'The activity spy was never called.');
         Assert::assertEquals(
             $expectedArgs,
             $this->calls[\count($this->calls) - 1],
@@ -143,7 +143,7 @@ final class ActivitySpy
      */
     public function assertFirstCallWith(array $expectedArgs): void
     {
-        Assert::assertNotEmpty($this->calls, 'L\'activité spy n\'a pas été appelée.');
+        Assert::assertNotEmpty($this->calls, 'The activity spy was never called.');
         Assert::assertEquals($expectedArgs, $this->calls[0], 'Les arguments du premier appel ne correspondent pas.');
     }
 
@@ -152,7 +152,7 @@ final class ActivitySpy
         Assert::assertCount(
             $times,
             $this->calls,
-            \sprintf('L\'activité spy devait être appelée %d fois, elle a été appelée %d fois.', $times, \count($this->calls)),
+            \sprintf('The activity spy was expected to be called %d times, it was called %d times.', $times, \count($this->calls)),
         );
     }
 
@@ -165,7 +165,7 @@ final class ActivitySpy
     {
         Assert::assertEmpty(
             $this->calls,
-            \sprintf('L\'activité spy ne devait pas être appelée, mais elle a été appelée %d fois.', \count($this->calls)),
+            \sprintf('The activity spy was not expected to be called, but it was called %d times.', \count($this->calls)),
         );
     }
 

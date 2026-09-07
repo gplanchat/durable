@@ -107,9 +107,9 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Accès direct à l'EventStore pour inspecter les événements enregistrés.
+     * Direct access to the EventStore, to inspect the events it recorded.
      *
-     * Utile pour les assertions personnalisées :
+     * Useful for assertions of your own:
      * ```php
      * foreach ($env->getEventStore()->readStream($executionId) as $event) {
      *     if ($event instanceof ExecutionCompleted) { ... }

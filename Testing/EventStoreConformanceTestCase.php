@@ -94,13 +94,13 @@ abstract class EventStoreConformanceTestCase extends TestCase
 
         $readBack = iterator_to_array($store->readStream('exec-fidelity'), false);
 
-        self::assertCount(\count($fixtures), $readBack, 'le flux doit rendre autant d\'événements qu\'il en a reçu');
+        self::assertCount(\count($fixtures), $readBack, 'the stream must return as many events as it was given');
 
         foreach (array_values($fixtures) as $index => $original) {
             self::assertSame(
                 EventDataMapper::fromDomainEvent($original),
                 EventDataMapper::fromDomainEvent($readBack[$index]),
-                \sprintf('%s ne survit pas à l\'aller-retour', $original::class),
+                \sprintf('%s does not survive the round trip', $original::class),
             );
         }
     }
@@ -121,7 +121,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $second = self::classesOf($store->readStream('exec-passes'));
 
         self::assertNotSame([], $first);
-        self::assertSame($first, $second, 'relire le flux doit rendre la même chose, pas rien');
+        self::assertSame($first, $second, 'reading the stream again must return the same thing, not nothing');
     }
 
     public function testAPartiallyConsumedStreamDoesNotDisturbTheNextRead(): void
@@ -132,7 +132,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         }
 
         foreach ($store->readStream('exec-partial') as $ignored) {
-            break; // on abandonne le flux au premier élément
+            break; // abandon the stream on its first element
         }
 
         self::assertSame(
@@ -165,14 +165,14 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store = $this->createEventStore();
         $fixtures = self::mappedEventFixtures('exec-count');
 
-        self::assertSame(0, $store->countEventsInStream('exec-count'), 'un flux vide compte zéro');
+        self::assertSame(0, $store->countEventsInStream('exec-count'), 'an empty stream counts zero');
 
         foreach (array_values($fixtures) as $index => $event) {
             $store->append($event);
             self::assertSame(
                 $index + 1,
                 $store->countEventsInStream('exec-count'),
-                'le compte doit suivre chaque écriture',
+                'the count must follow every write',
             );
         }
 
@@ -230,7 +230,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         foreach (glob(__DIR__ . '/../Event/*.php') ?: [] as $file) {
             $short = basename($file, '.php');
             if ('Event' === $short) {
-                continue; // l'interface elle-même
+                continue; // the interface itself
             }
             $declared[] = 'Gplanchat\\Durable\\Event\\' . $short;
         }
@@ -245,7 +245,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         self::assertSame(
             $declared,
             $accounted,
-            'un type d\'événement doit avoir une fixture, ou figurer dans eventTypesOutsideTheJournal()',
+            'an event type must have a fixture, or be listed in eventTypesOutsideTheJournal()',
         );
     }
 
