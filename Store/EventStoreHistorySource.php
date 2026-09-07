@@ -133,8 +133,8 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
             if ($event instanceof ActivityScheduled) {
                 if ($index === $slot) {
-                    // `payload()` rend l'enveloppe de l'événement ; les arguments de l'activité en
-                    // sont une case. Un non-tableau vaut « rien à comparer », pas « tableau vide ».
+                    // `payload()` returns the event's envelope; the activity's arguments are one
+                    // slot of it. A non-array means "nothing to compare", not "empty array".
                     $arguments = $event->payload()['payload'] ?? null;
 
                     return \is_array($arguments) ? $arguments : null;
@@ -166,12 +166,12 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     /**
      * Toujours null, et ce n'est pas un oubli.
      *
-     * Ce backend refuse les opérations Nexus par construction (DUR036) : aucun de ses historiques
-     * n'en porte une que le workflow aurait planifiée. Le seul `NexusOperationScheduled` qui puisse
-     * traverser un flux vient du convertisseur du profileur, qui l'écrit pour l'affichage — et cet
-     * événement ne porte que le site d'appel, jamais la charge. Il n'y a donc rien à comparer.
+     * This backend refuses Nexus operations by design (DUR036): none of its histories carries one
+     * the workflow would have scheduled. The only `NexusOperationScheduled` that can cross a stream
+     * comes from the profiler's converter, which writes it for display, and that event carries only
+     * the call site, never the payload. So there is nothing to compare.
      *
-     * La garde s'exerce là où Nexus existe : {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory}.
+     * The guard applies where Nexus exists: {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory}.
      */
     public function nexusOperationPayloadForSlot(int $slot): ?array
     {
@@ -269,6 +269,21 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         return null;
+    }
+
+    public function hasSideEffectForSlot(int $slot): bool
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof SideEffectRecorded) {
+                if ($index === $slot) {
+                    return true;
+                }
+                ++$index;
+            }
+        }
+
+        return false;
     }
 
     public function findSideEffectForSlot(int $slot): mixed

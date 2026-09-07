@@ -256,17 +256,20 @@ final class ExecutionContext
      * Deduced, therefore deterministic: two replays of the same history answer alike, which is
      * the only property versioning needs.
      *
-     * Side effects are not consulted: `findSideEffectForSlot()` returns `mixed`, and a recorded
-     * value can legitimately be `null` — "nothing here" cannot be told apart from "here, the
-     * value null". A workflow whose only work before a change point is a side effect will
-     * therefore be treated as new. That is the hole, it is narrow, and it is written down.
+     * Side effects count like the rest, now that the port can state their presence without going
+     * through their value. They could not while `findSideEffectForSlot()` returned `mixed`: a
+     * recorded value can legitimately be `null`, and "nothing here" was indistinguishable from
+     * "here, the value null". A workflow whose only work before a change point was a side effect
+     * then switched to the new branch mid-replay. The hole is closed along with `sideEffect()`'s,
+     * of which it was the same cause.
      */
     private function hasRecordedWorkAhead(): bool
     {
         return null !== $this->historySource->findScheduledActivityId($this->activitySlotIndex)
             || null !== $this->historySource->findScheduledTimerId($this->timerSlotIndex)
             || null !== $this->historySource->findScheduledChildExecutionId($this->childWorkflowSlotIndex)
-            || null !== $this->historySource->findScheduledNexusOperation($this->nexusOperationSlotIndex);
+            || null !== $this->historySource->findScheduledNexusOperation($this->nexusOperationSlotIndex)
+            || $this->historySource->hasSideEffectForSlot($this->sideEffectSlotIndex);
     }
 
     /**
@@ -476,10 +479,12 @@ final class ExecutionContext
     public function sideEffect(\Closure $closure): Awaitable
     {
         $slotIndex = $this->sideEffectSlotIndex++;
-        $replayResult = $this->historySource->findSideEffectForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-        if (null !== $replayResult) {
-            $deferred->resolve($replayResult);
+
+        // The slot's presence, never the value it carries: a closure returning `null` did run, and
+        // reading it back is exactly what `sideEffect()` promises.
+        if ($this->historySource->hasSideEffectForSlot($slotIndex)) {
+            $deferred->resolve($this->historySource->findSideEffectForSlot($slotIndex));
 
             return $deferred->awaitable();
         }
