@@ -29,8 +29,8 @@ use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Port\WorkflowLifecycleInterface;
 
 /**
- * Issues de cycle de vie du backend in-memory : journal + clôture des enfants, et signalement
- * à l'appelant par exception (suspension, annulation, échec non géré).
+ * The in-memory backend's lifecycle outcomes: journal + closing of the children, and signalling
+ * to the caller by exception (suspension, cancellation, unhandled failure).
  */
 final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInterface
 {
@@ -41,14 +41,14 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onBeforeRun(string $executionId): void
     {
-        // Rien à pré-empter : l'annulation est livrée dans le fiber, au point d'attente, pour
-        // laisser le workflow compenser.
+        // Nothing to pre-empt: the cancellation is delivered inside the fiber, at the wait
+        // point, to let the workflow compensate.
     }
 
     /**
-     * Demandée, et pas encore livrée : la livraison se trace par l'annulation d'une opération
-     * avec la raison workflow_cancelled — sans cette borne, chaque replay relèverait de nouveau
-     * l'annulation, y compris dans les attentes de compensation.
+     * Requested, and not yet delivered: the delivery is traced by the cancellation of an
+     * operation with the workflow_cancelled reason — without that bound, every replay would raise
+     * the cancellation again, including inside the compensation waits.
      */
     public function isCancellationPending(string $executionId): bool
     {
@@ -75,9 +75,9 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void
     {
-        // Rien à ajouter : ActivityCancelled / TimerCancelled portent déjà la raison
-        // workflow_cancelled, qui sert à la fois de trace de livraison et de source du rejet
-        // au rejeu.
+        // Nothing to add: ActivityCancelled / TimerCancelled already carry the
+        // workflow_cancelled reason, which serves both as the delivery trace and as the source
+        // of the rejection on replay.
     }
 
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void
@@ -103,7 +103,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onSuspended(string $executionId, Awaitable $pending): void
     {
-        // Doit traverser les composites : un any(activity, timer) attend bien une échéance.
+        // Must go through the composites: an any(activity, timer) really is waiting on a deadline.
         $waitingOnTimer = AwaitableInspector::waitsOnTimer($pending);
 
         throw new WorkflowSuspendedException(
