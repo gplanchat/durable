@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Une condition sur l'état du workflow, vue comme un awaitable.
+ * A condition on the workflow state, seen as an awaitable.
  *
- * Rien à envelopper : depuis que le contrat se réduit à `isSettled()` et `getResult()`, une
- * condition *est* un awaitable — `isSettled()` est le prédicat, littéralement. C'est ce qui
- * permet à une condition d'entrer dans le chemin d'échéance existant sans le faire bifurquer :
- * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} n'appelle rien d'autre sur ses branches.
+ * Nothing to wrap: since the contract came down to `isSettled()` and `getResult()`, a condition
+ * *is* an awaitable — `isSettled()` is the predicate, literally. That is what lets a condition
+ * enter the existing deadline path without making it branch:
+ * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} calls nothing else on its branches.
  *
- * Le prédicat est relu à chaque replay et doit donc être fonction du seul état du workflow —
- * ce qu'un replay ne reproduit pas se consigne d'abord ({@see \Gplanchat\Durable\WorkflowEnvironment::sideEffect()}).
- * Il est aussi évalué plusieurs fois par passe, et ne doit donc rien changer en le lisant.
+ * The predicate is re-read on every replay and must therefore be a function of the workflow
+ * state alone — whatever a replay does not reproduce is recorded first ({@see \Gplanchat\Durable\WorkflowEnvironment::sideEffect()}).
+ * It is also evaluated several times per pass, and must therefore change nothing by reading it.
  *
  * @implements Awaitable<null>
  */
@@ -33,7 +33,7 @@ final class ConditionAwaitable implements Awaitable
     }
 
     /**
-     * Une condition ne rapporte rien : le workflow lit son propre état, qu'il n'a jamais quitté.
+     * A condition reports nothing: the workflow reads its own state, which it never left.
      */
     public function getResult(): mixed
     {
@@ -41,8 +41,8 @@ final class ConditionAwaitable implements Awaitable
     }
 
     /**
-     * Où la condition est écrite — de quoi la nommer dans un diagnostic sans lui ajouter un
-     * paramètre de description que tout appelant devrait alors renseigner.
+     * Where the condition is written — enough to name it in a diagnostic without adding to it a
+     * description parameter that every caller would then have to fill in.
      */
     public function describe(): string
     {

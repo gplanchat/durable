@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Un travail dont on peut demander s'il est réglé, et lire le résultat quand il l'est.
+ * A piece of work you can ask whether it is settled, and read the result from once it is.
  *
- * Deux méthodes, et pas de `then()` / `otherwise()` — l'interface en a porté un, que seules ses
- * six implémentations s'appelaient entre elles. Un callback n'a pas sa place ici pour une raison
- * qui n'est pas de goût : il n'est pas journalisé. Au replay, l'awaitable se règle depuis
- * l'historique et le callback repart ; tout effet de bord qui y vivrait s'exécuterait à chaque
- * relecture, ce que ce moteur existe précisément pour empêcher.
+ * Two methods, and no `then()` / `otherwise()` — the interface carried one, which only its six
+ * implementations called on one another. A callback has no place here for a reason that is not a
+ * matter of taste: it is not journalled. On replay, the awaitable settles from the history and
+ * the callback starts again; any side effect living in it would run on every re-read, which is
+ * precisely what this engine exists to prevent.
  *
- * La composition se fait donc en deux temps, dans l'ordre où le journal les relira :
- * {@see \Gplanchat\Durable\WorkflowEnvironment::all()} / `any()` / `some()` assemblent, et
- * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} attend. Le `otherwise()`, c'est le
- * `catch` autour de l'`await()`. Voir ADR DUR033.
+ * Composition therefore happens in two stages, in the order the journal will re-read them:
+ * {@see \Gplanchat\Durable\WorkflowEnvironment::all()} / `any()` / `some()` assemble, and
+ * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} waits. The `otherwise()` is the
+ * `catch` around the `await()`. See ADR DUR033.
  *
  * @template TValue
  */
