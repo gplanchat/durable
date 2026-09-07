@@ -7,9 +7,9 @@ namespace Gplanchat\Durable\Query;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Façade injectable (DI) pour les lectures « query » à partir du journal seul.
+ * Injectable (DI) facade for "query" reads from the journal alone.
  *
- * @see WorkflowQueryEvaluator pour la logique statique réutilisable
+ * @see WorkflowQueryEvaluator for the reusable static logic
  */
 final class WorkflowQueryRunner
 {
