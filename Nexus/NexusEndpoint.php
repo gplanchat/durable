@@ -5,29 +5,29 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 /**
- * Le nom d'un endpoint Nexus : où une opération est routée.
+ * The name of a Nexus endpoint: where an operation is routed.
  *
- * **Cet objet n'est pas plus strict que le serveur, et c'est délibéré** — l'inverse du choix fait
- * pour {@see \Gplanchat\Durable\TaskQueue}. Une file mal nommée est acceptée par le serveur puis
- * n'est jamais servie : le travail y dort, rien n'apparaît dans les logs, et seule une règle plus
- * stricte que le serveur peut l'empêcher. Un endpoint mal nommé n'a pas cette panne muette : le
- * serveur le refuse net à la création. Inventer ici une règle supplémentaire ne préviendrait donc
- * aucune faute — elle ne ferait que rejeter des noms parfaitement valides.
+ * **This object is not stricter than the server, and that is deliberate** — the opposite of the
+ * choice made for {@see \Gplanchat\Durable\TaskQueue}. A misnamed queue is accepted by the server
+ * and then never served: the work sleeps there, nothing shows up in the logs, and only a rule
+ * stricter than the server can prevent it. A misnamed endpoint has no such silent failure: the
+ * server flatly refuses it at creation. Inventing an extra rule here would therefore prevent no
+ * mistake — it would only reject perfectly valid names.
  *
- * La règle est celle que le serveur énonce lui-même, observée sur Temporal 1.31.2 (tâche 1.1) et
- * épinglée par `NexusEndpointNameRulesTest` : `^[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9]$`, 200
- * caractères. Une conséquence de ce motif surprend et mérite d'être dite : il exige un premier
- * **et** un dernier caractère, donc une lettre seule (`a`) est refusée.
+ * The rule is the one the server states itself, observed on Temporal 1.31.2 (task 1.1) and pinned
+ * by `NexusEndpointNameRulesTest`: `^[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9]$`, 200 characters. One
+ * consequence of that pattern is surprising and deserves saying: it requires a first **and** a last
+ * character, so a single letter (`a`) is refused.
  *
- * La seule distinction conservée est celle du serveur : un nom vide n'est pas *malformé*, il est
- * *absent*, et les deux méritent des messages différents.
+ * The only distinction kept is the server's: an empty name is not *malformed*, it is *absent*, and
+ * the two deserve different messages.
  */
 final readonly class NexusEndpoint
 {
-    /** Limite du serveur, sondée : 200 accepté, 201 refusé. */
+    /** The server's limit, probed: 200 accepted, 201 refused. */
     public const MAX_LENGTH = 200;
 
-    /** Le motif que le serveur énonce dans son propre message de refus. */
+    /** The pattern the server states in its own refusal message. */
     private const PATTERN = '/^[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9]$/';
 
     private function __construct(
@@ -60,7 +60,7 @@ final readonly class NexusEndpoint
     }
 
     /**
-     * Coercition de frontière : accepte ce que l'appelant a sous la main.
+     * Boundary coercion: accepts whatever the caller has at hand.
      */
     public static function from(self|string $value): self
     {
@@ -68,7 +68,7 @@ final readonly class NexusEndpoint
     }
 
     /**
-     * Depuis une valeur de configuration éventuellement absente.
+     * From a configuration value that may be absent.
      */
     public static function fromNullable(self|string|null $value): ?self
     {
