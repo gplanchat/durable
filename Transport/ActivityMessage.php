@@ -8,14 +8,14 @@ use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Duration;
 
 /**
- * Une tentative d'activité en transit vers un worker.
+ * An activity attempt in transit towards a worker.
  *
- * Les options franchissent le transport telles que l'appelant les a construites ; la comptabilité
- * de transport — numéro de tentative, première mise en file, délai avant reprise — a chacune son
- * champ plutôt qu'une clé dans un tableau opaque.
+ * The options cross the transport exactly as the caller built them; the transport bookkeeping —
+ * attempt number, first queueing, delay before retrying — each has a field of its own rather than
+ * a key in an opaque array.
  *
- * {@see toWireMetadata()} et {@see fromWireMetadata()} donnent aux transports la forme plate dont
- * ils ont besoin pour sérialiser. Elle n'a pas changé.
+ * {@see toWireMetadata()} and {@see fromWireMetadata()} give transports the flat shape they need
+ * in order to serialize. It has not changed.
  */
 final readonly class ActivityMessage
 {
@@ -28,13 +28,13 @@ final readonly class ActivityMessage
         public string $activityName,
         public array $payload,
         public ?ActivityOptions $options = null,
-        /** Numéro de la tentative, 1-based. */
+        /** Attempt number, 1-based. */
         public int $attempt = 1,
-        /** Instant de première mise en file, horodaté par le backend qui a planifié l'activité. */
+        /** Instant of first queueing, timestamped by the backend that scheduled the activity. */
         public ?float $firstQueuedAt = null,
         /**
-         * Délai à respecter avant de reprendre. Consommé par le transport, qui le traduit dans
-         * son propre mécanisme de report, puis l'oublie — il ne survit pas à la mise en file.
+         * Delay to observe before retrying. Consumed by the transport, which translates it into
+         * its own deferral mechanism, then forgets it — it does not survive the queueing.
          */
         public ?Duration $retryDelay = null,
     ) {}
@@ -54,7 +54,7 @@ final readonly class ActivityMessage
     }
 
     /**
-     * Prochaine tentative, à reprendre après le délai donné.
+     * Next attempt, to be retried after the given delay.
      */
     public function retryingIn(?Duration $delay): self
     {
@@ -71,7 +71,7 @@ final readonly class ActivityMessage
     }
 
     /**
-     * Le délai une fois pris en charge par le transport.
+     * The delay once the transport has taken charge of it.
      */
     public function withoutRetryDelay(): self
     {
@@ -88,7 +88,7 @@ final readonly class ActivityMessage
     }
 
     /**
-     * Forme plate attendue par le journal et par l'entrée d'activité Temporal.
+     * Flat shape expected by the journal and by the Temporal activity input.
      *
      * @return array<string, mixed>
      */

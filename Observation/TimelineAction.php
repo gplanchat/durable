@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Une ligne de frise : **une action**, pas une nature.
+ * One frieze row: **one action**, not a kind.
  *
- * Une activité planifiée, démarrée puis terminée est une action et trois événements ; les
- * événements de l'exécution elle-même en sont une, la première. Ranger par nature — « les
- * activités », « les signaux » — obligeait l'exploitant à recoller trois lignes de l'œil pour
- * savoir combien de temps *celle-là* avait duré.
+ * An activity scheduled, started and then finished is one action and three events; the events of
+ * the execution itself make up one, the first. Filing by kind — "activities", "signals" — forced
+ * the operator to piece three rows back together by eye to work out how long *that one* had
+ * lasted.
  *
- * `label` est le nom de l'événement qui **ouvre** l'action : seule la planification connaît le nom
- * de l'activité, ses suites ne portent qu'un numéro. `kind` vient de la même source — une action a
- * la nature de ce qui l'ouvre.
+ * `label` is the name of the event that **opens** the action: only the scheduling knows the
+ * activity's name, its follow-ups carry nothing but a number. `kind` comes from the same source —
+ * an action has the kind of whatever opens it.
  *
- * `duration` peut valoir zéro sans que ce soit une anomalie : un événement qui est à lui seul son
- * action n'a aucun intervalle, et un instant n'a pas de durée.
+ * `duration` may be zero without that being an anomaly: an event that is its own action all by
+ * itself has no interval, and an instant has no duration.
  */
 final readonly class TimelineAction
 {

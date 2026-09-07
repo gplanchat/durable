@@ -42,8 +42,8 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     private $clock;
 
     /**
-     * @param (callable(): float)|null $clock horloge du backend ; injectable pour les harnais qui
-     *                                        avancent un temps virtuel
+     * @param (callable(): float)|null $clock the backend's clock; injectable for the harnesses
+     *                                        that advance a virtual time
      */
     public function __construct(
         private readonly EventStoreInterface $eventStore,
@@ -56,8 +56,8 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
     {
-        // C'est ici, dans l'adaptateur, que les options prennent leur forme de fil — et que la
-        // mise en file est horodatée, avec l'horloge de ce backend.
+        // It is here, in the adapter, that the options take their wire form — and that the
+        // enqueuing is timestamped, with this backend's clock.
         $queuedAt = ($this->clock)();
         $metadata = ($options?->toMetadata() ?? []) + [
             'queued_at' => $queuedAt,
@@ -83,7 +83,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function startTimer(string $timerId, Duration $delay, string $summary): void
     {
-        // Ce backend compare des échéances à son horloge : c'est ici que le délai en devient une.
+        // This backend compares deadlines against its clock: here is where the delay becomes one.
         $this->eventStore->append(new TimerScheduled(
             $this->executionId,
             $timerId,
@@ -118,8 +118,8 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         array $input,
         ChildWorkflowOptions $options,
     ): void {
-        // La forme de fil se fabrique ici : le journal enregistre les métadonnées plates que
-        // l'ancien code lui donnait déjà, y compris les deux clés que le cœur ajoutait à la main.
+        // The wire form is built here: the journal records the flat metadata the old code was
+        // already giving it, including the two keys the core used to add by hand.
         $this->eventStore->append(new ChildWorkflowScheduled(
             $this->executionId,
             $childExecutionId,
@@ -176,8 +176,8 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function cancelTimer(string $timerId, string $reason): void
     {
-        // Le replay repasse par cancelLosers() à chaque reprise : sans ce garde le journal
-        // accumulerait un TimerCancelled par replay.
+        // Replay goes through cancelLosers() again on every resume: without this guard the
+        // journal would accumulate one TimerCancelled per replay.
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
             if ($event instanceof TimerCancelled && $event->timerId() === $timerId) {
                 return;

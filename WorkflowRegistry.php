@@ -7,14 +7,14 @@ namespace Gplanchat\Durable;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
 /**
- * Registre des workflows par type.
+ * Registry of workflows by type.
  *
- * Chaque classe enregistrée est indexée **deux fois** : par l’**alias** Temporal
- * ({@see WorkflowDefinitionLoader::workflowTypeForClass()} — argument `#[AsWorkflow]` ou nom court)
- * et par le **FQCN**, pour le dispatch PHP. Le journal et Temporal utilisent l’**alias** uniquement
- * (voir {@see WorkflowDefinitionLoader::aliasForTemporalInterop()}).
+ * Every registered class is indexed **twice**: by the Temporal **alias**
+ * ({@see WorkflowDefinitionLoader::workflowTypeForClass()} — `#[AsWorkflow]` argument or short name)
+ * and by the **FQCN**, for PHP dispatch. The log and Temporal use the **alias** only
+ * (see {@see WorkflowDefinitionLoader::aliasForTemporalInterop()}).
  *
- * Les factories reçoivent le payload et retournent un callable(WorkflowEnvironment): mixed.
+ * Factories receive the payload and return a callable(WorkflowEnvironment): mixed.
  *
  * @see DUR021 Symfony Messenger integration (distributed resume)
  */
@@ -28,7 +28,7 @@ final class WorkflowRegistry
     ) {}
 
     /**
-     * Enregistre une classe workflow avec #[AsWorkflow] et #[AsWorkflowMethod].
+     * Registers a workflow class carrying #[AsWorkflow] and #[AsWorkflowMethod].
      *
      * @param class-string $workflowClass
      */
@@ -44,9 +44,9 @@ final class WorkflowRegistry
     }
 
     /**
-     * Enregistre une factory inline (pour les tests ou l'enregistrement programmatique).
+     * Registers an inline factory (for tests or programmatic registration).
      *
-     * La factory reçoit le payload de démarrage et retourne un callable(WorkflowEnvironment): mixed.
+     * The factory receives the start payload and returns a callable(WorkflowEnvironment): mixed.
      *
      * @param callable(array<string, mixed>): (callable(WorkflowEnvironment): mixed) $factory
      */

@@ -8,12 +8,11 @@ use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionRuntime;
 
 /**
- * Awaitable lié à une exécution : expose le couple (ExecutionContext, ExecutionRuntime).
+ * An awaitable bound to an execution: exposes the (ExecutionContext, ExecutionRuntime) pair.
  *
- * Les awaitables produits par le moteur (activité, timer, etc.) peuvent implémenter
- * cette interface pour que les composites (ex. CancellingCompositeAwaitable) récupèrent
- * le contexte depuis leurs membres. Aujourd’hui, WorkflowEnvironment fournit le
- * contexte au niveau de l’appel.
+ * The awaitables the engine produces (activity, timer, etc.) may implement this interface so
+ * that composites (e.g. CancellingCompositeAwaitable) recover the context from their members.
+ * Today, WorkflowEnvironment supplies the context at the call level.
  *
  * @extends Awaitable<mixed>
  */

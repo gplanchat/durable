@@ -5,27 +5,26 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Ce qu'un backend a enregistré avec un événement, mis en forme pour être lu — **une fois**.
+ * What a backend recorded along with an event, formatted to be read — **once**.
  *
- * Le contenu est le vocabulaire du backend et n'est **pas** normalisé, à dessein : décider pour
- * chaque backend lesquels de ses faits méritent un nom commun n'a de sens qu'une fois qu'on aura vu
- * ce que les exploitants y cherchent. La contrepartie assumée est qu'un journal maison peut tenir
- * une charge utile qui ne survit pas au rendu, et c'est donc à cet endroit-ci que la dégradation se
- * décide, pour toutes les surfaces à la fois.
+ * The content is the backend's vocabulary and is **not** normalised, by design: deciding, for each
+ * backend, which of its facts deserve a common name only makes sense once we have seen what
+ * operators look for in there. The accepted trade-off is that a homegrown journal may hold a
+ * payload that does not survive rendering, and this is therefore the place where the degradation is
+ * decided, for every surface at once.
  *
- * Elle ne se décidait pas au même endroit : le bloc Magento tolérait la sortie partielle et
- * retombait sur une ligne simple, le gabarit Sylius appelait `json_encode` sans tolérance, récoltait
- * `false` et rendait un **dépliant vide** — précisément l'écran qu'un exploitant ouvre en dernier
- * recours, et qui ne s'ouvre sur rien.
+ * It was not decided in the same place: the Magento block tolerated partial output and fell back to
+ * a plain row, the Sylius template called `json_encode` without tolerance, harvested `false` and
+ * rendered an **empty disclosure panel** — precisely the screen an operator opens as a last resort,
+ * and which opens onto nothing.
  *
- * `null` veut dire « rien à déplier ». En pratique c'est le cas où rien n'a été enregistré : la
- * sortie partielle sauve tout le reste, y compris une valeur d'un type que JSON ne tient pas — elle
- * arrive à `null` dans la charge, et l'exploitant voit à la fois ce qui a été enregistré et ce qui
- * n'a pas pu l'être. L'hôte laisse alors une ligne simple ; rendre une chaîne vide lui retirerait
- * ce choix.
+ * `null` means "nothing to unfold". In practice this is the case where nothing was recorded:
+ * partial output saves all the rest, including a value of a type JSON cannot hold — it comes out as
+ * `null` in the payload, and the operator sees both what was recorded and what could not be. The
+ * host then leaves a plain row; returning an empty string would take that choice away from it.
  *
- * C'est de la mise en forme dans le cœur, comme {@see ReadableDuration}, et pour la même raison :
- * ce que plusieurs hôtes doivent dire pareil se décide en un seul endroit.
+ * This is formatting inside the core, like {@see ReadableDuration}, and for the same reason: what
+ * several hosts must say the same way is decided in a single place.
  */
 final class RecordedDetails
 {
@@ -38,46 +37,44 @@ final class RecordedDetails
             return null;
         }
 
-        // `JSON_PARTIAL_OUTPUT_ON_ERROR` sauve le cas atteignable : une chaîne d'octets qui n'est
-        // pas de l'UTF-8 valide. Sans lui, l'octet fautif emporte toute la charge utile — le reste,
-        // parfaitement lisible, disparaît avec lui.
+        // `JSON_PARTIAL_OUTPUT_ON_ERROR` saves the reachable case: a byte string that is not
+        // valid UTF-8. Without it, the offending byte takes the whole payload with it — the rest,
+        // perfectly readable, disappears along with it.
         $rendered = json_encode(
             $details,
             \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_PARTIAL_OUTPUT_ON_ERROR,
         );
 
-        // Garde défensive, et mesurée avant d'être écrite : avec la sortie partielle, aucune
-        // entrée essayée ne rend `false` — ni un octet invalide, ni une ressource, ni six cents
-        // niveaux d'imbrication, qui rendent tous une sortie tronquée. La signature de PHP
-        // l'autorise pourtant, et une ligne sans dépliant vaut mieux qu'un écran de diagnostic qui
-        // tombe sur l'événement qu'on était venu regarder.
+        // Defensive guard, and measured before being written: with partial output, no input we
+        // tried returns `false` — neither an invalid byte, nor a resource, nor six hundred levels
+        // of nesting, which all return truncated output. PHP's signature allows it nonetheless,
+        // and a row without a disclosure panel is worth more than a diagnostic screen that falls
+        // over on the very event you came to look at.
         return false === $rendered ? null : $rendered;
     }
 
     /**
-     * La même dégradation, rendue en **structure** plutôt qu'en texte.
+     * The same degradation, rendered as **structure** rather than as text.
      *
-     * {@see self::of()} sert les surfaces qui affichent un dépliant : elles veulent du texte, une
-     * fois. Le profileur Symfony, lui, doit *ranger* ce qu'il a observé avant que le Profiler
-     * sérialise le profil entier — une charge utile qui refuse `serialize()` n'y casse pas le
-     * panneau Durable, elle casse le profil de la requête, panneaux des autres bundles compris.
-     * Le besoin est le même à un type près, et la décision de dégradation doit rester ici : c'est
-     * tout l'objet de cette classe.
+     * {@see self::of()} serves the surfaces that show a fold-out: they want text, once. The Symfony
+     * profiler has to *store* what it observed before the Profiler serialises the whole profile, and
+     * a payload that refuses `serialize()` does not break the Durable panel there, it breaks the
+     * request's profile, other bundles' panels included. The need is the same but for a type, and the
+     * degradation decision must stay here: it is what this class is for.
      *
-     * Trois écarts avec `of()`, chacun mesuré :
+     * Three departures from `of()`, each one measured:
      *
-     * - **`json_encode` peut lever.** Il appelle le `jsonSerialize()` de la charge utile, donc du
-     *   code métier. Aucun drapeau ne couvre ce cas, et une exception qui remonte d'ici tue la
-     *   requête depuis `kernel.response` — plus tôt et plus visiblement que le défaut qu'on
-     *   corrigeait. D'où le `catch`.
-     * - **`JSON_PRESERVE_ZERO_FRACTION`** — sans lui, un `float` de valeur entière revient en
-     *   `int` et les bornes de la frise (`tMin`, `tMax`, `spanSec`), qui se déclarent `float`,
-     *   mentent sur leur type.
-     * - **La profondeur.** Au-delà de 512 niveaux, `json_decode` rend `null` là où l'encodage
-     *   avait produit du texte. L'appelant applique donc cette méthode **clé par clé** : la
-     *   charge utile pathologique disparaît seule, le reste du panneau tient.
+     * - **`json_encode` can throw.** It calls the payload's `jsonSerialize()`, so business code. No
+     *   flag covers that case, and an exception surfacing from here kills the request from
+     *   `kernel.response`, earlier and more visibly than the defect being fixed. Hence the `catch`.
+     * - **`JSON_PRESERVE_ZERO_FRACTION`.** Without it a `float` holding a whole value comes back as
+     *   an `int`, and the timeline bounds (`tMin`, `tMax`, `spanSec`), which declare `float`, lie
+     *   about their type.
+     * - **Depth.** Past 512 levels `json_decode` returns `null` where the encoding had produced
+     *   text. The caller therefore applies this method **key by key**: the pathological payload
+     *   disappears on its own, and the rest of the panel holds.
      *
-     * @return mixed la valeur ramenée aux types que JSON tient ; `null` si rien n'a survécu
+     * @return mixed the value brought back to the types JSON holds; `null` when nothing survived
      */
     public static function storable(mixed $value): mixed
     {

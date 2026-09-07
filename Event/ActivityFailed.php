@@ -24,7 +24,7 @@ final readonly class ActivityFailed implements Event
         private array $failurePrevious = [],
         private string $activityName = '',
         private int $failureAttempt = 0,
-        /** Pourquoi les tentatives se sont arrêtées ; null = journal antérieur au discriminant. */
+        /** Why the attempts stopped; null = journal older than the discriminant. */
         private ?ActivityRetryState $retryState = null,
     ) {}
 
@@ -77,7 +77,7 @@ final readonly class ActivityFailed implements Event
     }
 
     /**
-     * Vrai lorsque l'échec est dû à l'épuisement des retentatives (« ActivityStalled »).
+     * True when the failure is due to the retries being exhausted ("ActivityStalled").
      */
     public function isStalled(): bool
     {

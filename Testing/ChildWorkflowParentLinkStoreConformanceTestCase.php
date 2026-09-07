@@ -8,11 +8,11 @@ use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Suite de conformité de {@see ChildWorkflowParentLinkStoreInterface} — DUR041.
+ * Conformance suite for {@see ChildWorkflowParentLinkStoreInterface} — DUR041.
  *
- * Le contrat dit « ordre non garanti » pour les enfants d'un parent. La suite le respecte en triant
- * avant de comparer : figer un ordre que le port ne promet pas ferait échouer un adaptateur correct,
- * ce qui est la façon la plus sûre de rendre une suite de conformité inutilisable.
+ * The contract says "order not guaranteed" for the children of a parent. The suite honours that by
+ * sorting before comparing: freezing an order the port does not promise would fail a correct
+ * adapter, which is the surest way to make a conformance suite unusable.
  *
  * @see DUR041
  */

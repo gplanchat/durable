@@ -10,19 +10,19 @@ use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Délai jusqu’au prochain minuteur non complété (pour {@see \Symfony\Component\Messenger\Stamp\DelayStamp}).
+ * Delay until the next uncompleted timer (for {@see \Symfony\Component\Messenger\Stamp\DelayStamp}).
  */
 /*
- * Descendu du paquet du bundle vers le cœur : il n'importait rien de Symfony — seulement les
- * événements de minuterie et le port du magasin d'événements — et `InMemoryWorkflowRunner`, qui est
- * du cœur, l'appelait. Un hôte sans le bundle prenait donc une erreur fatale à la première reprise
- * qui devait sauter au prochain minuteur, et sous Symfony rien ne se voyait.
+ * Moved down from the bundle package into the core: it imported nothing from Symfony — only the
+ * timer events and the event store port — and `InMemoryWorkflowRunner`, which is core, called it.
+ * A host without the bundle therefore took a fatal error on the first resume that had to jump to
+ * the next timer, and under Symfony nothing showed.
  */
 final class TimerWakeDelayCalculator
 {
     /**
-     * @return int millisecondes jusqu’à {@see TimerScheduled::scheduledAt()} du prochain timer en attente
-     *             (ni complété ni annulé), ou null si aucun
+     * @return int milliseconds until {@see TimerScheduled::scheduledAt()} of the next pending timer
+     *             (neither completed nor cancelled), or null if there is none
      */
     public static function millisecondsUntilNextTimerDue(EventStoreInterface $store, string $executionId, float $nowSeconds): ?int
     {

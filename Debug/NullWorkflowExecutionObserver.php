@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Debug;
 
 /**
- * L'observateur quand personne n'observe.
+ * The observer for when nobody observes.
  *
- * L'observation est optionnelle par contrat, mais les trois services du chemin chaud —
- * {@see \Gplanchat\Durable\ExecutionRuntime}, {@see \Gplanchat\Durable\ExecutionEngine},
- * {@see \Gplanchat\Durable\Worker\ActivityMessageProcessor} — la reçoivent en injection. Il leur
- * faut donc quelqu'un, y compris en production où il n'y a pas de profileur à alimenter.
+ * Observation is optional by contract, but the three services on the hot path,
+ * {@see \Gplanchat\Durable\ExecutionRuntime}, {@see \Gplanchat\Durable\ExecutionEngine} and
+ * {@see \Gplanchat\Durable\Worker\ActivityMessageProcessor}, take one by injection. So they need
+ * somebody, including in production where there is no profiler to feed.
  *
- * Ne rien faire est ici un comportement réel et non un bouche-trou de signature : une exécution
- * que personne ne regarde s'exécute pareil. C'est la même raison qui fait de `Psr\Log\NullLogger`
- * un objet nul légitime.
+ * Doing nothing is a real behaviour here rather than a hole plugged to satisfy a signature: an
+ * execution nobody watches runs the same. It is the same reason that makes `Psr\Log\NullLogger` a
+ * legitimate null object.
  */
 final class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
 {

@@ -12,12 +12,12 @@ use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 
 /**
- * Détecte si le journal contient déjà une issue terminale pour une activité donnée
- * (succès, échec définitif, annulation). Utilisé pour ignorer les redélivrances Messenger
- * ou les doublons de traitement sans dupliquer les événements.
+ * Detects whether the journal already holds a terminal outcome for a given activity
+ * (success, final failure, cancellation). Used to ignore Messenger re-deliveries
+ * or duplicate processing without duplicating the events.
  *
- * {@see \Gplanchat\Durable\Event\ActivityTaskFailed} et un {@see ActivityFailed} en
- * {@see ActivityRetryState::InProgress} ne sont **pas** terminaux : une retentative reste attendue.
+ * {@see \Gplanchat\Durable\Event\ActivityTaskFailed} and an {@see ActivityFailed} in
+ * {@see ActivityRetryState::InProgress} are **not** terminal: a retry is still expected.
  */
 final class ActivityEventJournal
 {
@@ -31,9 +31,9 @@ final class ActivityEventJournal
                 return true;
             }
             if ($event instanceof ActivityFailed && $event->activityId() === $activityId) {
-                // Un échec en `InProgress` est journalisé lorsque le retry est délégué au transport
-                // (serveur Temporal) : la tentative suivante doit réellement s'exécuter, pas être
-                // court-circuitée par cet événement.
+                // A failure in `InProgress` is journalled when the retry is delegated to the
+                // transport (Temporal server): the next attempt must really execute, not be
+                // short-circuited by this event.
                 if (ActivityRetryState::InProgress === $event->retryState()) {
                     continue;
                 }
@@ -52,10 +52,10 @@ final class ActivityEventJournal
     }
 
     /**
-     * Dernière issue terminale journalisée pour une activité, ou null si elle en attend encore une.
+     * The last terminal outcome journalled for an activity, or null if it is still awaiting one.
      *
-     * Prend la **dernière** correspondance : un échec en {@see ActivityRetryState::InProgress} laissé
-     * par une tentative précédente est ainsi supplanté par le succès de la suivante.
+     * Takes the **last** match: a failure in {@see ActivityRetryState::InProgress} left behind by a
+     * previous attempt is thereby superseded by the success of the next one.
      */
     public static function lastTerminalOutcome(
         EventStoreInterface $eventStore,
@@ -80,26 +80,26 @@ final class ActivityEventJournal
     }
 
     /**
-     * L'issue qui tranche **cette livraison-ci**, ou `null` s'il faut exécuter.
+     * The outcome that settles **this very delivery**, or `null` if it has to execute.
      *
-     * ⚠ Cette classe portait déjà deux notions de « terminal » qui se contredisaient.
-     * {@see self::hasTerminalOutcomeForActivity()} sait qu'un `ActivityFailed` en
-     * {@see ActivityRetryState::InProgress} n'est pas terminal — la tentative suivante doit
-     * réellement s'exécuter — mais {@see self::lastTerminalOutcome()} rend le même événement sans
-     * cette réserve. Le worker Temporal interrogeait la seconde **avant** de traiter, pour ne pas
-     * réexécuter une tâche redélivrée : il répondait donc au serveur l'échec de la tentative 1 pour
-     * les tentatives 2 et 3, sans jamais rappeler le code de l'activité. Trois tentatives brûlées
-     * en deux secondes, le même message d'échec recopié, et une panne passagère devenue définitive.
+     * ⚠ This class already carried two notions of "terminal" that contradicted each other.
+     * {@see self::hasTerminalOutcomeForActivity()} knows that an `ActivityFailed` in
+     * {@see ActivityRetryState::InProgress} is not terminal — the next attempt must really
+     * execute — but {@see self::lastTerminalOutcome()} returns the same event without that
+     * reservation. The Temporal worker queried the second one **before** processing, so as not to
+     * re-execute a re-delivered task: it therefore answered the server with attempt 1's failure
+     * for attempts 2 and 3, without ever calling the activity code again. Three attempts burnt in
+     * two seconds, the same failure message copied over, and a transient outage turned final.
      *
-     * Ce qui distingue les deux cas n'est pas la nature de l'issue mais **le rang de la tentative
-     * qui l'a écrite** : une issue écrite pour la tentative en cours est une redélivrance, à
-     * laquelle il faut répondre sans réexécuter ; une issue écrite pour une tentative antérieure
-     * est une reprise, qui doit s'exécuter.
+     * What tells the two cases apart is not the nature of the outcome but **the rank of the
+     * attempt that wrote it**: an outcome written for the attempt under way is a re-delivery, to
+     * be answered without re-executing; an outcome written for an earlier attempt is a resume,
+     * which has to execute.
      *
-     * Une issue autre qu'un échec en cours de reprise est terminale quel que soit son rang : une
-     * activité terminée, annulée ou irrémédiablement cassée ne se rejoue pas. Un `retryState` nul —
-     * journal ancien, politique non renseignée — n'est pas `InProgress` et reste donc terminal :
-     * dans le doute, on ne rejoue pas un effet de bord.
+     * An outcome other than a failure in the middle of a retry is terminal whatever its rank: an
+     * activity that is finished, cancelled or irreparably broken is not replayed. A null
+     * `retryState` — an old journal, a policy left unfilled — is not `InProgress` and therefore
+     * stays terminal: when in doubt, a side effect is not replayed.
      */
     public static function settledOutcomeForDelivery(
         EventStoreInterface $eventStore,

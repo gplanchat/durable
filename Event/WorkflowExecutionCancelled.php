@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Fin d'exécution sur annulation — contrepartie terminale de {@see WorkflowCancellationRequested},
- * qui n'en avait aucune : un enfant en {@see \Gplanchat\Durable\ParentClosePolicy::RequestCancel}
- * restait « actif » pour toujours aux yeux de
+ * End of execution on cancellation — the terminal counterpart of
+ * {@see WorkflowCancellationRequested}, which had none: a child in
+ * {@see \Gplanchat\Durable\ParentClosePolicy::RequestCancel} stayed "active" forever in the eyes of
  * {@see \Gplanchat\Durable\ParentChildWorkflowCoordinator::isChildRunActive()}.
  *
- * ponytail: annulation coopérative, honorée au point de reprise suivant. Aucune exception n'est
- * injectée dans le fiber en cours ; un vrai `CancelledFailure` façon Temporal demanderait de
- * reprendre le fiber par l'exception, pas de le rejouer.
+ * ponytail: cooperative cancellation, honoured at the next resumption point. No exception is
+ * injected into the running fiber; a true Temporal-style `CancelledFailure` would call for
+ * resuming the fiber through the exception, not for replaying it.
  */
 final readonly class WorkflowExecutionCancelled implements Event
 {

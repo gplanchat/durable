@@ -9,14 +9,14 @@ use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException;
 
 /**
- * Les opérations Nexus que ce composant sert.
+ * The Nexus operations this component serves.
  *
- * Une opération est nommée par un couple (service, opération) : c'est ce que porte la tâche de
- * start, et c'est donc la seule clé qui permette de router sans deviner.
+ * An operation is named by a (service, operation) pair: that is what the start task carries, and it
+ * is therefore the only key that allows routing without guessing.
  *
- * Le registre ne poll rien et ne parle à personne. Il répond à une question — « qui sert ceci ? » —
- * et rend ce que le gestionnaire a répondu. La boucle de poll, le gRPC et la traduction des erreurs
- * vivent dans le worker, qui n'a besoin d'aucune de ces trois choses pour être testé.
+ * The registry polls nothing and talks to nobody. It answers one question — "who serves this?" —
+ * and returns what the handler answered. The polling loop, the gRPC and the error translation live
+ * in the worker, which needs none of those three things to be tested.
  */
 final class NexusOperationRegistry
 {
@@ -24,26 +24,26 @@ final class NexusOperationRegistry
     private array $handlers = [];
 
     /**
-     * Les opérations qu'un workflow remplit, déclarées plutôt qu'écrites.
+     * The operations a workflow fulfils, declared rather than written.
      *
-     * @var array<string, string> clé (service, opération) => type de workflow
+     * @var array<string, string> (service, operation) key => workflow type
      */
     private array $fulfilments = [];
 
     /**
-     * Le backend qui refuse, ou `null` quand il sait router.
+     * The backend that refuses, or `null` when it knows how to route.
      *
-     * Le garde est **ici**, dans le cœur, et non seulement dans la passe de compilation du bundle
-     * Symfony : celle-ci n'attrape que Symfony, alors que le module Magento et le pont Illuminate
-     * montent leurs services autrement et n'auraient rien eu. Un hôte qui oublie de garder est
-     * précisément celui dont l'utilisateur découvrira le silence en production.
+     * The guard is **here**, in the core, and not only in the Symfony bundle's compiler pass: that
+     * one only catches Symfony, whereas the Magento module and the Illuminate bridge wire their
+     * services differently and would have had nothing. A host that forgets to guard is precisely
+     * the one whose user will discover the silence in production.
      */
     private function __construct(
         private readonly ?string $refusingBackend,
     ) {}
 
     /**
-     * Un backend qui sait router une opération Nexus vers l'endpoint qui la sert.
+     * A backend that knows how to route a Nexus operation to the endpoint that serves it.
      */
     public static function routedBy(string $backend): self
     {
@@ -53,7 +53,7 @@ final class NexusOperationRegistry
     }
 
     /**
-     * Un backend qui n'a aucune route, et le dit dès qu'on lui déclare un gestionnaire.
+     * A backend that has no route at all, and says so as soon as a handler is declared on it.
      */
     public static function unavailableOn(string $backend): self
     {
@@ -80,11 +80,11 @@ final class NexusOperationRegistry
     }
 
     /**
-     * Déclare qu'un workflow remplit une opération : son résultat deviendra celui de l'opération.
+     * Declares that a workflow fulfils an operation: its result will become the operation's.
      *
-     * Il n'y a pas de gestionnaire à appeler, et pas de corps à écrire. Le worker démarre ce
-     * workflow avec le `callback` de la tâche attaché, et le serveur livre son résultat à
-     * l'appelant — c'est ce que la sonde §3.1 a mesuré, et le jeton n'y est qu'un identifiant.
+     * There is no handler to call, and no body to write. The worker starts that workflow with the
+     * task's `callback` attached, and the server delivers its result to the caller — that is what
+     * probe §3.1 measured, and the token there is only an identifier.
      */
     public function registerFulfilment(NexusService $service, NexusOperationName $operation, string $workflowType): void
     {
@@ -100,7 +100,7 @@ final class NexusOperationRegistry
     }
 
     /**
-     * @throws NexusOperationNotHandledException si aucun gestionnaire n'est déclaré
+     * @throws NexusOperationNotHandledException if no handler is declared
      */
     public function dispatch(NexusService $service, NexusOperationName $operation, mixed $payload): NexusOperationResponse
     {
@@ -108,8 +108,8 @@ final class NexusOperationRegistry
 
         $workflowType = $this->fulfilments[$key] ?? null;
         if (null !== $workflowType) {
-            // Déclarée plutôt qu'écrite : la charge de l'appelant devient l'entrée du workflow,
-            // telle quelle. Aucun gestionnaire n'est appelé, et il n'y en a pas à écrire.
+            // Declared rather than written: the caller's payload becomes the workflow's input, as
+            // it stands. No handler is called, and there is none to write.
             return NexusOperationResponse::fulfilledByWorkflow($workflowType, \is_array($payload) ? $payload : ['payload' => $payload]);
         }
 
@@ -123,9 +123,9 @@ final class NexusOperationRegistry
 
     private static function key(NexusService $service, NexusOperationName $operation): string
     {
-        // Le séparateur est un octet que ni un nom de service ni un nom d'opération ne peut
-        // contenir — les deux sont validés à la construction. Un simple point laisserait
-        // ("a.b", "c") et ("a", "b.c") se confondre.
+        // The separator is a byte that neither a service name nor an operation name can contain —
+        // both are validated at construction. A plain dot would let ("a.b", "c") and ("a", "b.c")
+        // be confused with one another.
         return $service->name() . "\0" . $operation->name();
     }
 }

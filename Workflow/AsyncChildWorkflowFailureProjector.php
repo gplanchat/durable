@@ -9,8 +9,8 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Projette l’échec d’un enfant async sur {@see ChildWorkflowFailed} en s’appuyant sur le journal enfant
- * ({@see WorkflowExecutionFailed}) lorsqu’il est présent.
+ * Projects an async child's failure onto {@see ChildWorkflowFailed}, relying on the child journal
+ * ({@see WorkflowExecutionFailed}) when it is present.
  */
 final class AsyncChildWorkflowFailureProjector
 {
