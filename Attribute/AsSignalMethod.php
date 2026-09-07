@@ -11,7 +11,7 @@ final class AsSignalMethod
         public readonly \BackedEnum|string $name,
     ) {}
 
-    /** Le nom tel qu'il voyage : sur le fil, un signal est une chaîne. */
+    /** The name as it travels: on the wire, a signal is a string. */
     public function signalName(): string
     {
         return $this->name instanceof \BackedEnum ? (string) $this->name->value : $this->name;

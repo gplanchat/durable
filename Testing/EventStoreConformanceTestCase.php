@@ -37,32 +37,32 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Suite de conformité d'{@see EventStoreInterface} — DUR041.
+ * Conformance suite for {@see EventStoreInterface} — DUR041.
  *
- * Un adaptateur prouve qu'il implémente le port en étendant cette classe et en rendant un store
- * neuf depuis {@see createEventStore()}. La référence, c'est
- * {@see \Gplanchat\Durable\Store\InMemoryEventStore}, et elle rejoue la suite elle aussi : une
- * référence qu'on ne vérifie pas est une définition, pas une garde.
+ * An adapter proves it implements the port by extending this class and returning a fresh store
+ * from {@see createEventStore()}. The reference is
+ * {@see \Gplanchat\Durable\Store\InMemoryEventStore}, and it replays the suite too: a reference
+ * nobody checks is a definition, not a guard.
  *
- * Ce que la suite garde, c'est la panne qui ne se voit pas à l'écriture. Un aller-retour qui
- * déforme un payload ne casse rien au moment de `append()` ; il casse le replay, plus tard, sur une
- * exécution qui reprend et lit autre chose que ce qu'elle avait écrit.
+ * What the suite guards is the failure that does not show at write time. A round trip that distorts
+ * a payload breaks nothing at `append()` time; it breaks the replay, later, on an execution that
+ * resumes and reads something other than what it had written.
  *
- * ponytail: pas de fabrique d'événements paramétrable — la liste de {@see mappedEventFixtures()}
- * est en dur, et {@see testEveryEventTypeIsCoveredOrExplicitlyExcluded} la tient à jour à la place
- * d'une convention que personne ne relit.
+ * ponytail: no parameterizable event factory — the list in {@see mappedEventFixtures()} is
+ * hardcoded, and {@see testEveryEventTypeIsCoveredOrExplicitlyExcluded} keeps it up to date in
+ * place of a convention nobody rereads.
  *
  * @see DUR041
  */
 abstract class EventStoreConformanceTestCase extends TestCase
 {
     /**
-     * Un store vide, prêt à recevoir. Appelée une fois par cas.
+     * An empty store, ready to receive. Called once per case.
      */
     abstract protected function createEventStore(): EventStoreInterface;
 
     // -----------------------------------------------------------------------------------------
-    // Les cas
+    // The cases
     // -----------------------------------------------------------------------------------------
 
     public function testAStreamComesBackInInsertionOrder(): void
@@ -79,9 +79,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
     }
 
     /**
-     * Le cas central. La comparaison passe par l'enregistrement plutôt que par l'objet : c'est
-     * l'enregistrement qui traverse le stockage, et deux instances égales ne prouvent rien si la
-     * forme sur disque a bougé sous elles.
+     * The central case. The comparison goes through the record rather than the object: it is the
+     * record that travels through the storage, and two equal instances prove nothing if the shape
+     * on disk moved under them.
      */
     public function testEveryMappedEventTypeSurvivesTheRoundTrip(): void
     {
@@ -94,21 +94,21 @@ abstract class EventStoreConformanceTestCase extends TestCase
 
         $readBack = iterator_to_array($store->readStream('exec-fidelity'), false);
 
-        self::assertCount(\count($fixtures), $readBack, 'le flux doit rendre autant d\'événements qu\'il en a reçu');
+        self::assertCount(\count($fixtures), $readBack, 'the stream must return as many events as it was given');
 
         foreach (array_values($fixtures) as $index => $original) {
             self::assertSame(
                 EventDataMapper::fromDomainEvent($original),
                 EventDataMapper::fromDomainEvent($readBack[$index]),
-                \sprintf('%s ne survit pas à l\'aller-retour', $original::class),
+                \sprintf('%s does not survive the round trip', $original::class),
             );
         }
     }
 
     /**
-     * Le store DBAL rend un générateur adossé à une requête, le store in-memory un tableau. Les
-     * deux moitiés comptent : une passe suffit, **et** un second appel repart du début. C'est la
-     * seconde qu'un adaptateur rate — un générateur mémorisé une fois ne rejoue pas.
+     * The DBAL store returns a generator backed by a query, the in-memory store an array. Both
+     * halves count: one pass is enough, **and** a second call starts again from the beginning. It
+     * is the second one an adapter misses — a generator memoized once does not replay.
      */
     public function testAStreamIsConsumableOnceAndRestartsOnTheNextCall(): void
     {
@@ -121,7 +121,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $second = self::classesOf($store->readStream('exec-passes'));
 
         self::assertNotSame([], $first);
-        self::assertSame($first, $second, 'relire le flux doit rendre la même chose, pas rien');
+        self::assertSame($first, $second, 'reading the stream again must return the same thing, not nothing');
     }
 
     public function testAPartiallyConsumedStreamDoesNotDisturbTheNextRead(): void
@@ -132,7 +132,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         }
 
         foreach ($store->readStream('exec-partial') as $ignored) {
-            break; // on abandonne le flux au premier élément
+            break; // abandon the stream on its first element
         }
 
         self::assertSame(
@@ -165,14 +165,14 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store = $this->createEventStore();
         $fixtures = self::mappedEventFixtures('exec-count');
 
-        self::assertSame(0, $store->countEventsInStream('exec-count'), 'un flux vide compte zéro');
+        self::assertSame(0, $store->countEventsInStream('exec-count'), 'an empty stream counts zero');
 
         foreach (array_values($fixtures) as $index => $event) {
             $store->append($event);
             self::assertSame(
                 $index + 1,
                 $store->countEventsInStream('exec-count'),
-                'le compte doit suivre chaque écriture',
+                'the count must follow every write',
             );
         }
 
@@ -183,8 +183,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
     }
 
     /**
-     * `recordedAt` est nullable par contrat — le store in-memory ne date rien. La suite garde donc
-     * la **forme** et l'ordre, pas une valeur.
+     * `recordedAt` is nullable by contract — the in-memory store dates nothing. So the suite guards
+     * the **shape** and the order, not a value.
      */
     public function testRecordedAtYieldsTheSameEventsInTheSameOrder(): void
     {
@@ -220,9 +220,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
     }
 
     /**
-     * La garde que DUR041 laisse derrière lui : une suite ne prouve que ce qu'on lui apprend à
-     * demander. Ajouter un type d'événement sans le ranger d'un côté ou de l'autre échoue ici,
-     * plutôt que d'élargir le journal sans élargir la garde.
+     * The guard DUR041 leaves behind: a suite only proves what it is taught to ask. Adding an event
+     * type without filing it on one side or the other fails here, rather than widening the journal
+     * without widening the guard.
      */
     public function testEveryEventTypeIsCoveredOrExplicitlyExcluded(): void
     {
@@ -230,7 +230,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         foreach (glob(__DIR__ . '/../Event/*.php') ?: [] as $file) {
             $short = basename($file, '.php');
             if ('Event' === $short) {
-                continue; // l'interface elle-même
+                continue; // the interface itself
             }
             $declared[] = 'Gplanchat\\Durable\\Event\\' . $short;
         }
@@ -245,7 +245,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         self::assertSame(
             $declared,
             $accounted,
-            'un type d\'événement doit avoir une fixture, ou figurer dans eventTypesOutsideTheJournal()',
+            'an event type must have a fixture, or be listed in eventTypesOutsideTheJournal()',
         );
     }
 
@@ -254,18 +254,18 @@ abstract class EventStoreConformanceTestCase extends TestCase
     // -----------------------------------------------------------------------------------------
 
     /**
-     * Un exemplaire de chaque type que {@see EventDataMapper} sait relire, avec des payloads
-     * volontairement non scalaires : c'est là qu'un aller-retour JSON déforme.
+     * One instance of each type that {@see EventDataMapper} can read back, with deliberately
+     * non-scalar payloads: that is where a JSON round trip distorts.
      *
-     * @return array<class-string<Event>, Event> indexé par classe, pour que la garde de couverture
-     *                                           lise les clés
+     * @return array<class-string<Event>, Event> indexed by class, so that the coverage guard reads
+     *                                           the keys
      */
     final protected static function mappedEventFixtures(string $executionId): array
     {
-        // Les valeurs qui traversent mal un aller-retour JSON, réunies là où elles servent : une
-        // référence SKU à zéro initial et un entier au-delà de PHP_INT_MAX ne survivent pas à un
-        // `JSON_NUMERIC_CHECK` ni à un cast naïf, et c'est la panne que le replay ne verra qu'après
-        // coup. Une mutation qui déforme le payload doit échouer ici.
+        // The values that travel badly through a JSON round trip, gathered where they are used: a
+        // SKU reference with a leading zero and an integer beyond PHP_INT_MAX do not survive a
+        // `JSON_NUMERIC_CHECK` nor a naive cast, and that is the failure the replay will only see
+        // after the fact. A mutation that distorts the payload must fail here.
         $nested = [
             'deep' => ['ratio' => 0.125, 'flags' => [true, false], 'label' => 'é✓ "quoted" \\ backslash'],
             'n' => 3,
@@ -353,9 +353,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
     }
 
     /**
-     * Les types que le journal ne porte pas. Nexus est servi côté appelant seulement (DUR036) : ces
-     * événements naissent de l'historique Temporal, `EventDataMapper` ne les relit pas, et un
-     * journal SQL n'en verra jamais. Les exclure ici est une décision écrite, pas un oubli.
+     * The types the journal does not carry. Nexus is served on the caller side only (DUR036): these
+     * events are born from the Temporal history, `EventDataMapper` does not read them back, and an
+     * SQL journal will never see any. Excluding them here is a written decision, not an oversight.
      *
      * @return list<class-string<Event>>
      */

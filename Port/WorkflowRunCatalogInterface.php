@@ -11,48 +11,48 @@ use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
 /**
- * Lecture seule : quelles exécutions existent, et ce qu'elles sont devenues.
+ * Read-only: which executions exist, and what became of them.
  *
- * Le composant n'avait aucune surface de listage — {@see \Gplanchat\Durable\Store\EventStoreInterface}
- * ne lit qu'un flux par id d'exécution, {@see \Gplanchat\Durable\Store\WorkflowMetadataStore} qu'une
- * exécution à la fois. Un tableau de bord lit en travers des exécutions ; c'est un autre besoin, et
- * ce port est là pour qu'il ne soit pas servi en parlant gRPC ou SQL depuis la vue.
+ * The component had no listing surface at all — {@see \Gplanchat\Durable\Store\EventStoreInterface}
+ * only reads one stream per execution id, {@see \Gplanchat\Durable\Store\WorkflowMetadataStore} one
+ * execution at a time. A dashboard reads across executions; that is another need, and this port is
+ * here so that it is not served by speaking gRPC or SQL from the view.
  *
- * Les implémentations rendent des {@see \Gplanchat\Durable\Observation\WorkflowRunDescription} : ce
- * que le backend sait dire, et rien qu'il ne saurait pas.
+ * Implementations return {@see \Gplanchat\Durable\Observation\WorkflowRunDescription}: what the
+ * backend can say, and nothing it could not.
  */
 interface WorkflowRunCatalogInterface
 {
     /**
-     * Une page d'exécutions, de la plus récemment démarrée à la plus ancienne.
+     * A page of executions, from the most recently started to the oldest.
      *
-     * @param WorkflowRunStatus|null $status `null` pour toutes les issues
-     * @param string|null            $cursor `nextCursor` d'une page précédente, obtenu du même
-     *                                       catalogue et avec le même filtre ; `null` pour la
-     *                                       première page
+     * @param WorkflowRunStatus|null $status `null` for every outcome
+     * @param string|null            $cursor `nextCursor` of a previous page, obtained from the
+     *                                       same catalog and with the same filter; `null` for the
+     *                                       first page
      */
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
 
     /**
-     * L'historique enregistré d'une exécution, dans l'ordre où il a été enregistré.
+     * The recorded history of an execution, in the order it was recorded.
      *
-     * Prend la **description** et non l'identifiant seul : Temporal exige le workflow id en plus du
-     * run id pour retrouver une histoire, et il vit dans `groupId`. Un port qui ne passerait que
-     * l'identifiant obligerait l'appelant à le retrouver par ses propres moyens, c'est-à-dire à
-     * savoir de quel backend il parle.
+     * Takes the **description** and not the identifier alone: Temporal demands the workflow id on
+     * top of the run id to retrieve a history, and it lives in `groupId`. A port that passed only
+     * the identifier would force the caller to retrieve it by its own means, that is, to know
+     * which backend it is talking about.
      *
-     * Une exécution inconnue rend une liste vide : une exécution purgée, ou jamais vue, n'est pas
-     * une erreur d'appel — la vue doit pouvoir l'afficher sans rien avoir à rattraper.
+     * An unknown execution returns an empty list: an execution that was purged, or never seen, is
+     * not a call error — the view must be able to display it with nothing to catch up on.
      *
      * @return list<WorkflowRunEvent>
      */
     public function readHistory(WorkflowRunDescription $run): array;
 
     /**
-     * Le backend répond-il, maintenant.
+     * Whether the backend answers, right now.
      *
-     * Ne lève jamais : une sonde qui échoue est un diagnostic, pas une panne de l'appelant. La page
-     * doit pouvoir afficher « injoignable » plutôt que rendre une erreur cinq-cents.
+     * Never throws: a probe that fails is a diagnosis, not a failure of the caller. The page must
+     * be able to display "unreachable" rather than return a five-hundred error.
      */
     public function checkHealth(): BackendHealth;
 }

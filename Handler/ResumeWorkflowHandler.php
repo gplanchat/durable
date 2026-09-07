@@ -23,11 +23,11 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 use Gplanchat\Durable\WorkflowRegistry;
 
 /*
- * Descendu du paquet du bundle vers le cœur. Ce n'était pas un adaptateur d'hôte : sur 138 lignes,
- * quinze imports venaient du cœur et six de Symfony, ces six-là ne servant qu'à deux choses — un
- * identifiant v7, que `ExecutionId` fabrique déjà, et le réveil des minuteries, qui est désormais
- * un port. Six hôtes du sélecteur ne passent pas par le bundle ; les y laisser aurait voulu dire
- * autant de copies de la sémantique de reprise, divergentes à la première correction.
+ * Moved down from the bundle package into the core. This was not a host adapter: over 138 lines,
+ * fifteen imports came from the core and six from Symfony, and those six served only two things —
+ * a v7 identifier, which `ExecutionId` already makes, and the timer wake-up, which is now a port.
+ * Six hosts of the selector do not go through the bundle; leaving it there would have meant as
+ * many copies of the resume semantics, divergent at the first fix.
  */
 final class ResumeWorkflowHandler
 {
@@ -94,8 +94,8 @@ final class ResumeWorkflowHandler
 
             return;
         } catch (WorkflowCancelledException $e) {
-            // Terminaison normale : ne pas relancer la reprise, sinon l'annulation serait
-            // redélivrée indéfiniment. Le parent est notifié comme pour un échec.
+            // Normal termination: do not dispatch the resume again, otherwise the cancellation
+            // would be redelivered indefinitely. The parent is notified as for a failure.
             $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);
             $this->metadataStore->delete($executionId);
 

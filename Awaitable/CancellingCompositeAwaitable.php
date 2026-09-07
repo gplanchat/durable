@@ -8,12 +8,12 @@ use Gplanchat\Durable\ActivityCancellationReason;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Une fois le composite réglé, retire de la file les branches qui n'ont plus d'objet.
+ * Once the composite is settled, takes the branches that no longer have a purpose off the queue.
  *
- * S'applique à toute forme de course — le premier arrivé d'un {@see AnyAwaitable}, comme le
- * quorum d'un {@see QuorumAwaitable} : dans les deux cas des branches restent en vol alors que
- * le verdict est acquis, et rien ne viendra les réclamer. Best effort : si le transport ne le
- * permet pas, ou si l'activité a déjà été consommée, on n'insiste pas.
+ * Applies to any form of race — the first to arrive in an {@see AnyAwaitable}, as much as the
+ * quorum of a {@see QuorumAwaitable}: in both cases branches stay in flight while the verdict is
+ * already in, and nothing will come to claim them. Best effort: if the transport does not allow
+ * it, or if the activity has already been consumed, we do not insist.
  *
  * @implements Awaitable<mixed>
  */
@@ -42,9 +42,9 @@ final class CancellingCompositeAwaitable implements Awaitable
 
     public function getResult(): mixed
     {
-        // Le verdict doit être acquis avant d'annuler quoi que ce soit : sur un composite non
-        // réglé, getResult() relève, et les branches encore en course sont la seule chance que
-        // l'attente a de se régler.
+        // The verdict must be in before cancelling anything at all: on an unsettled composite,
+        // getResult() throws, and the branches still in the race are the only chance the wait
+        // has of settling.
         if (!$this->inner->isSettled()) {
             return $this->inner->getResult();
         }

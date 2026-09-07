@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Prédicats structurels sur un awaitable, partagés par les points qui décident du réveil.
+ * Structural predicates on an awaitable, shared by the points that decide on the wake-up.
  */
 final class AwaitableInspector
 {
     private function __construct() {}
 
     /**
-     * L'attente porte-t-elle (au moins en partie) sur un minuteur ?
+     * Does the wait bear (at least in part) on a timer?
      *
-     * Doit traverser les composites ({@see CompositeAwaitable}) : un `any(activity, timer)`
-     * attend bien une échéance, et le tester par un simple `instanceof TimerAwaitable` laissait
-     * l'exécution sans réveil planifié — elle ne repartait jamais si l'activité n'aboutissait
-     * pas.
+     * Must walk through the composites ({@see CompositeAwaitable}): an `any(activity, timer)`
+     * does wait on a deadline, and testing it with a plain `instanceof TimerAwaitable` left the
+     * execution with no wake-up scheduled — it never started again if the activity did not
+     * succeed.
      *
      * @param Awaitable<mixed> $awaitable
      */
@@ -43,10 +43,10 @@ final class AwaitableInspector
     }
 
     /**
-     * Nomme la condition sur laquelle porte l'attente, s'il y en a une.
+     * Names the condition the wait bears on, if there is one.
      *
-     * Sert au diagnostic : une exécution qu'aucun message ne peut plus faire avancer doit dire
-     * *laquelle* de ses conditions ne peut pas devenir vraie, pas seulement qu'elle est bloquée.
+     * Serves the diagnostic: an execution that no message can move forward any more must say
+     * *which* of its conditions cannot become true, not merely that it is stuck.
      *
      * @param Awaitable<mixed> $awaitable
      */

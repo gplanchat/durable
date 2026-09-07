@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Un awaitable qui en assemble d'autres.
+ * An awaitable that assembles others.
  *
- * Deux endroits du moteur ont besoin de traverser un assemblage plutôt que de le regarder de
- * l'extérieur : {@see AwaitableInspector::waitsOnTimer()}, qui décide si un réveil doit être
- * planifié, et {@see AwaitableCancellation}, qui doit atteindre les feuilles pour les retirer de
- * la file. Les deux le faisaient par une chaîne de `instanceof` sur les composites connus ; il
- * suffisait d'en ajouter un pour que ses membres cessent silencieusement d'être vus — une
- * exécution sans réveil, ou une activité orpheline. Voir ADR DUR033.
+ * Two places in the engine need to walk an assembly rather than look at it from the outside:
+ * {@see AwaitableInspector::waitsOnTimer()}, which decides whether a wake-up must be scheduled,
+ * and {@see AwaitableCancellation}, which has to reach the leaves to take them off the queue.
+ * Both did it through a chain of `instanceof` over the known composites; adding one was enough
+ * for its members to stop being seen, silently — an execution with no wake-up, or an orphaned
+ * activity. See ADR DUR033.
  *
  * @template TValue
  *

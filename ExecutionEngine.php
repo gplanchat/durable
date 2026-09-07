@@ -31,7 +31,7 @@ final class ExecutionEngine
     ) {}
 
     /**
-     * @param array<string, mixed> $executionStartedPayloadExtras Fusionnés dans le payload {@see ExecutionStarted} (ex. bootstrap interpréteur Temporal).
+     * @param array<string, mixed> $executionStartedPayloadExtras Merged into the {@see ExecutionStarted} payload (e.g. Temporal interpreter bootstrap).
      */
     public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
@@ -66,8 +66,8 @@ final class ExecutionEngine
     }
 
     /**
-     * Reprend une exécution suspendue. N'ajoute pas ExecutionStarted.
-     * Utilisé après WorkflowSuspendedException lorsque les activités ont été exécutées.
+     * Resumes a suspended execution. Does not append ExecutionStarted.
+     * Used after WorkflowSuspendedException once the activities have run.
      */
     public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {

@@ -26,8 +26,8 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
 
 /**
- * Le bundle Symfony enregistre toujours la suspension sur await non résolu (6ᵉ argument à true).
- * Les tests peuvent passer false pour simuler un drain synchrone dans le même processus.
+ * The Symfony bundle always registers suspension on an unresolved await (6th argument set to true).
+ * Tests can pass false to simulate a synchronous drain within the same process.
  */
 final class ExecutionRuntime
 {
@@ -37,8 +37,8 @@ final class ExecutionRuntime
     private ?ActivityMessageProcessor $activityMessageProcessor = null;
 
     /**
-     * Budget de temps du drain synchrone : c'est un harnais en ligne, pas un worker — il ne peut
-     * pas dormir indéfiniment sur le backoff d'une activité qui échoue toujours.
+     * Time budget of the synchronous drain: this is an inline harness, not a worker — it cannot
+     * sleep forever on the backoff of an activity that always fails.
      */
     public const DEFAULT_DRAIN_BUDGET_SECONDS = 5.0;
 
@@ -115,7 +115,7 @@ final class ExecutionRuntime
     }
 
     /**
-     * Horloge utilisée par {@see checkTimers()} et par le calcul de délai Messenger pour les minuteurs.
+     * Clock used by {@see checkTimers()} and by the Messenger delay computation for timers.
      */
     public function nowSeconds(): float
     {
@@ -123,16 +123,16 @@ final class ExecutionRuntime
     }
 
     /**
-     * Exécute **une** tentative d'activité en ligne, puis règle l'awaitable du contexte.
+     * Runs **one** activity attempt inline, then settles the context's awaitable.
      *
-     * Le travail lui-même est délégué à {@see ActivityMessageProcessor}, le même que le worker
-     * Messenger : timeouts, marqueurs worker, politique de retry et annulation par heartbeat
-     * étaient auparavant absents de ce chemin, si bien que le harness de test public
-     * ({@see \Gplanchat\Durable\Testing\WorkflowTestEnvironment}) ne reproduisait pas le
-     * comportement de production. Seule la résolution de l'awaitable reste ici : elle n'existe
-     * que dans le drain en ligne, où le fiber du workflow vit dans le même processus.
+     * The work itself is delegated to {@see ActivityMessageProcessor}, the same one the
+     * Messenger worker uses: timeouts, worker markers, retry policy and heartbeat cancellation
+     * used to be absent from this path, so that the public test harness
+     * ({@see \Gplanchat\Durable\Testing\WorkflowTestEnvironment}) did not reproduce
+     * production behaviour. Only settling the awaitable stays here: it exists only in the
+     * inline drain, where the workflow fiber lives in the same process.
      *
-     * @return bool false si la file n'avait aucun message prêt
+     * @return bool false when the queue had no ready message
      */
     public function drainActivityQueueOnce(ExecutionContext $context): bool
     {
@@ -163,7 +163,7 @@ final class ExecutionRuntime
                 $context->rejectActivity($message->activityId, new ActivitySupersededException($message->activityId, $outcome->reason()));
                 break;
             default:
-                // Aucune issue terminale : une retentative est en file, on la traitera au tour suivant.
+                // No terminal outcome: a retry is queued, it will be handled on the next round.
                 break;
         }
 
@@ -184,24 +184,24 @@ final class ExecutionRuntime
     }
 
     /**
-     * Draine la file jusqu'à épuisement, **retentatives différées comprises**.
+     * Drains the queue until it is exhausted, **deferred retries included**.
      *
-     * `isEmpty()` ne signale que l'absence de message *prêt* : boucler dessus concluait « plus
-     * rien à faire » alors qu'une retentative était planifiée quelques secondes plus tard, si
-     * bien que la politique de retry ne s'appliquait pas du tout dans le harness de test.
+     * `isEmpty()` only reports the absence of a *ready* message: looping on it concluded
+     * "nothing left to do" while a retry was scheduled a few seconds later, so that the retry
+     * policy did not apply at all in the test harness.
      *
-     * ponytail: le backoff est attendu pour de vrai — ce drain est synchrone et dans le même
-     * processus. Une horloge virtuelle partagée avec le transport permettrait de l'avancer.
+     * ponytail: the backoff is waited out for real — this drain is synchronous and in the same
+     * process. A virtual clock shared with the transport would allow moving it forward.
      */
     public function runUntilIdle(ExecutionContext $context, ?float $budgetSeconds = null): void
     {
         $deadline = microtime(true) + ($budgetSeconds ?? self::DEFAULT_DRAIN_BUDGET_SECONDS);
 
         while (null !== ($dueAt = $this->activityTransport->nextDueAt())) {
-            // Les tentatives sont illimitées par défaut (sémantique Temporal) : une activité
-            // durablement en échec ferait tourner ce drain sans fin. En production le transport
-            // Messenger rend la main entre deux tentatives ; ici on s'arrête, et l'appelant
-            // signale une exécution qui n'avance plus.
+            // Attempts are unlimited by default (Temporal semantics): an activity that keeps
+            // failing would spin this drain forever. In production the Messenger transport
+            // hands control back between two attempts; here we stop, and the caller reports an
+            // execution that is no longer moving.
             if ($dueAt > $deadline || microtime(true) >= $deadline) {
                 return;
             }
@@ -222,10 +222,10 @@ final class ExecutionRuntime
     }
 
     /**
-     * Timer : {@see ResumeWorkflowHandler} envoie {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (pas un resume direct).
-     * Activité : faux — {@see ActivityMessageProcessor} appelle {@see \Gplanchat\Durable\Port\WorkflowResumeDispatcher::dispatchResume}
-     * à la fin de l’activité ; un {@code dispatchResume} depuis le handler workflow avec transport **sync/in-memory** bouclerait à l’infini.
-     * Signal / update : seuls {@see DeliverWorkflowSignalHandler} etc. doivent relancer.
+     * Timer: {@see ResumeWorkflowHandler} sends {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (not a direct resume).
+     * Activity: false — {@see ActivityMessageProcessor} calls {@see \Gplanchat\Durable\Port\WorkflowResumeDispatcher::dispatchResume}
+     * at the end of the activity; a {@code dispatchResume} from the workflow handler with a **sync/in-memory** transport would loop forever.
+     * Signal / update: only {@see DeliverWorkflowSignalHandler} and friends must trigger a resume.
      *
      * @param Awaitable<mixed> $awaitable
      */

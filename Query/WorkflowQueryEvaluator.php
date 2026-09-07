@@ -12,15 +12,15 @@ use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Lectures « query » côté client : sans exécuter le code workflow, à partir du journal seul.
+ * Client-side "query" reads: without running the workflow code, from the journal alone.
  *
- * Les queries synchrones Temporal ne mutent pas l’historique ; ce service expose des projections
- * courantes pour l’observabilité et les tests.
+ * Temporal's synchronous queries do not mutate the history; this service exposes common
+ * projections for observability and tests.
  */
 final class WorkflowQueryEvaluator
 {
     /**
-     * Dernier résultat {@see ExecutionCompleted} présent dans le flux (null si aucun).
+     * Last {@see ExecutionCompleted} result present in the stream (null if there is none).
      */
     public static function lastExecutionResult(EventStoreInterface $store, string $executionId): mixed
     {

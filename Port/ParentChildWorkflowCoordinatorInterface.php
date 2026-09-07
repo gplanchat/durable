@@ -7,7 +7,7 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\ParentClosureReason;
 
 /**
- * Applique les politiques parent → enfant après fermeture du workflow parent.
+ * Applies the parent → child policies after the parent workflow closes.
  */
 interface ParentChildWorkflowCoordinatorInterface
 {

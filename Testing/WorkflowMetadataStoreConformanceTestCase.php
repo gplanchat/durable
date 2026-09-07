@@ -8,13 +8,13 @@ use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Suite de conformité de {@see WorkflowMetadataStore} — DUR041.
+ * Conformance suite for {@see WorkflowMetadataStore} — DUR041.
  *
- * Ce port a une subtilité qui vaut une suite à elle seule : `markCompleted()` **ne supprime pas**.
- * Le type et le payload restent lisibles après le succès pour le profiler et l'observabilité, et
- * c'est `hasActiveWorkflowMetadata()` — pas `get()` — qui dit si une reprise doit encore avoir
- * lieu. Un adaptateur qui confond les deux rend un workflow terminé éternellement reprenable, ou
- * fait disparaître son type d'un tableau de bord.
+ * This port has a subtlety worth a suite of its own: `markCompleted()` **does not delete**. The
+ * type and the payload stay readable after success, for the profiler and for observability, and it
+ * is `hasActiveWorkflowMetadata()` — not `get()` — that says whether a resume must still take
+ * place. An adapter that confuses the two makes a finished workflow forever resumable, or makes its
+ * type disappear from a dashboard.
  *
  * @see DUR041
  * @see DUR021
@@ -33,7 +33,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
 
         self::assertNotNull($stored);
         self::assertSame('App\\OrderWorkflow', $stored['workflowType']);
-        self::assertSame($payload, $stored['payload'], 'le payload doit traverser le stockage intact');
+        self::assertSame($payload, $stored['payload'], 'the payload must cross the storage intact');
     }
 
     public function testAnUnknownExecutionIsNullAndInactiveRatherThanAnError(): void
@@ -53,7 +53,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     }
 
     /**
-     * Le cœur du port : terminer rend inactif **sans** effacer.
+     * The core of the port: completing makes it inactive **without** erasing it.
      */
     public function testCompletingLeavesTheRowReadableAndStopsItBeingActive(): void
     {
@@ -62,10 +62,10 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
 
         $store->markCompleted('exec-1');
 
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'), 'une exécution terminée ne se reprend plus');
+        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'), 'a finished execution is not resumable any more');
 
         $stored = $store->get('exec-1');
-        self::assertNotNull($stored, 'terminer ne supprime pas : le profiler lit encore le type');
+        self::assertNotNull($stored, 'completing does not delete: the profiler still reads the type');
         self::assertSame('App\\OrderWorkflow', $stored['workflowType']);
         self::assertSame(['input' => 'kept'], $stored['payload']);
     }
@@ -104,7 +104,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
         self::assertSame(['v' => 2], $stored['payload']);
         self::assertTrue(
             $store->hasActiveWorkflowMetadata('exec-1'),
-            'réécrire les métadonnées repart d\'une exécution reprenable',
+            'writing the metadata again starts from a resumable execution',
         );
     }
 

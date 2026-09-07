@@ -57,8 +57,8 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
                 $completedResults[$event->activityId()] = $event->result();
             }
             if ($event instanceof ActivityFailed) {
-                // Un échec `InProgress` (retry délégué au serveur Temporal) n'est pas terminal :
-                // il ne doit pas régler le slot d'activité au replay.
+                // An `InProgress` failure (retry delegated to the Temporal server) is not
+                // terminal: it must not settle the activity slot on replay.
                 if (ActivityRetryState::InProgress !== $event->retryState()) {
                     $failedByActivityId[$event->activityId()] = DurableActivityFailedException::toThrowable($event);
                 }
@@ -116,14 +116,65 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
             if ($event instanceof ActivityScheduled) {
                 if ($index === $slot) {
-                    // Une chaîne vide n'est pas un nom : c'est « rien d'enregistré ». Le port
-                    // promet null dans ce cas, et la garde compte dessus.
+                    // An empty string is not a name: it is "nothing recorded". The port
+                    // promises null in that case, and the guard counts on it.
                     return '' === $event->activityName() ? null : $event->activityName();
                 }
                 ++$index;
             }
         }
 
+        return null;
+    }
+
+    public function activityPayloadForSlot(int $slot): ?array
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ActivityScheduled) {
+                if ($index === $slot) {
+                    // `payload()` returns the event's envelope; the activity's arguments are one
+                    // slot of it. A non-array means "nothing to compare", not "empty array".
+                    $arguments = $event->payload()['payload'] ?? null;
+
+                    return \is_array($arguments) ? $arguments : null;
+                }
+                ++$index;
+            }
+        }
+
+        return null;
+    }
+
+    public function childWorkflowInputForSlot(int $slot): ?array
+    {
+        $index = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ChildWorkflowScheduled) {
+                if ($index === $slot) {
+                    $input = $event->payload()['input'] ?? null;
+
+                    return \is_array($input) ? $input : null;
+                }
+                ++$index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Toujours null, et ce n'est pas un oubli.
+     *
+     * This backend refuses Nexus operations by design (DUR036): none of its histories carries one
+     * the workflow would have scheduled. The only `NexusOperationScheduled` that can cross a stream
+     * comes from the profiler's converter, which writes it for display, and that event carries only
+     * the call site, never the payload. So there is nothing to compare.
+     *
+     * The guard applies where Nexus exists: {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory}.
+     */
+    public function nexusOperationPayloadForSlot(int $slot): ?array
+    {
         return null;
     }
 
@@ -143,9 +194,9 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     }
 
     /**
-     * Ce backend refuse d'ordonnancer une opération Nexus (DUR036) : aucun de ses journaux n'en
-     * porte, et la réponse est donc toujours « rien ». Ce n'est pas un trou d'implémentation mais
-     * la conséquence exacte du refus.
+     * This backend refuses to schedule a Nexus operation (DUR036): none of its journals carries
+     * one, so the answer is always "nothing". This is not an implementation gap but the exact
+     * consequence of that refusal.
      */
     public function nexusOperationSignatureForSlot(int $slot): ?string
     {
@@ -197,7 +248,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             ];
         }
 
-        // Un perdant de course reste simplement non réglé : il n'a jamais eu de gagnant à annoncer.
+        // A race loser simply stays unsettled: it never had a winner to announce.
         if (!isset($completedIds[$timerId])) {
             return null;
         }
@@ -308,8 +359,8 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         $position = 0;
         $seen = 0;
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
-            // Signaux et updates partagent le même curseur : ce qui les ordonne est leur rang
-            // dans le journal, pas leur nature.
+            // Signals and updates share the same cursor: what orders them is their rank in the
+            // journal, not their kind.
             if ($event instanceof WorkflowSignalReceived) {
                 if ($seen === $index) {
                     return [
@@ -372,17 +423,17 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     }
 
     /**
-     * Toujours null : le tampon de ce backend refuse de planifier une opération Nexus
-     * ({@see \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException}), donc aucune ne peut
-     * figurer dans son journal. Ce n'est pas une implémentation en attente — il n'y a rien à
-     * relire parce qu'il n'y a rien eu à écrire.
+     * Always null: this backend's buffer refuses to schedule a Nexus operation
+     * ({@see \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException}), so none can figure in
+     * its journal. This is not an implementation still pending — there is nothing to read back
+     * because there was never anything to write.
      */
     public function findNexusOperationSlotResult(int $slot): ?array
     {
         return null;
     }
 
-    /** Toujours null, pour la même raison que {@see findNexusOperationSlotResult()}. */
+    /** Always null, for the same reason as {@see findNexusOperationSlotResult()}. */
     public function findScheduledNexusOperation(int $slot): ?string
     {
         return null;

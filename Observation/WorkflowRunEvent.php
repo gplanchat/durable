@@ -5,46 +5,46 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Un événement de l'historique d'une exécution, dans le vocabulaire du composant.
+ * One event from an execution's history, in the component's vocabulary.
  *
- * `label` est ce qu'un humain lit — le nom de l'activité, du signal, de la mise à jour — et non un
- * identifiant technique. Quand le backend ne sait vraiment pas nommer, l'identifiant est un
- * repli assumé, pas un défaut de conception : mieux vaut un id qu'une ligne sans nom.
+ * `label` is what a human reads — the name of the activity, of the signal, of the update — and not
+ * a technical identifier. When the backend really cannot name a thing, the identifier is an
+ * accepted fallback, not a design flaw: an id is worth more than a row without a name.
  *
- * `sequence` est l'ordre d'enregistrement, pas un identifiant : il sert à ranger, et deux backends
- * n'ont aucune raison de numéroter pareil.
+ * `sequence` is the recording order, not an identifier: it serves to sort, and two backends have no
+ * reason to number things the same way.
  *
- * `details` est ce qu'une ligne ne tient pas : l'entrée d'une activité, son résultat, la classe et
- * le message d'un échec, les délais d'une planification. Une frise sans lui répond « quoi » et
- * jamais « avec quoi » — et c'est la deuxième question que se pose un exploitant, aussitôt après
- * la première. Vide est une réponse valable : tous les événements n'ont pas de quoi la remplir.
+ * `details` is what a single row cannot hold: an activity's input, its result, the class and the
+ * message of a failure, the delays of a scheduling. A frieze without it answers "what" and never
+ * "with what" — and that is the second question an operator asks, right after the first. Empty is
+ * a valid answer: not every event has something to fill it with.
  *
- * ⚠ Le contenu est **le vocabulaire du backend**, pas le nôtre : les clés d'un journal maison ne
- * sont pas celles de l'historique Temporal. Le normaliser demanderait de décider, pour chaque
- * backend, ce qui mérite un nom commun — un travail qui n'a de sens qu'une fois qu'on aura vu ce
- * que les exploitants y cherchent. En attendant, montrer la forme brute ne ment pas.
+ * ⚠ The content is **the backend's vocabulary**, not ours: the keys of a homegrown journal are not
+ * those of the Temporal history. Normalising it would mean deciding, for each backend, what
+ * deserves a common name — work that only makes sense once we have seen what operators look for in
+ * there. In the meantime, showing the raw shape does not lie.
  *
- * `actionKey` est **l'action** dont l'événement fait partie : une activité planifiée, démarrée puis
- * terminée est une action et trois événements. Sans lui, une frise ne peut que ranger par nature —
- * « les activités », « les signaux » — et l'exploitant qui veut savoir combien de temps *cette*
- * activité a duré doit recoller trois lignes de l'œil. La clé n'a pas de sens hors de son exécution
- * et n'en a pas besoin : elle sert à regrouper, pas à désigner.
+ * `actionKey` is **the action** the event is part of: an activity scheduled, started and then
+ * finished is one action and three events. Without it, a frieze can only file by kind —
+ * "activities", "signals" — and the operator who wants to know how long *this* activity lasted has
+ * to piece three rows back together by eye. The key has no meaning outside its execution and needs
+ * none: it serves to group, not to designate.
  *
- * `null` veut dire « cet événement est à lui seul son action » — le démarrage d'une exécution, un
- * signal reçu. C'est une réponse, pas une absence de réponse.
+ * `null` means "this event is its own action all by itself" — the start of an execution, a signal
+ * received. It is an answer, not the absence of one.
  *
- * `started` dit que **le travail commence ici** : un worker a pris la tâche, l'exécution enfant a
- * démarré, l'opération a débuté. Ce qui précède un tel événement dans son action n'est donc pas du
- * travail mais une **attente de prise en charge** — la file. Deux barres de même longueur ne
- * racontent pas la même chose selon que le temps a été passé à travailler ou à attendre que
- * quelqu'un veuille bien commencer, et c'est la première question d'un exploitant devant une
- * exécution lente : est-ce mon code, ou est-ce que personne n'a répondu ?
+ * `started` says that **the work begins here**: a worker has picked up the task, the child
+ * execution has started, the operation has begun. What precedes such an event within its action is
+ * therefore not work but a **wait to be picked up** — the queue. Two bars of the same length do not
+ * tell the same story depending on whether the time was spent working or waiting for someone to be
+ * willing to begin, and that is an operator's first question when facing a slow execution: is it my
+ * code, or did nobody answer?
  *
- * `failed` marque **l'événement** qui a mal tourné, pas l'action ni l'exécution : une activité
- * reprise après deux échecs porte du rouge et se termine bien, et c'est exactement ce qu'un
- * exploitant doit pouvoir lire d'un coup d'œil. Une annulation et une interruption n'en sont pas :
- * ce sont des issues, décidées par quelqu'un, et les peindre comme des pannes enverrait chercher
- * une panne là où il n'y a qu'une décision.
+ * `failed` marks **the event** that went wrong, not the action nor the execution: an activity
+ * resumed after two failures carries some red and ends well, and that is exactly what an operator
+ * must be able to read at a glance. A cancellation and an interruption are not failures: they are
+ * outcomes, decided by someone, and painting them as breakdowns would send people looking for a
+ * breakdown where there is only a decision.
  *
  * @phpstan-type Details array<string, mixed>
  */

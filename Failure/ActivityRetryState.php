@@ -5,41 +5,41 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Failure;
 
 /**
- * Pourquoi une activité a cessé d'être retentée (discriminant porté par {@see \Gplanchat\Durable\Event\ActivityFailed}).
+ * Why an activity stopped being retried (discriminant carried by {@see \Gplanchat\Durable\Event\ActivityFailed}).
  *
- * Aligné sur {@see \Temporal\Api\Enums\V1\RetryState} : Temporal modélise cet état comme un **champ**
- * de `ActivityTaskFailedEventAttributes` / `ActivityFailureInfo`, pas comme un type d'événement distinct.
+ * Aligned on {@see \Temporal\Api\Enums\V1\RetryState}: Temporal models this state as a **field**
+ * of `ActivityTaskFailedEventAttributes` / `ActivityFailureInfo`, not as a distinct event type.
  */
 enum ActivityRetryState: string
 {
-    /** Une nouvelle tentative est planifiée (porté par {@see \Gplanchat\Durable\Event\ActivityTaskFailed}). */
+    /** A new attempt is scheduled (carried by {@see \Gplanchat\Durable\Event\ActivityTaskFailed}). */
     case InProgress = 'in_progress';
 
-    /** L'exception fait partie de {@see \Gplanchat\Durable\Activity\ActivityOptions::$nonRetryableExceptions}. */
+    /** The exception is one of {@see \Gplanchat\Durable\Activity\ActivityOptions::$nonRetryableExceptions}. */
     case NonRetryableFailure = 'non_retryable_failure';
 
-    /** Timeout schedule-to-start / schedule-to-close : plus aucune tentative n'est autorisée. */
+    /** Schedule-to-start / schedule-to-close timeout: no further attempt is allowed. */
     case Timeout = 'timeout';
 
-    /** Toutes les tentatives autorisées ont été consommées — « ActivityStalled ». */
+    /** Every allowed attempt has been consumed — "ActivityStalled". */
     case MaximumAttemptsReached = 'maximum_attempts_reached';
 
     /**
-     * Aucune politique de retry active côté serveur. Plus produit localement depuis que
-     * {@see \Gplanchat\Durable\Activity\RetryLimit::unlimited()} est le défaut ; reste relu
-     * depuis l'historique Temporal (`RETRY_STATE_RETRY_POLICY_NOT_SET`).
+     * No retry policy active on the server side. No longer produced locally since
+     * {@see \Gplanchat\Durable\Activity\RetryLimit::unlimited()} became the default; still read
+     * back from the Temporal history (`RETRY_STATE_RETRY_POLICY_NOT_SET`).
      */
     case RetryPolicyNotSet = 'retry_policy_not_set';
 
     /**
-     * Le retry côté PHP est désactivé par le transport ({@see \Gplanchat\Durable\Transport\NoopActivityTransport},
-     * worker Temporal natif) : l'échec journalisé est **synthétique**, la vraie cause est portée par Temporal.
+     * PHP-side retrying is disabled by the transport ({@see \Gplanchat\Durable\Transport\NoopActivityTransport},
+     * native Temporal worker): the journalled failure is **synthetic**, the real cause is carried by Temporal.
      */
     case TransportRetryDisabled = 'transport_retry_disabled';
 
     /**
-     * Vrai si l'événement décrit un arrêt définitif consécutif à une vraie défaillance métier
-     * (par opposition à un marqueur d'infrastructure).
+     * True if the event describes a definitive stop following a genuine business failure
+     * (as opposed to an infrastructure marker).
      */
     public function isTerminalBusinessFailure(): bool
     {

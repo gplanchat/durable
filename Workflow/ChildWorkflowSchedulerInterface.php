@@ -8,14 +8,14 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\ChildWorkflowOptions;
 
 /**
- * Ce dont un {@see ChildWorkflowStub} a besoin : de quoi démarrer un enfant, et rien de plus.
+ * What a {@see ChildWorkflowStub} needs: enough to start a child, and nothing more.
  *
- * Pendant de {@see \Gplanchat\Durable\Activity\ActivitySchedulerInterface} pour les activités, et
- * pour la même raison : le stub recevait l'environnement entier, ce qui obligeait à garder
- * publique la forme qui nomme le type d'enfant par une chaîne.
+ * Counterpart of {@see \Gplanchat\Durable\Activity\ActivitySchedulerInterface} for activities,
+ * and for the same reason: the stub used to receive the whole environment, which forced keeping
+ * public the form that names the child type by a string.
  *
- * Le port **démarre** et rend un awaitable ; il n'attend pas. C'est la règle de DUR033 — `await()`
- * est la seule méthode qui attend — dont le stub s'était écarté.
+ * The port **starts** and returns an awaitable; it does not await. That is the DUR033 rule —
+ * `await()` is the only method that awaits — from which the stub had departed.
  */
 interface ChildWorkflowSchedulerInterface
 {

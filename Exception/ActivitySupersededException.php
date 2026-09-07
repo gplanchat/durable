@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * L'activité a été annulée car une autre branche concurrente (ex. any/race) a gagné.
+ * The activity was cancelled because another concurrent branch (e.g. any/race) won.
  */
 final class ActivitySupersededException extends \RuntimeException
 {

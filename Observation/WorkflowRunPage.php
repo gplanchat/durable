@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Une page du catalogue, et de quoi demander la suivante.
+ * One page of the catalog, and what it takes to ask for the next one.
  *
- * `nextCursor` est opaque : sa forme appartient au backend qui l'a émise, et le rendre au même
- * catalogue est la seule chose qu'un appelant ait le droit d'en faire. Temporal rendra son jeton de
- * page, DBAL une clé de reprise ; la vue ne fait que le transporter.
+ * `nextCursor` is opaque: its shape belongs to the backend that issued it, and handing it back to
+ * the same catalog is the only thing a caller has the right to do with it. Temporal will return its
+ * page token, DBAL a resumption key; the view merely carries it.
  *
- * `null` veut dire « il n'y a rien après », et pas « je ne sais pas » : une page exactement pleine
- * ne doit pas promettre une page vide, sous peine d'un « suivant » qui ne mène nulle part.
+ * `null` means "there is nothing after this", and not "I do not know": a page that is exactly full
+ * must not promise an empty page, on pain of a "next" that leads nowhere.
  */
 final readonly class WorkflowRunPage
 {

@@ -31,6 +31,9 @@ use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 
 final class ExecutionContext
 {
+    /** Ce qu'un message de divergence montre d'une empreinte de charge avant de la couper. */
+    private const DIVERGENCE_PRINT_LIMIT = 256;
+
     private ?QueryHandlerRegistry $queryHandlers = null;
 
     /** @var array<string, \Gplanchat\Durable\Awaitable\Deferred> */
@@ -53,8 +56,8 @@ final class ExecutionContext
     private int $childWorkflowSlotIndex = 0;
 
     /**
-     * Rang du prochain message non appliqué. Reconstruit à zéro à chaque passe, avancé par la
-     * même règle sur le même journal : c'est ce qui rend le verdict d'une condition reproductible.
+     * Rank of the next unapplied message. Rebuilt from zero on every pass, advanced by the same
+     * rule over the same log: that is what makes a condition's verdict reproducible.
      */
     private int $messageCursor = 0;
 
@@ -65,8 +68,8 @@ final class ExecutionContext
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
         private readonly ?UuidGeneratorInterface $uuidGenerator = null,
         /**
-         * Les updates que la passe reçoit hors journal. Ils viennent après tout ce qui est
-         * enregistré : n'ayant pas encore de position, ils prennent celle de leur arrivée.
+         * The updates the pass receives outside the log. They come after everything that is
+         * recorded: having no position yet, they take the one of their arrival.
          *
          * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
          */
@@ -74,10 +77,10 @@ final class ExecutionContext
     ) {}
 
     /**
-     * Les handlers de query de cette exécution.
+     * The query handlers of this execution.
      *
-     * Porté ici parce qu'un workflow ne reçoit jamais le contexte : c'est ce qui met la
-     * plomberie des queries hors de sa portée sans la rendre inaccessible au moteur.
+     * Carried here because a workflow never receives the context: that is what puts the query
+     * plumbing out of its reach without making it unreachable to the engine.
      *
      * @internal
      */
@@ -100,6 +103,13 @@ final class ExecutionContext
     {
         $slotIndex = $this->activitySlotIndex++;
         $this->refuseActivityDivergence($slotIndex, $name);
+        $this->refusePayloadDivergence(
+            'activity',
+            $slotIndex,
+            $name,
+            $this->historySource->activityPayloadForSlot($slotIndex),
+            $payload,
+        );
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
@@ -124,8 +134,8 @@ final class ExecutionContext
         $this->pendingActivities[$activityId] = $deferred;
 
         if (null === $scheduled) {
-            // Les options partent telles quelles ; l'horodatage de mise en file appartient au
-            // backend, qui seul possède une horloge.
+            // The options travel as they are; the enqueue timestamp belongs to the backend,
+            // which alone owns a clock.
             $this->commandBuffer->scheduleActivity($activityId, $name, $payload, $options);
         }
 
@@ -133,12 +143,12 @@ final class ExecutionContext
     }
 
     /**
-     * Planifie une opération Nexus et rend l'attente de son résultat.
+     * Schedules a Nexus operation and returns the wait for its result.
      *
-     * Même discipline de slot que {@see activity()} : le rang de l'appel identifie l'opération
-     * d'une passe de replay à l'autre. La différence de conséquence mérite d'être dite — une
-     * activité replanifiée par erreur retombe sur un worker à soi, une opération Nexus part chez
-     * un tiers, où le doublon est le sien.
+     * Same slot discipline as {@see activity()}: the rank of the call identifies the operation
+     * from one replay pass to the next. The difference in consequence is worth stating — an
+     * activity rescheduled by mistake lands back on a worker of one's own, a Nexus operation
+     * goes out to a third party, where the duplicate is theirs.
      *
      * @param array<string, mixed> $payload
      *
@@ -158,6 +168,13 @@ final class ExecutionContext
             $slotIndex,
             $this->historySource->nexusOperationSignatureForSlot($slotIndex),
             \sprintf('%s/%s/%s', $endpoint->name(), $service->name(), $operation->name()),
+        );
+        $this->refusePayloadDivergence(
+            'Nexus operation',
+            $slotIndex,
+            \sprintf('%s/%s/%s', $endpoint->name(), $service->name(), $operation->name()),
+            $this->historySource->nexusOperationPayloadForSlot($slotIndex),
+            $payload,
         );
         $scheduled = $this->historySource->findScheduledNexusOperation($slotIndex);
         $operationId = $scheduled ?? $this->uuid();
@@ -193,20 +210,20 @@ final class ExecutionContext
     }
 
     /**
-     * Déclare que le comportement du workflow a changé ici, et rend celui qui concerne CETTE
-     * exécution.
+     * Declares that the workflow's behaviour changed here, and returns the one that applies to
+     * THIS execution.
      *
-     * La réponse est figée à la première rencontre et relue du journal ensuite : une exécution en
-     * vol garde son comportement quoi qu'on déploie après elle. C'est ce qui distingue le
-     * versioning de la devinette.
+     * The answer is frozen on the first encounter and read back from the log afterwards: an
+     * execution in flight keeps its behaviour whatever is deployed after it. That is what
+     * separates versioning from guesswork.
      *
-     * Deux points de changement sont indépendants — ils sont indexés par leur identifiant, pas par
-     * une position —, donc une exécution peut être du vieux côté de l'un et du neuf côté de
-     * l'autre.
+     * Two change points are independent — they are keyed by their identifier, not by a
+     * position —, so an execution can be on the old side of one and on the new side of the
+     * other.
      *
-     * @param string $changeId     le nom de ce point de changement, stable dans le temps
-     * @param int    $minSupported la plus ancienne version que ce code sait encore jouer
-     * @param int    $maxSupported la plus récente, celle qu'une exécution neuve prendra
+     * @param string $changeId     the name of this change point, stable over time
+     * @param int    $minSupported the oldest version this code can still play
+     * @param int    $maxSupported the most recent one, the one a fresh execution will take
      */
     public function version(string $changeId, int $minSupported, int $maxSupported): int
     {
@@ -215,10 +232,10 @@ final class ExecutionContext
             return $recorded;
         }
 
-        // Aucun marqueur, et du travail enregistré encore devant : cette exécution est passée
-        // ici avant que le point n'existe. Elle garde donc l'ancien comportement, et rien n'est
-        // écrit — la réponse se déduit de l'historique plutôt que de s'y ajouter, ce qui la rend
-        // stable par construction.
+        // No marker, and recorded work still ahead: this execution went through here before
+        // the change point existed. So it keeps the old behaviour, and nothing is written —
+        // the answer is deduced from the history rather than added to it, which makes it
+        // stable by construction.
         if ($this->hasRecordedWorkAhead()) {
             return ChangePoint::DEFAULT_VERSION;
         }
@@ -229,22 +246,22 @@ final class ExecutionContext
     }
 
     /**
-     * Le journal porte-t-il encore du travail que cette passe n'a pas atteint ?
+     * Does the log still carry work this pass has not reached?
      *
-     * C'est le signal « en train de rejouer » que ce moteur n'avait pas, déduit de ce que le port
-     * expose déjà plutôt qu'ajouté à côté : si le slot suivant de l'un des types est enregistré,
-     * l'appel courant se situe dans le préfixe rejoué. Sinon l'exécution est arrivée au bout de
-     * son historique et ce qu'elle fait maintenant est neuf.
+     * This is the "currently replaying" signal this engine did not have, deduced from what the
+     * port already exposes rather than bolted on beside it: if the next slot of one of the types
+     * is recorded, the current call sits inside the replayed prefix. Otherwise the execution has
+     * reached the end of its history and what it does now is new.
      *
-     * Déduit, donc déterministe : deux replays de la même histoire répondent pareil, ce qui est la
-     * seule propriété dont le versioning a besoin.
+     * Deduced, therefore deterministic: two replays of the same history answer alike, which is
+     * the only property versioning needs.
      *
-     * Les effets de bord comptent comme les autres depuis que le port sait dire leur présence
-     * sans passer par leur valeur. Ils ne le pouvaient pas tant que `findSideEffectForSlot()`
-     * rendait `mixed` : une valeur enregistrée peut légitimement être `null`, et « rien ici » ne
-     * s'y distinguait pas de « ici, la valeur null ». Un workflow dont le seul travail avant un
-     * point de changement était un effet de bord basculait alors sur la branche neuve, en plein
-     * rejeu — le trou est fermé avec celui de `sideEffect()`, dont il était la même cause.
+     * Side effects count like the rest, now that the port can state their presence without going
+     * through their value. They could not while `findSideEffectForSlot()` returned `mixed`: a
+     * recorded value can legitimately be `null`, and "nothing here" was indistinguishable from
+     * "here, the value null". A workflow whose only work before a change point was a side effect
+     * then switched to the new branch mid-replay. The hole is closed along with `sideEffect()`'s,
+     * of which it was the same cause.
      */
     private function hasRecordedWorkAhead(): bool
     {
@@ -256,21 +273,21 @@ final class ExecutionContext
     }
 
     /**
-     * Refuse de résoudre un slot avec un enregistrement qui n'est pas le sien.
+     * Refuses to settle a slot with a record that is not its own.
      *
-     * Les slots sont positionnels : le slot N est le N-ième appel, pas le N-ième appel *à cette
-     * activité-là*. Insérer un appel avant un autre décale donc tout ce qui suit, et le replay
-     * rendait jusqu'ici le résultat enregistré du voisin — sans un mot. Mesuré contre un vrai
-     * serveur : l'exécution se terminait **en succès** en portant la mauvaise valeur.
+     * Slots are positional: slot N is the N-th call, not the N-th call *to that particular
+     * activity*. Inserting a call before another therefore shifts everything that follows, and
+     * replay used to return the neighbour's recorded result — without a word. Measured against
+     * a real server: the execution finished **successfully** carrying the wrong value.
      *
-     * La comparaison ne s'appuie que sur ce que l'historique porte déjà. Ajouter un champ aux
-     * événements aurait laissé sans garde exactement les exécutions que la garde protège : les
-     * anciennes.
+     * The comparison relies only on what the history already carries. Adding a field to the
+     * events would have left unguarded exactly the executions the guard protects: the old
+     * ones.
      *
-     * Un slot que personne n'a enregistré n'est pas une divergence — c'est un workflow qui
-     * grandit, et le refuser casserait le cas normal.
+     * A slot nobody recorded is not a divergence — it is a workflow growing, and refusing it
+     * would break the normal case.
      *
-     * @throws WorkflowTaskFailure si le code demande autre chose que ce que le journal tient
+     * @throws WorkflowTaskFailure when the code asks for something other than what the log holds
      */
     private function refuseActivityDivergence(int $slotIndex, string $requested): void
     {
@@ -278,14 +295,162 @@ final class ExecutionContext
     }
 
     /**
-     * La règle, une fois, pour les trois types de slot qui portent une identité.
+     * Refuse a slot whose **identity** matches but whose **payload** changed on replay.
      *
-     * `$recorded` à null veut dire « l'historique n'a rien dit là » — soit le slot est neuf, soit
-     * le journal ne porte pas cette identité. Dans les deux cas il n'y a rien à comparer, et
-     * refuser casserait le cas normal. Les minuteurs sont dans ce cas par nature : leur échéance
-     * est absolue et leur libellé facultatif (sonde 1.4).
+     * The name alone let half the problem through: the journal served the old result, the freshly
+     * computed payload went in the bin, and the execution finished successfully having lied about
+     * what it asked for. Measured: nine payloads computed, three journaled, six divergences
+     * swallowed without a word.
      *
-     * @throws WorkflowTaskFailure si le code demande autre chose que ce que le journal tient
+     * The comparison goes through {@see canonicalPayload()}, which shows both sides **what the
+     * journal can hold** and nothing more. That is the rule that avoids false positives: an object
+     * the journal keeps nothing of must not make a faithful replay diverge, or production would
+     * stop executions that are perfectly sound.
+     *
+     * The rule, once, for the three slot types that carry a payload, as {@see refuseDivergence()}
+     * does for the three that carry an identity. `$slotKind` and `$identity` come from the caller
+     * because what identifies a slot is not the same kind of thing everywhere: a name for an
+     * activity, a type for a child, a triple for Nexus.
+     *
+     * @param array<string, mixed>|null $recorded
+     * @param array<string, mixed>      $requested
+     *
+     * @throws WorkflowTaskFailure when the code asks for the same call again with another payload
+     */
+    private function refusePayloadDivergence(
+        string $slotKind,
+        int $slotIndex,
+        string $identity,
+        ?array $recorded,
+        array $requested,
+    ): void {
+        if (null === $recorded) {
+            // Nothing recorded here: a new slot, or a history written before the payload became
+            // readable. Refusing would fail exactly the executions this guard exists to protect.
+            return;
+        }
+
+        $recordedPrint = $this->canonicalPayload($recorded);
+        $requestedPrint = $this->canonicalPayload($requested);
+        if (null === $recordedPrint || null === $requestedPrint || $recordedPrint === $requestedPrint) {
+            // A payload the journal cannot make comparable proves nothing, so the guard stays quiet.
+            return;
+        }
+
+        $at = self::firstDifference($recordedPrint, $requestedPrint);
+
+        throw new WorkflowTaskFailure(\sprintf(
+            'Replay divergence at %s slot %d of execution "%s": "%s" is still the same %s, '
+            . 'but its payload changed at byte %d. History recorded %s, code scheduled %s '
+            . '(%d and %d bytes). '
+            . 'This is non-deterministic workflow code — the payload is rebuilt on every replay pass, '
+            . 'so something in it reads the clock, draws a random value, or is resolved from outside '
+            . 'the journal. This is not a version skew: a declared change point would have changed '
+            . 'the identity or the slot, not the payload alone.',
+            $slotKind,
+            $slotIndex,
+            $this->executionId,
+            $identity,
+            $slotKind,
+            $at,
+            self::windowAround($recordedPrint, $at),
+            self::windowAround($requestedPrint, $at),
+            \strlen($recordedPrint),
+            \strlen($requestedPrint),
+        ));
+    }
+
+    /**
+     * Returns the print the journal would keep of a payload, or null when it has none.
+     *
+     * Both sides come through here, and that is the whole point: the recorded side made the
+     * store's JSON round trip, the fresh side did not. Without this normalisation an object with
+     * private properties, which is the house style, renders `{}` on one side and `[]` on the other,
+     * and every execution carrying one would diverge on every resume. Measured before it was
+     * written.
+     *
+     * Keys are sorted because a JSON object has no order, so seeing it change proves nothing.
+     * Lists keep theirs, where the order is the information.
+     *
+     * Null means incomparable: a resource, a NAN, a recursion. The guard then stays quiet rather
+     * than accusing a payload it cannot read.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function canonicalPayload(array $payload): ?string
+    {
+        try {
+            $throughTheJournal = json_decode(
+                json_encode($payload, \JSON_THROW_ON_ERROR),
+                true,
+                512,
+                \JSON_THROW_ON_ERROR,
+            );
+
+            self::sortKeysDeeply($throughTheJournal);
+
+            return json_encode($throughTheJournal, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+    }
+
+    private static function sortKeysDeeply(mixed &$value): void
+    {
+        if (!\is_array($value)) {
+            return;
+        }
+
+        ksort($value);
+        foreach ($value as &$nested) {
+            self::sortKeysDeeply($nested);
+        }
+    }
+
+    /**
+     * The first byte at which the two prints stop matching.
+     *
+     * It is what makes the message usable: an agent payload weighs kilobytes, and two identical
+     * prefixes teach the reader nothing. Measured before it was written: the first message showed
+     * the leading 256 bytes, and both sides looked the same.
+     */
+    private static function firstDifference(string $recorded, string $requested): int
+    {
+        $shortest = min(\strlen($recorded), \strlen($requested));
+        $at = 0;
+        while ($at < $shortest && $recorded[$at] === $requested[$at]) {
+            ++$at;
+        }
+
+        return $at;
+    }
+
+    /**
+     * Returns the window of the print around the divergence, with enough on each side to place it.
+     */
+    private static function windowAround(string $print, int $at): string
+    {
+        $margin = intdiv(self::DIVERGENCE_PRINT_LIMIT, 4);
+        $from = max(0, $at - $margin);
+        $window = substr($print, $from, self::DIVERGENCE_PRINT_LIMIT);
+
+        return \sprintf(
+            '%s%s%s',
+            $from > 0 ? '…' : '',
+            $window,
+            $from + \strlen($window) < \strlen($print) ? '…' : '',
+        );
+    }
+
+    /**
+     * The rule, once, for the three slot types that carry an identity.
+     *
+     * `$recorded` at null means "the history said nothing there" — either the slot is new, or
+     * the log does not carry that identity. In both cases there is nothing to compare, and
+     * refusing would break the normal case. Timers are in that case by nature: their due time
+     * is absolute and their label optional (probe 1.4).
+     *
+     * @throws WorkflowTaskFailure when the code asks for something other than what the log holds
      */
     private function refuseDivergence(string $slotKind, int $slotIndex, ?string $recorded, string $requested): void
     {
@@ -316,8 +481,8 @@ final class ExecutionContext
         $slotIndex = $this->sideEffectSlotIndex++;
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
 
-        // La présence du slot, jamais la valeur qu'il porte : une closure qui rend `null` a bel et
-        // bien été exécutée, et la relire est exactement ce que `sideEffect()` promet.
+        // The slot's presence, never the value it carries: a closure returning `null` did run, and
+        // reading it back is exactly what `sideEffect()` promises.
         if ($this->historySource->hasSideEffectForSlot($slotIndex)) {
             $deferred->resolve($this->historySource->findSideEffectForSlot($slotIndex));
 
@@ -369,6 +534,13 @@ final class ExecutionContext
             $this->historySource->childWorkflowTypeForSlot($slotIndex),
             $childWorkflowType,
         );
+        $this->refusePayloadDivergence(
+            'child workflow',
+            $slotIndex,
+            $childWorkflowType,
+            $this->historySource->childWorkflowInputForSlot($slotIndex),
+            $input,
+        );
         $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replay) {
@@ -398,10 +570,10 @@ final class ExecutionContext
 
         try {
             $result = $this->childWorkflowRunner->runChild($childExecutionId, $childWorkflowType, $input, $this->executionId);
-            // L'issue de l'ENFANT, pas celle du run courant : completeWorkflow() ici clôturait le
-            // journal du parent avec le résultat de l'enfant, et n'écrivait jamais le
-            // ChildWorkflowCompleted que findChildWorkflowForSlot() cherche au replay — l'enfant
-            // était donc réexécuté à chaque reprise du parent.
+            // The CHILD's outcome, not the current run's: completeWorkflow() here closed the
+            // parent's log with the child's result, and never wrote the ChildWorkflowCompleted
+            // that findChildWorkflowForSlot() looks for on replay — so the child was re-run on
+            // every resume of the parent.
             $this->commandBuffer->completeChildWorkflow($childExecutionId, $result);
             $deferred->resolve($result);
         } catch (ChildWorkflowStartDeferred) {
@@ -420,15 +592,16 @@ final class ExecutionContext
     }
 
     /**
-     * Applique le prochain message enregistré, s'il en reste un avant `$beforePosition`.
+     * Applies the next recorded message, if one is left before `$beforePosition`.
      *
-     * Un par un, jamais par lot : un message enregistré après le tir d'une échéance ne doit pas
-     * régler la condition qu'elle bornait, et une condition satisfaite par le premier de deux
-     * messages doit reprendre en n'ayant vu que celui-là. Les deux sortent de la même règle —
-     * le verdict est une position dans le journal (ADR DUR035).
+     * One by one, never in a batch: a message recorded after a deadline fired must not settle
+     * the condition that deadline bounded, and a condition satisfied by the first of two
+     * messages must resume having seen only that one. Both follow from the same rule —
+     * the verdict is a position in the log (ADR DUR035).
      *
-     * `pending` porte l'update hors journal quand c'en est un, et null quand le message est relu
-     * du journal : c'est ce qui distingue « produire l'issue » de « refaire l'état ».
+     * `pending` carries the out-of-log update when the message is one, and null when the message
+     * is read back from the log: that is what separates "producing the outcome" from "rebuilding
+     * the state".
      *
      * @return array{kind: 'signal'|'update', name: string, payload: array<string, mixed>, pending: \Gplanchat\Durable\Workflow\PendingUpdate|null}|null
      */
@@ -450,7 +623,8 @@ final class ExecutionContext
             ];
         }
 
-        // Le journal est épuisé : restent les updates arrivés hors journal pour cette passe.
+        // The log is exhausted: what is left are the updates that arrived outside the log for
+        // this pass.
         $recorded = $this->countRecordedMessages();
         $pending = $this->pendingUpdates[$this->messageCursor - $recorded] ?? null;
         if (null === $pending) {
@@ -473,7 +647,7 @@ final class ExecutionContext
     }
 
     /**
-     * Consigne l'issue d'un update qui vient d'être traité, à la position où il l'a été.
+     * Records the outcome of an update that has just been handled, at the position where it was.
      *
      * @param array<string, mixed> $arguments
      */
@@ -483,7 +657,7 @@ final class ExecutionContext
     }
 
     /**
-     * Position à laquelle le tir de ce minuteur est enregistré, ou null s'il n'a pas tiré.
+     * Position at which this timer's firing is recorded, or null when it has not fired.
      */
     public function timerCompletionPosition(string $timerId): ?int
     {
@@ -508,12 +682,12 @@ final class ExecutionContext
     }
 
     /**
-     * Retire une opération Nexus encore en vol (best effort).
+     * Withdraws a Nexus operation still in flight (best effort).
      *
-     * Comme pour une activité, la demande part vers l'endpoint sans garantie qu'il l'honore : ce
-     * qui est garanti est que sa réponse ne réveillera plus cette exécution. L'annulation du
-     * workflow rejette l'attente pour qu'il puisse compenser ; un perdant de course reste
-     * simplement non réglé.
+     * As with an activity, the request goes out to the endpoint with no guarantee it will be
+     * honoured: what is guaranteed is that its answer will no longer wake this execution up.
+     * Cancelling the workflow rejects the wait so that it can compensate; a race loser is
+     * simply left unsettled.
      */
     public function cancelScheduledNexusOperation(string $operationId, string $reason): bool
     {
@@ -533,10 +707,10 @@ final class ExecutionContext
     }
 
     /**
-     * Annule un minuteur encore en attente (best effort).
+     * Cancels a timer still pending (best effort).
      *
-     * Le minuteur ne sera jamais résolu : il est retiré des pending pour que
-     * {@see resolveTimer()} devienne un no-op, et le journal reçoit un
+     * The timer will never be settled: it is removed from the pending ones so that
+     * {@see resolveTimer()} becomes a no-op, and the log receives a
      * {@see \Gplanchat\Durable\Event\TimerCancelled}.
      */
     public function cancelScheduledTimer(string $timerId, string $reason): bool
@@ -549,8 +723,8 @@ final class ExecutionContext
         unset($this->pendingTimers[$timerId]);
         $this->commandBuffer->cancelTimer($timerId, $reason);
 
-        // Un perdant de course reste simplement non résolu ; une annulation de workflow doit
-        // au contraire relever, pour que le workflow puisse compenser.
+        // A race loser is simply left unsettled; a workflow cancellation must on the contrary
+        // throw, so that the workflow can compensate.
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
             $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
         }
@@ -582,8 +756,8 @@ final class ExecutionContext
         $this->pendingTimers[$timerId] = $deferred;
 
         if (null === $scheduled) {
-            // Le délai part tel quel : transformer une durée en échéance demande une horloge, et
-            // le cœur n'en a pas — c'est une décision de backend.
+            // The delay travels as it is: turning a duration into a due time requires a clock,
+            // and the core has none — that is a backend decision.
             $this->commandBuffer->startTimer($timerId, $delay, $timerSummary);
         }
 
@@ -611,10 +785,10 @@ final class ExecutionContext
      * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
      */
     /**
-     * Les opérations Nexus encore en vol, par identifiant.
+     * The Nexus operations still in flight, by identifier.
      *
-     * Miroir de {@see pendingActivities()} : c'est par là que l'issue d'une opération, lue dans
-     * l'historique, retrouve l'attente qu'elle doit régler.
+     * Mirror of {@see pendingActivities()}: that is how the outcome of an operation, read from
+     * the history, finds again the wait it has to settle.
      *
      * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
      */

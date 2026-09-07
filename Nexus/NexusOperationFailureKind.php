@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 /**
- * Pourquoi une opération Nexus n'a pas abouti.
+ * Why a Nexus operation did not succeed.
  *
- * Les quatre natures ne sont pas un confort de lecture : elles appellent des gestes différents.
- * Un appelant compense sur {@see self::OperationFailed} — le handler a tourné et a dit non. Il
- * peut réessayer sur {@see self::HandlerError}, où le handler n'a pas tourné du tout et où le
- * serveur dit lui-même si la reprise a un sens. Il ne fait ni l'un ni l'autre sur
- * {@see self::Cancellation}, qu'il a le plus souvent demandée. Et {@see self::Timeout} dit que la
- * borne a parlé avant l'opération, ce qui n'est un échec de personne.
+ * The four kinds are not a reading convenience: they call for different moves. A caller
+ * compensates on {@see self::OperationFailed} — the handler ran and said no. It can retry on
+ * {@see self::HandlerError}, where the handler did not run at all and where the server itself
+ * says whether resuming makes sense. It does neither on {@see self::Cancellation}, which it most
+ * often requested. And {@see self::Timeout} says the bound spoke before the operation did, which
+ * is nobody's failure.
  *
- * Aplatir les quatre sur un échec générique effacerait justement ce qui permet de choisir.
+ * Flattening the four onto a generic failure would erase exactly what makes the choice possible.
  */
 enum NexusOperationFailureKind: string
 {
-    /** Le handler a tourné et a rendu un échec. */
+    /** The handler ran and returned a failure. */
     case OperationFailed = 'operation_failed';
 
-    /** Le handler n'a pas pu tourner ; le serveur porte le comportement de reprise. */
+    /** The handler could not run; the server carries the retry behaviour. */
     case HandlerError = 'handler_error';
 
-    /** Une borne s'est écoulée avant que l'opération n'aboutisse. */
+    /** A bound elapsed before the operation completed. */
     case Timeout = 'timeout';
 
-    /** L'opération a été annulée. */
+    /** The operation was cancelled. */
     case Cancellation = 'cancellation';
 }

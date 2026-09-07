@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Message Messenger : remettre un update à l'exécution, qui le traitera.
+ * Messenger message: hand an update to the execution, which will process it.
  *
- * Aucun résultat ici : l'issue d'un update est le retour de son handler, et seule une passe du
- * workflow la produit — {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowUpdateHandler}.
+ * No result here: the outcome of an update is its handler's return value, and only a pass of the
+ * workflow produces it — {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowUpdateHandler}.
  */
 final readonly class DeliverWorkflowUpdateMessage
 {

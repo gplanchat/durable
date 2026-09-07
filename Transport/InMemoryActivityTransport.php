@@ -13,7 +13,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
 
     public function enqueue(ActivityMessage $message): void
     {
-        // Le transport traduit le délai dans son propre mécanisme de report, puis l'oublie.
+        // The transport translates the delay into its own deferral mechanism, then forgets it.
         $at = microtime(true);
         if (null !== $message->retryDelay) {
             $at += $message->retryDelay->toSeconds();
@@ -43,7 +43,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
     }
 
     /**
-     * Premier message prêt sans le retirer (tests / orchestration distribuée).
+     * First ready message, without removing it (tests / distributed orchestration).
      */
     public function peek(): ?ActivityMessage
     {
@@ -95,7 +95,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
     }
 
     /**
-     * Nombre de messages encore en file (tous délais confondus).
+     * Number of messages still queued (all delays taken together).
      */
     public function pendingCount(): int
     {
@@ -103,7 +103,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
     }
 
     /**
-     * Lecture non destructive des messages dont l’heure d’échéance est atteinte.
+     * Non-destructive read of the messages whose due time has been reached.
      *
      * @return list<array{name: string, payload: array<string, mixed>}>
      */
