@@ -12,19 +12,18 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Suite de conformité de {@see WorkflowRunCatalogInterface} — DUR041.
+ * Conformance suite for {@see WorkflowRunCatalogInterface} — DUR041.
  *
- * Ce port est en **lecture seule** : la suite ne peut donc pas se remplir elle-même, et demande
- * deux crochets d'amorçage à l'adaptateur. C'est la forme qu'une suite de conformité prend quand le
- * port n'a pas d'écriture — les crochets disent « fais exister une exécution dans cet état », pas
- * « écris cette ligne ».
+ * This port is **read-only**: the suite therefore cannot fill itself, and asks the adapter for two
+ * seeding hooks. This is the shape a conformance suite takes when the port has no write side — the
+ * hooks say "make an execution exist in this state", not "write this row".
  *
- * **Ce que la suite n'exige pas :** un ordre précis entre deux exécutions démarrées dans la même
- * seconde. Le contrat annonce « de la plus récemment démarrée à la plus ancienne », et un backend
- * qui date à la seconde n'a alors pas de départage neutre à offrir. Exiger un ordre que le port ne
- * promet pas ferait échouer un adaptateur correct, ce qui est la façon la plus sûre de rendre une
- * suite inutilisable. Ce qui est exigé, et qui est la vraie garantie d'un tableau de bord, c'est
- * qu'une pagination **ne perde rien et ne montre rien deux fois**.
+ * **What the suite does not require:** a precise order between two executions started within the
+ * same second. The contract announces "from the most recently started to the oldest", and a backend
+ * that dates to the second then has no neutral tiebreak to offer. Requiring an order the port does
+ * not promise would fail a correct adapter, which is the surest way to make a suite unusable. What
+ * is required, and what is the real guarantee of a dashboard, is that a pagination **loses nothing
+ * and shows nothing twice**.
  *
  * @see DUR041
  * @see DUR037
@@ -32,17 +31,17 @@ use PHPUnit\Framework\TestCase;
 abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 {
     /**
-     * Le catalogue sous test, au-dessus du stockage que les deux crochets remplissent.
+     * The catalog under test, on top of the storage the two hooks fill.
      */
     abstract protected function catalogUnderTest(): WorkflowRunCatalogInterface;
 
     /**
-     * Fait exister une exécution en cours, portant ce type de workflow.
+     * Makes a running execution exist, carrying this workflow type.
      */
     abstract protected function startRun(string $executionId, string $workflowType): void;
 
     /**
-     * Amène une exécution déjà démarrée à son issue.
+     * Brings an already started execution to its outcome.
      */
     abstract protected function endRun(string $executionId, WorkflowRunStatus $outcome): void;
 
@@ -122,9 +121,9 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
-     * La garantie qui compte pour une vue. Les exécutions sont créées d'affilée, donc très
-     * probablement dans la même seconde : c'est exactement le cas où un curseur à décalage fait
-     * glisser la fenêtre.
+     * The guarantee that matters for a view. The executions are created in a row, so very probably
+     * within the same second: this is exactly the case where an offset cursor makes the window
+     * slide.
      */
     public function testPagingLosesNothingAndRepeatsNothing(): void
     {
@@ -191,8 +190,8 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
-     * « Ne lève jamais » est dans le contrat : une sonde en échec est un diagnostic, pas une panne
-     * de l'appelant.
+     * "Never throws" is in the contract: a failing probe is a diagnostic, not a failure of the
+     * caller.
      */
     public function testCheckingHealthAnswersRatherThanThrows(): void
     {
@@ -200,7 +199,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertNotSame('', $health->backend, 'a health report must say which backend it speaks of');
         self::assertNotSame('', $health->message);
-        self::assertTrue($health->reachable, 'le stockage du test est joignable par construction');
+        self::assertTrue($health->reachable, 'the test storage is reachable by construction');
     }
 
     // -----------------------------------------------------------------------------------------
@@ -217,13 +216,13 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         do {
             $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit);
             foreach (self::idsOf($page->runs) as $id) {
-                self::assertNotContains($id, $seen, \sprintf('%s est apparu deux fois en paginant', $id));
+                self::assertNotContains($id, $seen, \sprintf('%s showed up twice while paging', $id));
                 $seen[] = $id;
             }
             $cursor = $page->nextCursor;
         } while (null !== $cursor && ++$guard < 50);
 
-        self::assertLessThan(50, $guard, 'la pagination ne se termine pas');
+        self::assertLessThan(50, $guard, 'the paging does not terminate');
 
         return $seen;
     }

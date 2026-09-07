@@ -7,12 +7,12 @@ namespace Gplanchat\Durable\Testing;
 use PHPUnit\Framework\Assert;
 
 /**
- * Test double contrôlable pour les activités de workflow.
+ * A controllable test double for workflow activities.
  *
- * Enregistre chaque appel (payload), retourne des valeurs préréglées ou lève
- * une exception. Compatible avec {@see \Gplanchat\Durable\RegistryActivityExecutor::register()}.
+ * It records every call (payload), returns preset values or throws an
+ * exception. Compatible with {@see \Gplanchat\Durable\RegistryActivityExecutor::register()}.
  *
- * Usage :
+ * Usage:
  * ```php
  * $spy = ActivitySpy::returns('hello');
  * $env->register('greet', $spy);
@@ -36,7 +36,7 @@ final class ActivitySpy
     private function __construct() {}
 
     /**
-     * Retourne toujours la même valeur.
+     * Always returns the same value.
      */
     public static function returns(mixed $value): self
     {
@@ -47,7 +47,7 @@ final class ActivitySpy
     }
 
     /**
-     * Lève toujours l'exception fournie.
+     * Always throws the exception it was given.
      */
     public static function throws(\Throwable $exception): self
     {
@@ -58,15 +58,15 @@ final class ActivitySpy
     }
 
     /**
-     * Retourne les valeurs dans l'ordre à chaque appel.
-     * La dernière valeur est répétée si la séquence est épuisée.
+     * Returns the values in order, one per call.
+     * The last value is repeated once the sequence is exhausted.
      *
-     * Pour simuler des échecs dans une séquence, passer un Throwable
-     * directement (il sera levé lors de l'appel correspondant) :
+     * To simulate failures inside a sequence, pass a Throwable
+     * directly (it is thrown on the matching call):
      * ```php
      * $spy = ActivitySpy::returnsSequence(
-     *     new \RuntimeException('Temporary failure'), // tentative 1 → throw
-     *     'Success after retry',                      // tentative 2 → return
+     *     new \RuntimeException('Temporary failure'), // attempt 1 → throw
+     *     'Success after retry',                      // attempt 2 → return
      * );
      * ```
      */
@@ -79,7 +79,7 @@ final class ActivitySpy
     }
 
     /**
-     * Appelé par le registre d'activités avec le payload de la tâche.
+     * Called by the activity registry with the task payload.
      *
      * @param array<string, mixed> $payload
      */
@@ -126,7 +126,7 @@ final class ActivitySpy
     }
 
     /**
-     * @param array<string, mixed> $expectedArgs Payload attendu pour le dernier appel
+     * @param array<string, mixed> $expectedArgs Payload expected for the last call
      */
     public function assertCalledWith(array $expectedArgs): void
     {
@@ -134,17 +134,17 @@ final class ActivitySpy
         Assert::assertEquals(
             $expectedArgs,
             $this->calls[\count($this->calls) - 1],
-            'Les arguments du dernier appel ne correspondent pas.',
+            'The arguments of the last call do not match.',
         );
     }
 
     /**
-     * @param array<string, mixed> $expectedArgs Payload attendu pour le premier appel
+     * @param array<string, mixed> $expectedArgs Payload expected for the first call
      */
     public function assertFirstCallWith(array $expectedArgs): void
     {
         Assert::assertNotEmpty($this->calls, 'The activity spy was never called.');
-        Assert::assertEquals($expectedArgs, $this->calls[0], 'Les arguments du premier appel ne correspondent pas.');
+        Assert::assertEquals($expectedArgs, $this->calls[0], 'The arguments of the first call do not match.');
     }
 
     public function assertCalledTimes(int $times): void
@@ -170,8 +170,8 @@ final class ActivitySpy
     }
 
     /**
-     * Remet à zéro les appels enregistrés et la position dans la séquence.
-     * Utile pour réutiliser un spy entre plusieurs runs dans le même test.
+     * Resets the recorded calls and the position in the sequence.
+     * Useful to reuse a spy across several runs in the same test.
      */
     public function reset(): void
     {

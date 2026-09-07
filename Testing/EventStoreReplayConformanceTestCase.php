@@ -16,23 +16,23 @@ use Gplanchat\Durable\WorkflowEnvironment;
 use Gplanchat\Durable\WorkflowRegistry;
 
 /**
- * Le palier « replay » de DUR041 : au lieu d'écrire des événements fabriqués, il en fait produire
- * par un vrai workflow — activité, minuteur, deux effets de bord dont un payload imbriqué — puis
- * compare ce que le replay relit de l'adaptateur à ce qu'il relit de la référence.
+ * The "replay" tier of DUR041: instead of writing fabricated events, it has them produced by a real
+ * workflow — an activity, a timer, two side effects, one with a nested payload — then it compares
+ * what the replay reads back from the adapter with what it reads back from the reference.
  *
- * Un adaptateur qui pilote un workflow en ligne étend cette classe et hérite des deux paliers. Un
- * adaptateur adossé à un serveur doit n'étendre que {@see EventStoreConformanceTestCase} et rejouer
- * ce palier dans la suite d'intégration. La coupure est dans la déclaration de classe, pour qu'un
- * pont qui ne joue qu'une moitié de la suite soit un fait visible et non un oubli.
+ * An adapter that drives a workflow inline extends this class and inherits both tiers. An adapter
+ * backed by a server must extend {@see EventStoreConformanceTestCase} only, and replay this tier in
+ * the integration suite. The cut is in the class declaration, so that a bridge playing only one
+ * half of the suite is a visible fact and not an oversight.
  *
- * Ce docbloc affirmait que les deux stores Temporal étendaient le palier port. **C'est faux** : ni
- * {@see \Gplanchat\Bridge\Temporal\TemporalJournalEventStore} ni
- * {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore} n'étend quoi que ce
- * soit, et aucun des deux paliers ne s'exécute contre eux. Un pont qui ne joue **aucune** moitié
- * n'était pas prévu par la coupure, et c'est précisément l'oubli qu'elle devait rendre visible.
- * Le change `backend-data-parity` le comble ; DUR041 porte l'état réel.
+ * This docblock claimed that both Temporal stores extended the port tier. **That is false**:
+ * neither {@see \Gplanchat\Bridge\Temporal\TemporalJournalEventStore} nor
+ * {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore} extends anything at
+ * all, and neither tier runs against them. A bridge playing **no** half was not foreseen by the
+ * cut, and that is precisely the oversight it was meant to make visible.
+ * The `backend-data-parity` change fills it in; DUR041 carries the real state.
  *
- * La référence, elle, n'étend pas cette classe : on ne différencie pas un store d'avec lui-même.
+ * The reference, for its part, does not extend this class: a store is not diffed against itself.
  *
  * @see DUR041
  */
@@ -55,8 +55,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     }
 
     /**
-     * `EventStoreHistorySource` relit le flux à chaque interrogation de slot — c'est le chemin que
-     * le replay emprunte réellement, et il est plus exigeant qu'une lecture unique.
+     * `EventStoreHistorySource` reads the stream again on every slot lookup — that is the path the
+     * replay actually takes, and it is more demanding than a single read.
      */
     public function testReplaySlotLookupsAgreeWithTheReference(): void
     {
@@ -75,7 +75,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
         self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
 
-        // Les effets de bord portent un `mixed` : c'est là qu'un aller-retour JSON déforme.
+        // Side effects carry a `mixed`: that is where a JSON round trip distorts.
         self::assertSame($fromReference->findSideEffectForSlot(0), $fromSubject->findSideEffectForSlot(0));
         self::assertSame($fromReference->findSideEffectForSlot(1), $fromSubject->findSideEffectForSlot(1));
 
@@ -83,16 +83,16 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     }
 
     /**
-     * Les accesseurs d'identité que la garde de divergence interroge (DUR042).
+     * The identity accessors the divergence guard queries (DUR042).
      *
-     * Ils sont sur le même port que les recherches de slot ci-dessus, mais ils ne répondent pas à
-     * la même question : « qu'est-ce qui s'est passé ici » d'un côté, « qu'est-ce que c'était » de
-     * l'autre. Un adaptateur peut très bien rendre le bon résultat au bon slot et se tromper
-     * d'identité — et une garde qui compare la mauvaise identité vaut moins que pas de garde,
-     * puisqu'elle refuserait des replays fidèles.
+     * They are on the same port as the slot lookups above, but they do not answer the same
+     * question: "what happened here" on one side, "what was it" on the other. An adapter may very
+     * well return the right result for the right slot and get the identity wrong — and a guard that
+     * compares the wrong identity is worth less than no guard, since it would refuse faithful
+     * replays.
      *
-     * Ici plutôt que dans un test de parité dédié à un adaptateur : tout store qui étend cette
-     * classe hérite du contrôle, aujourd'hui comme demain.
+     * Here rather than in a parity test dedicated to one adapter: every store that extends this
+     * class inherits the check, today as tomorrow.
      */
     public function testIdentityLookupsAgreeWithTheReference(): void
     {
@@ -112,14 +112,14 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
         self::assertNotNull($fromSubject->activityNameForSlot(0), 'and must not be lost on the way');
 
-        // Un slot que le workflow n'a pas atteint : null des deux côtés. C'est ce qui distingue
-        // « rien à comparer » de « divergence », et un adaptateur qui répondrait la chaîne vide
-        // ferait refuser un workflow qui grandit.
+        // A slot the workflow did not reach: null on both sides. That is what distinguishes
+        // "nothing to compare" from "divergence", and an adapter answering the empty string would
+        // have a growing workflow refused.
         self::assertNull($fromSubject->activityNameForSlot(1));
         self::assertSame($fromReference->activityNameForSlot(1), $fromSubject->activityNameForSlot(1));
 
-        // Le workflow de conformité ne démarre aucun enfant et ce backend refuse Nexus (DUR036) :
-        // les deux accesseurs doivent le dire, et le dire pareil.
+        // The conformance workflow starts no child and this backend refuses Nexus (DUR036): both
+        // accessors must say so, and say it the same way.
         self::assertNull($fromSubject->childWorkflowTypeForSlot(0));
         self::assertSame($fromReference->childWorkflowTypeForSlot(0), $fromSubject->childWorkflowTypeForSlot(0));
         self::assertNull($fromSubject->nexusOperationSignatureForSlot(0));
@@ -127,12 +127,12 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     }
 
     /**
-     * La version qu'une exécution a enregistrée doit survivre à l'aller-retour dans le store.
+     * The version an execution recorded must survive the round trip through the store.
      *
-     * C'est la propriété dont dépend tout le versioning : au replay, la réponse vient du journal.
-     * Un adaptateur qui la perdrait ferait reprendre à une exécution en vol l'autre branche — sans
-     * rien signaler, puisque la garde de divergence, elle, verrait un code cohérent avec sa
-     * nouvelle version.
+     * This is the property the whole of versioning depends on: at replay, the answer comes from the
+     * journal. An adapter that lost it would have an in-flight execution resume on the other branch
+     * — without signalling anything, since the divergence guard would see code consistent with its
+     * new version.
      */
     public function testVersionLookupsAgreeWithTheReference(): void
     {
@@ -151,9 +151,9 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
             $fromSubject->versionForChangeId('conformance-change'),
         );
 
-        // Un point que ce workflow n'a jamais déclaré : null des deux côtés. C'est ce qui
-        // distingue « pas encore atteint » de « version 0 », et un adaptateur qui répondrait 0
-        // ferait prendre l'ancienne branche à une exécution qui n'y a jamais eu droit.
+        // A change point this workflow never declared: null on both sides. That is what
+        // distinguishes "not reached yet" from "version 0", and an adapter answering 0 would
+        // have an execution take the old branch it was never entitled to.
         self::assertNull($fromSubject->versionForChangeId('jamais-declare'));
         self::assertSame(
             $fromReference->versionForChangeId('jamais-declare'),
@@ -179,10 +179,10 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
 
         return $runner->run($executionId, static function (WorkflowEnvironment $wf): array {
-            // Un point de changement dans le workflow de conformité : c'est ce qui oblige chaque
-            // adaptateur à faire l'aller-retour du marqueur de version, et pas seulement la
-            // référence. Un store qui perdrait `VersionMarked` ferait rebasculer une exécution en
-            // vol sur l'autre branche — en silence.
+            // A change point in the conformance workflow: this is what forces every adapter to
+            // round trip the version marker, and not just the reference. A store that lost
+            // `VersionMarked` would swing an in-flight execution back onto the other branch —
+            // silently.
             $wf->version('conformance-change', ChangePoint::DEFAULT_VERSION, 1);
             $nested = $wf->sideEffect(static fn(): array => ['nested' => ['deep' => true], 'ratio' => 0.1]);
             $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
@@ -194,7 +194,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     }
 
     /**
-     * @return list<array{string, array<string, mixed>}> type d'événement + payload, dans l'ordre
+     * @return list<array{string, array<string, mixed>}> event type + payload, in order
      */
     private static function journalShape(EventStoreInterface $store, string $executionId): array
     {
@@ -207,8 +207,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     }
 
     /**
-     * Deux exécutions distinctes tirent des identifiants et des horloges différents ; les
-     * neutraliser laisse exactement ce que la comparaison doit porter : la forme du journal.
+     * Two distinct executions draw different identifiers and clocks; neutralizing them leaves
+     * exactly what the comparison must carry: the shape of the journal.
      *
      * @param array<string, mixed> $payload
      *

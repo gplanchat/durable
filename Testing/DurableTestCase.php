@@ -58,9 +58,9 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Raccourci : crée l'environnement et retourne directement le runner.
+     * Shortcut: creates the environment and returns the runner directly.
      *
-     * Convient pour les tests simples qui n'ont pas besoin des assertions de cette classe.
+     * Suitable for simple tests that do not need the assertions of this class.
      *
      * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers
      */
@@ -72,7 +72,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Vérifie que le workflow s'est terminé normalement et que son résultat est correct.
+     * Checks that the workflow finished normally and that its result is correct.
      */
     protected function assertWorkflowCompleted(string $executionId, mixed $expectedResult): void
     {
@@ -89,7 +89,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Vérifie que le workflow a échoué, optionnellement avec une classe d'exception précise.
+     * Checks that the workflow failed, optionally with a specific exception class.
      *
      * @param class-string<\Throwable>|'' $expectedFailureClass
      */
@@ -111,7 +111,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Vérifie qu'une activité nommée a bien été planifiée (et donc exécutée) dans le workflow.
+     * Checks that a named activity was indeed scheduled (and therefore executed) in the workflow.
      */
     protected function assertActivityExecuted(string $executionId, string $activityName): void
     {
@@ -130,7 +130,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Vérifie qu'un type d'événement précis se trouve dans l'event store pour cette exécution.
+     * Checks that a specific event type is in the event store for this execution.
      *
      * @param class-string $eventClass
      */
@@ -151,7 +151,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Compte combien d'activités d'un nom donné ont été planifiées.
+     * Counts how many activities of a given name were scheduled.
      */
     protected function countActivityExecutions(string $executionId, string $activityName): int
     {
@@ -167,7 +167,7 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Retourne l'environnement courant ou lève une LogicException s'il n'a pas été initialisé.
+     * Returns the current environment, or throws a LogicException if it was not initialized.
      */
     protected function requireCurrentEnvironment(): WorkflowTestEnvironment
     {
