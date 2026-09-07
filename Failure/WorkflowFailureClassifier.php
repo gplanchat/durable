@@ -13,11 +13,11 @@ use Gplanchat\Durable\Exception\DurableNexusOperationFailedException;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 
 /**
- * Traduit un throwable remonté d'un fiber workflow en {@see WorkflowExecutionFailed} typé.
+ * Translates a throwable surfacing from a workflow fiber into a typed {@see WorkflowExecutionFailed}.
  *
- * Point de passage unique des **deux** pilotes de fiber ({@see \Gplanchat\Durable\ExecutionEngine}
- * et {@see \Gplanchat\Bridge\Temporal\Worker\WorkflowTaskRunner}) : sans lui, le pilote Temporal
- * aplatissait tout sur un seul `kind`.
+ * Single point of passage for **both** fiber drivers ({@see \Gplanchat\Durable\ExecutionEngine}
+ * and {@see \Gplanchat\Bridge\Temporal\Worker\WorkflowTaskRunner}): without it, the Temporal
+ * driver flattened everything onto a single `kind`.
  */
 final class WorkflowFailureClassifier
 {

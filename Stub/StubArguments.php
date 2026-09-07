@@ -5,45 +5,45 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Stub;
 
 /**
- * Ce qu'un stub `__call` fait des arguments qu'on lui a passés.
+ * What a `__call` stub does with the arguments it was handed.
  *
- * Les trois stubs — activité, opération Nexus, workflow enfant — appellent tous une méthode d'un
- * contrat par `__call`, et doivent tous transformer les arguments reçus en une charge nommée, parce
- * que c'est nommé que ça voyage dans le journal. Ils le faisaient chacun de leur côté, à
- * l'identique, et avec le même défaut.
+ * The three stubs — activity, Nexus operation, child workflow — all call a contract method through
+ * `__call`, and all have to turn the arguments they receive into a named payload, because named is
+ * how it travels in the journal. Each did it on its own side, identically, and with the same flaw.
  *
- * **Le défaut : les arguments nommés étaient silencieusement perdus.** PHP passe les arguments
- * nommés à `__call` dans un tableau à **clés de chaînes** ; l'appariement se faisait par indice
- * (`$arguments[$i]`), aucun indice ne répondait, et *tous* les paramètres retombaient sur leur
- * valeur par défaut. Sans exception, sans trace. Un workflow enfant démarré ainsi partait avec un
- * prompt vide et attendait un message qui ne viendrait jamais.
+ * **The flaw: named arguments were silently lost.** PHP passes named arguments to `__call` in an
+ * array with **string keys**; the matching was done by index (`$arguments[$i]`), no index ever
+ * answered, and *every* parameter fell back to its default value. No exception, no trace. A child
+ * workflow started that way set off with an empty prompt and waited for a message that would never
+ * come.
  *
- * **Le second défaut, du même ordre : `??` confond « absent » et « null ».** Passer explicitement
- * `null` à un paramètre nullable donnait sa valeur par défaut plutôt que `null` — c'est-à-dire
- * l'inverse de ce qui était demandé. D'où `array_key_exists` plutôt que `??`.
+ * **The second flaw, of the same order: `??` confuses "absent" and "null".** Explicitly passing
+ * `null` to a nullable parameter gave its default value rather than `null` — that is, the opposite
+ * of what was asked for. Hence `array_key_exists` rather than `??`.
  *
- * **Et ce que PHP refuse, le stub le refuse.** Sur un appel ordinaire, PHP lève sur un argument
- * nommé inconnu (`Unknown named parameter`), sur un argument requis manquant (`ArgumentCountError`)
- * et sur un paramètre servi deux fois, en positionnel puis en nommé (`Named parameter $x overwrites
- * previous argument`). Un stub qui avale l'un des trois rend une faute indiscernable d'une valeur
- * voulue — et la fait voyager jusque dans le journal, où elle sera rejouée à l'identique. Les trois
- * lèvent donc ici aussi. Le type diffère de celui de PHP — `\BadMethodCallException` plutôt que
- * `\Error` ou `\ArgumentCountError` — parce que l'appel passe par `__call` : c'est l'exception que
- * la SPL réserve à une méthode appelée de travers, et elle reste rattrapable.
+ * **And what PHP refuses, the stub refuses.** On an ordinary call, PHP throws on an unknown named
+ * argument (`Unknown named parameter`), on a missing required argument (`ArgumentCountError`) and
+ * on a parameter served twice, positionally then by name (`Named parameter $x overwrites previous
+ * argument`). A stub that swallows any of the three makes a mistake indistinguishable from an
+ * intended value — and sends it travelling all the way into the journal, where it will be replayed
+ * identically. All three therefore throw here too. The type differs from PHP's —
+ * `\BadMethodCallException` rather than `\Error` or `\ArgumentCountError` — because the call goes
+ * through `__call`: it is the exception the SPL reserves for a method called wrongly, and it stays
+ * catchable.
  */
 final class StubArguments
 {
     private function __construct() {}
 
     /**
-     * @param array<int|string, mixed> $arguments tels que `__call` les a reçus : les positionnels
-     *                                            sous des indices, les nommés sous leur nom
+     * @param array<int|string, mixed> $arguments as `__call` received them: the positional ones
+     *                                            under indices, the named ones under their name
      *
-     * @return array<string, mixed> la charge nommée, un paramètre du contrat par clé
+     * @return array<string, mixed> the named payload, one contract parameter per key
      *
-     * @throws \BadMethodCallException si un argument nommé ne correspond à aucun paramètre, si un
-     *                                 paramètre requis n'est pas fourni, ou si un paramètre est
-     *                                 servi à la fois en positionnel et en nommé
+     * @throws \BadMethodCallException if a named argument matches no parameter, if a required
+     *                                 parameter is not supplied, or if a parameter is served both
+     *                                 positionally and by name
      */
     public static function toPayload(\ReflectionFunctionAbstract $method, array $arguments): array
     {
@@ -54,8 +54,8 @@ final class StubArguments
             $name = $param->getName();
             $connus[$name] = true;
 
-            // Un variadique n'a ni valeur par défaut ni obligation : il ne peut pas manquer, et
-            // il n'a pas de place à lui dans une charge nommée.
+            // A variadic has neither a default value nor an obligation: it cannot be missing, and
+            // it has no place of its own in a named payload.
             if ($param->isVariadic()) {
                 continue;
             }
@@ -89,9 +89,9 @@ final class StubArguments
                 continue;
             }
 
-            // Le retomber-sur-`null` d'ici traversait le journal sans un mot, et se rejouait à
-            // l'identique à chaque passe : le paramètre est requis, son absence est une faute
-            // d'appel, et un type non nullable l'aurait de toute façon refusée à l'arrivée.
+            // The fall-back-to-`null` that used to be here crossed the journal without a word,
+            // and replayed identically on every pass: the parameter is required, its absence is a
+            // call error, and a non-nullable type would have refused it on arrival anyway.
             throw new \BadMethodCallException(\sprintf(
                 'Missing required argument $%s for %s().',
                 $name,

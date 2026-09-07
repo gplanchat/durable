@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 /**
- * Marque une classe comme implémentation des activités d'un contrat (interface + #[AsActivityMethod]).
- * Le bundle enregistre chaque activité sur {@see \Gplanchat\Durable\ActivityExecutor} au compile-time.
+ * Marks a class as the implementation of a contract's activities (interface + #[AsActivityMethod]).
+ * The bundle registers each activity on {@see \Gplanchat\Durable\ActivityExecutor} at compile-time.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class AsActivityHandler

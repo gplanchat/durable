@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 /**
- * Déclare qu'un workflow remplit une opération Nexus : son résultat devient celui de l'opération.
+ * Declares that a workflow fulfils a Nexus operation: its result becomes the operation's result.
  *
- * La déclaration vit **sur le workflow**, et non sur le contrat, pour deux raisons.
+ * The declaration lives **on the workflow**, and not on the contract, for two reasons.
  *
- * Le contrat est lu par l'appelant, qui n'a pas à connaître la classe qui le sert — l'y nommer
- * ferait fuir l'implémentation à travers la frontière que Nexus existe pour poser.
+ * The contract is read by the caller, which has no business knowing the class that serves it —
+ * naming it there would leak the implementation across the very boundary Nexus exists to draw.
  *
- * Et c'est ici que le code vit. Une opération remplie par un workflow n'a pas de corps de
- * gestionnaire : la plomberie démarre le workflow avec le callback de la tâche attaché, et le
- * serveur livre son résultat à l'appelant. Le déclarer ailleurs obligerait à écrire une méthode
- * vide pour dire qu'il n'y a rien à écrire.
+ * And this is where the code lives. An operation fulfilled by a workflow has no handler body: the
+ * plumbing starts the workflow with the task's callback attached, and the server delivers its
+ * result to the caller. Declaring it anywhere else would force writing an empty method just to say
+ * there is nothing to write.
  */
 #[\Attribute(\Attribute::TARGET_CLASS | \Attribute::IS_REPEATABLE)]
 final readonly class FulfilsNexusOperation
