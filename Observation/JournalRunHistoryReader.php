@@ -35,18 +35,18 @@ use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * Traduit un flux de journal en historique lisible.
+ * Translates a journal stream into a readable history.
  *
- * Une seule passe avant suffit pour nommer les activités : la planification précède toujours la
- * complétion dans l'ordre d'enregistrement, donc le nom est connu quand on en a besoin. Une
- * complétion sans sa planification — journal purgé, reprise partielle — retombe sur l'identifiant :
- * un id vaut mieux qu'une ligne sans nom.
+ * A single forward pass is enough to name the activities: the scheduling always precedes the
+ * completion in recording order, so the name is known by the time it is needed. A completion
+ * without its scheduling — purged journal, partial resumption — falls back to the identifier: an id
+ * is worth more than a row without a name.
  */
 final class JournalRunHistoryReader
 {
     /**
-     * La clé de l'action que l'exécution est pour elle-même. Une seule par historique, et la
-     * première : c'est son démarrage qui ouvre le flux.
+     * The key of the action the execution is for itself. One only per history, and the first: it
+     * is its start that opens the stream.
      */
     private const RUN_ACTION = 'workflow';
 
@@ -61,12 +61,12 @@ final class JournalRunHistoryReader
     {
         /** @var array<string, string> $activityNames */
         $activityNames = [];
-        // Les événements terminaux d'une opération Nexus ne portent que le `scheduledEventId` :
-        // l'identité — endpoint, service, opération — n'est écrite que sur la planification. Même
-        // contrainte que pour les activités, même remède.
+        // The terminal events of a Nexus operation carry nothing but the `scheduledEventId`: the
+        // identity — endpoint, service, operation — is written on the scheduling only. Same
+        // constraint as for activities, same remedy.
         /** @var array<int, string> $nexusNames */
         $nexusNames = [];
-        // Même contrainte que pour les activités : seule la planification connaît le résumé.
+        // Same constraint as for activities: only the scheduling knows the summary.
         /** @var array<string, string> $timerNames */
         $timerNames = [];
         /** @var array<string, string> $childNames */
@@ -103,15 +103,16 @@ final class JournalRunHistoryReader
                 $recordedAt instanceof \DateTimeImmutable ? $recordedAt : new \DateTimeImmutable('@0'),
                 self::kindOf($event),
                 self::labelOf($event, $activityNames, $nexusNames, $timerNames, $childNames, $workflowName),
-                // `payload()` est sur l'interface `Event` : c'est la forme sérialisée que
-                // l'événement se donne déjà pour être écrit puis relu. Rien à traduire, et rien à
-                // choisir non plus — filtrer ici reviendrait à décider à la place de l'exploitant
-                // ce qui mérite d'être vu le jour où quelque chose ne va pas.
+                // `payload()` is on the `Event` interface: it is the serialised shape the event
+                // already gives itself in order to be written and then read back. Nothing to
+                // translate, and nothing to choose either — filtering here would amount to
+                // deciding in the operator's stead what deserves to be seen on the day something
+                // goes wrong.
                 $event->payload(),
                 self::actionKeyOf($event),
-                // Même règle que le pont Temporal : l'événement par lequel le travail commence
-                // pour de bon. Ici il n'y en a que deux, et `ExecutionStarted` est inerte — il
-                // ouvre l'exécution, donc aucun intervalle ne le précède.
+                // Same rule as the Temporal bridge: the event by which the work begins for real.
+                // Here there are only two of them, and `ExecutionStarted` is inert — it opens the
+                // execution, so no interval precedes it.
                 $event instanceof ActivityTaskStarted || $event instanceof ExecutionStarted,
                 self::isFailure($event),
             );
@@ -121,16 +122,16 @@ final class JournalRunHistoryReader
     }
 
     /**
-     * Le nom d'un minuteur : son résumé s'il en a un, et **son délai dans tous les cas**.
+     * The name of a timer: its summary if it has one, and **its delay in every case**.
      *
-     * « TimerScheduled » nomme la classe, et un résumé seul dit pourquoi on attend sans dire
-     * combien de temps — or c'est le délai qu'un exploitant vient lire, et le déduire lui
-     * demanderait de soustraire deux horodatages de deux lignes.
+     * "TimerScheduled" names the class, and a summary on its own says why we are waiting without
+     * saying for how long — yet the delay is what an operator comes to read, and deducing it would
+     * require subtracting two timestamps from two rows.
      *
-     * ⚠ `scheduledAt()` est l'**échéance**, pas l'instant de la planification : le délai est donc
-     * la différence avec l'horodatage d'enregistrement. Sans cet horodatage — un journal qui ne
-     * l'a pas gardé — le minuteur reste sans délai plutôt que d'en annoncer un compté depuis
-     * l'époque Unix, ce qui donnerait « 55 ans » sur une attente de cinq secondes.
+     * ⚠ `scheduledAt()` is the **deadline**, not the instant of the scheduling: the delay is
+     * therefore the difference with the recording timestamp. Without that timestamp — a journal
+     * that did not keep it — the timer stays without a delay rather than announcing one counted
+     * from the Unix epoch, which would give "55 years" for a five-second wait.
      */
     private static function timerLabel(TimerScheduled $event, ?\DateTimeImmutable $recordedAt): string
     {
@@ -145,14 +146,14 @@ final class JournalRunHistoryReader
     }
 
     /**
-     * Ce qui a mal tourné, et rien d'autre.
+     * What went wrong, and nothing else.
      *
-     * ⚠ **Une annulation n'en est pas.** `ActivityCancelled`, `TimerCancelled`,
-     * `WorkflowExecutionCancelled` sont des issues demandées par quelqu'un ; les peindre comme des
-     * pannes enverrait chercher un incident là où il n'y a qu'une décision, et le rouge cesserait
-     * de vouloir dire quoi que ce soit. Le pont Temporal tient la même frontière, aux deux
-     * suffixes `_FAILED` et `_TIMED_OUT` — ⚠ et il écrit `CANCELED` à un seul « l » là où le
-     * journal écrit `Cancelled`, ce qui fait rater une règle écrite d'un seul côté.
+     * ⚠ **A cancellation is not one.** `ActivityCancelled`, `TimerCancelled`,
+     * `WorkflowExecutionCancelled` are outcomes requested by someone; painting them as breakdowns
+     * would send people looking for an incident where there is only a decision, and red would stop
+     * meaning anything at all. The Temporal bridge holds the same line, at the two suffixes
+     * `_FAILED` and `_TIMED_OUT` — ⚠ and it writes `CANCELED` with a single "l" where the journal
+     * writes `Cancelled`, which makes a rule written on one side only miss.
      */
     private static function isFailure(Event $event): bool
     {
@@ -166,17 +167,17 @@ final class JournalRunHistoryReader
     }
 
     /**
-     * L'action dont l'événement fait partie, ou `null` quand il est à lui seul la sienne.
+     * The action the event is part of, or `null` when it is its own all by itself.
      *
-     * Le journal corrèle déjà : une activité par son `activityId`, un minuteur par son `timerId`,
-     * une opération Nexus par l'identifiant de sa planification. Il n'y a rien à inventer ici, juste
-     * à cesser de jeter le lien au moment de traduire.
+     * The journal already correlates: an activity by its `activityId`, a timer by its `timerId`, a
+     * Nexus operation by the identifier of its scheduling. There is nothing to invent here, just to
+     * stop throwing the link away at translation time.
      */
     private static function actionKeyOf(Event $event): ?string
     {
-        // L'exécution elle-même est une action : son démarrage, sa fin, son annulation. Un signal
-        // reçu ou une mise à jour n'en font pas partie — ce sont des actions à part entière, et
-        // c'est pour cela que la liste est écrite plutôt que dérivée de la nature `Execution`.
+        // The execution itself is an action: its start, its end, its cancellation. A signal
+        // received or an update are not part of it — they are actions in their own right, and that
+        // is why the list is written out rather than derived from the `Execution` kind.
         if ($event instanceof ExecutionStarted
             || $event instanceof ExecutionCompleted
             || $event instanceof WorkflowExecutionFailed
@@ -261,9 +262,9 @@ final class JournalRunHistoryReader
         array $childNames,
         string $workflowName,
     ): string {
-        // Une ligne de frise porte le nom de son action, et l'action de l'exécution est
-        // l'exécution : « ExecutionStarted » nomme une classe d'événement, pas ce qui tourne.
-        // Le journal ne connaît pas ce nom — il n'a qu'un flux — donc l'appelant le lui donne.
+        // A frieze row carries the name of its action, and the action of the execution is the
+        // execution: "ExecutionStarted" names an event class, not what is running. The journal
+        // does not know that name — it only has a stream — so the caller gives it to it.
         if ($event instanceof ExecutionStarted && '' !== $workflowName) {
             return $workflowName;
         }
@@ -282,8 +283,8 @@ final class JournalRunHistoryReader
 
         $scheduledEventId = self::nexusScheduledEventIdOf($event);
         if (null !== $scheduledEventId) {
-            // Sans la planification — un journal tronqué, une lecture partielle — mieux vaut
-            // nommer l'identifiant que rendre une étiquette qui ne désigne rien.
+            // Without the scheduling — a truncated journal, a partial read — it is better to
+            // name the identifier than to return a label that designates nothing.
             return $nexusNames[$scheduledEventId] ?? ('nexus #' . $scheduledEventId);
         }
 
@@ -291,8 +292,8 @@ final class JournalRunHistoryReader
             || $event instanceof TimerCompleted
             || $event instanceof TimerCancelled
         ) {
-            // Une ligne de frise porte le nom de son action. « TimerScheduled » nomme la classe,
-            // pas l'attente : `timer 5s avant relance` dit ce qu'un exploitant est venu lire.
+            // A frieze row carries the name of its action. "TimerScheduled" names the class, not
+            // the wait: `timer 5s before retry` says what an operator came to read.
             return $timerNames[$event->timerId()] ?? ('timer ' . $event->timerId());
         }
 
@@ -343,8 +344,8 @@ final class JournalRunHistoryReader
     }
 
     /**
-     * Repli lisible pour tout ce qui n'a pas de nom métier : `SideEffectRecorded` vaut mieux que
-     * `Gplanchat\Durable\Event\SideEffectRecorded`, et bien mieux que rien.
+     * Readable fallback for everything that has no business name: `SideEffectRecorded` is worth
+     * more than `Gplanchat\Durable\Event\SideEffectRecorded`, and far better than nothing.
      */
     private static function shortName(Event $event): string
     {
