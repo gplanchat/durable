@@ -7,15 +7,15 @@ namespace Gplanchat\Durable\Exception;
 use Gplanchat\Durable\Duration;
 
 /**
- * L'échéance passée à {@see \Gplanchat\Durable\WorkflowEnvironment::await()} ou à
- * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} s'est écoulée avant que le travail
- * attendu ne se règle.
+ * The deadline passed to {@see \Gplanchat\Durable\WorkflowEnvironment::await()} or to
+ * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} elapsed before the awaited work
+ * settled.
  *
- * Une défaillance, pas une valeur : `null` est une réponse qu'un travail borné a le droit de
- * rendre, et le point de cette échéance est justement de l'en distinguer (ADR DUR032).
+ * A failure, not a value: `null` is an answer a bounded piece of work is entitled to return, and
+ * the point of this deadline is precisely to tell it apart from that (ADR DUR032).
  *
- * À ne pas confondre avec {@see \Gplanchat\Durable\Activity\ActivityTimeouts}, qui borne une
- * tentative d'activité côté serveur. Celle-ci borne *cette* attente, dans *cette* exécution.
+ * Not to be confused with {@see \Gplanchat\Durable\Activity\ActivityTimeouts}, which bounds an
+ * activity attempt on the server side. This one bounds *this* wait, in *this* execution.
  */
 final class DeadlineExceededException extends \RuntimeException
 {
@@ -36,7 +36,7 @@ final class DeadlineExceededException extends \RuntimeException
         return $this->deadline;
     }
 
-    /** Ce qui était attendu, tel qu'il peut être nommé depuis le journal (activité, minuteur, signal). */
+    /** What was awaited, as it can be named from the journal (activity, timer, signal). */
     public function awaited(): string
     {
         return $this->awaited;

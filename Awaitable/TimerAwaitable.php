@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Enveloppe d'un awaitable issu de {@see \Gplanchat\Durable\ExecutionContext::delay()} / {@see \Gplanchat\Durable\ExecutionContext::timer()}.
+ * Wrapper for an awaitable produced by {@see \Gplanchat\Durable\ExecutionContext::delay()} / {@see \Gplanchat\Durable\ExecutionContext::timer()}.
  *
- * Permet au runtime distribué de distinguer une attente timer (reprise par worker / horloge) d'une attente signal/update.
+ * Lets the distributed runtime tell a timer wait (resumed by worker / clock) from a signal/update wait.
  *
  * @implements Awaitable<mixed>
  */

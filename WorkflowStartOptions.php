@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable;
 
 /**
- * Options de démarrage d'une exécution racine (pendant de {@see ChildWorkflowOptions} pour les
- * enfants).
+ * Start options for a root execution (the counterpart of {@see ChildWorkflowOptions} for
+ * children).
  *
- * Les clés de métadonnées sont volontairement identiques à celles de
- * {@see ChildWorkflowOptions::toSchedulingMetadata()} : racine et enfant décrivent les mêmes
- * réglages, et le pont Temporal les lit au même endroit.
+ * The metadata keys are deliberately identical to those of
+ * {@see ChildWorkflowOptions::toSchedulingMetadata()}: root and child describe the same
+ * settings, and the Temporal bridge reads them in the same place.
  */
 final readonly class WorkflowStartOptions
 {
-    /** Les bornes temporelles de l'exécution, prises ensemble. */
+    /** The time bounds of the execution, taken together. */
     public WorkflowTimeouts $timeouts;
 
-    /** Ce sur quoi l'exécution pourra être retrouvée. */
+    /** What the execution will be findable by. */
     public SearchAttributes $searchAttributes;
 
     public function __construct(
         /**
-         * Récurrence. Le serveur relance une exécution à chaque échéance ; la précédente doit
-         * être terminée, sinon l'échéance est sautée.
+         * Recurrence. The server starts an execution at every due time; the previous one must
+         * be finished, otherwise the due time is skipped.
          */
         public ?CronSchedule $cronSchedule = null,
         public ?TaskQueue $taskQueue = null,

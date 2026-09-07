@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Levée lorsque le workflow doit s'arrêter et être re-dispatché
- * (mode distribué, activité en attente).
+ * Thrown when the workflow must stop and be re-dispatched
+ * (distributed mode, activity pending).
  *
- * {@see shouldDispatchResume()} : faux pour signaux / updates — seuls les handlers
- * {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowSignalHandler} (etc.) doivent
- * relancer ; sinon transport Messenger **sync** boucle à l’infini.
+ * {@see shouldDispatchResume()}: false for signals / updates — only the
+ * {@see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowSignalHandler} handlers (etc.) must
+ * relaunch; otherwise a **sync** Messenger transport loops forever.
  *
  * @see DUR021 Symfony Messenger integration (distributed resume)
  */
@@ -23,9 +23,9 @@ final class WorkflowSuspendedException extends \RuntimeException
         private readonly bool $shouldDispatchResume = true,
         private readonly bool $waitingOnTimer = false,
         /**
-         * Ce sur quoi l'attente porte, quand ça se nomme : sans ça, un runner qui constate
-         * qu'une exécution n'avance plus ne peut dire que « bloquée », jamais « bloquée sur
-         * cette condition-là ».
+         * What the wait bears on, when that has a name: without it, a runner that observes an
+         * execution no longer moving forward can only say "stuck", never "stuck on that
+         * particular condition".
          */
         private readonly ?string $waitingOn = null,
     ) {
@@ -33,8 +33,8 @@ final class WorkflowSuspendedException extends \RuntimeException
     }
 
     /**
-     * Si vrai, {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} envoie un {@see \Gplanchat\Durable\Transport\WorkflowRunMessage} de reprise
-     * (activité / timer à faire progresser par un worker).
+     * If true, {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} sends a {@see \Gplanchat\Durable\Transport\WorkflowRunMessage} resume
+     * (activity / timer to be moved forward by a worker).
      */
     public function shouldDispatchResume(): bool
     {
@@ -42,8 +42,8 @@ final class WorkflowSuspendedException extends \RuntimeException
     }
 
     /**
-     * Si vrai, l’attente porte sur un minuteur durable : ne pas enchaîner des reprises immédiates ;
-     * planifier {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (éventuellement avec délai Messenger).
+     * If true, the wait bears on a durable timer: do not chain immediate resumes;
+     * schedule {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (possibly with a Messenger delay).
      */
     public function waitingOn(): ?string
     {

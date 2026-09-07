@@ -5,31 +5,30 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Un événement, et **où il se pose** dans la durée de son exécution.
+ * An event, and **where it sits** within the duration of its execution.
  *
- * `offset` compte les secondes depuis le premier fait enregistré du run, pas depuis le début de
- * l'action : c'est ce qui met le repère d'une ligne sur la même verticale que celui d'une autre, et
- * donc ce qui permet de lire d'un coup d'œil qu'une activité a démarré pendant qu'une autre
- * attendait.
+ * `offset` counts the seconds since the run's first recorded fact, not since the start of the
+ * action: that is what puts one row's marker on the same vertical as another's, and therefore what
+ * makes it possible to read at a glance that one activity started while another was waiting.
  *
- * Des **secondes**, jamais un pourcentage. Mettre à l'échelle demande de connaître la largeur d'une
- * colonne, et une surface qui ne rend aucun balisage n'en a pas.
+ * **Seconds**, never a percentage. Scaling requires knowing the width of a column, and a surface
+ * that renders no markup has none.
  *
- * `title` est ce qu'un hôte affiche au survol du repère. Il est composé ici et non chez l'hôte pour
- * que les deux surfaces le disent avec les mêmes mots : un exploitant qui passe de l'une à l'autre
- * ne doit rien avoir à traduire.
+ * `title` is what a host displays when hovering the marker. It is composed here and not at the host
+ * so that both surfaces say it with the same words: an operator moving from one to the other must
+ * have nothing to translate.
  *
- * `actionLabel` est le nom de l'**action** dont l'événement fait partie, et non le sien : seule la
- * planification connaît le nom de l'activité, ses suites ne portent qu'un numéro. Une surface en
- * tableau affichait donc `ACTIVITY TASK STARTED` sur deux lignes sur trois, là où l'exploitant
- * cherchait `charge`. C'est la même chaîne que celle qui nomme la ligne de frise, si bien qu'une
- * ligne de l'un se retrouve dans l'autre. Un événement qui est à lui seul son action se nomme
- * lui-même : laisser la case vide ferait croire à un trou.
+ * `actionLabel` is the name of the **action** the event is part of, and not its own: only the
+ * scheduling knows the activity's name, its follow-ups carry nothing but a number. A table surface
+ * therefore displayed `ACTIVITY TASK STARTED` on two rows out of three, where the operator was
+ * looking for `charge`. It is the same string as the one that names the frieze row, so that a row
+ * of the one is found again in the other. An event that is its own action all by itself names
+ * itself: leaving the cell empty would look like a hole.
  *
- * `renderedDetails` est {@see RecordedDetails::of()} appliqué une fois. `null` veut dire « rien à
- * déplier » — et c'est ce qui permet à l'hôte de laisser une ligne simple plutôt qu'un dépliant qui
- * s'ouvre sur du vide. Le fait brut reste sur `$event->details`, pour une surface qui sert des
- * données plutôt qu'une page.
+ * `renderedDetails` is {@see RecordedDetails::of()} applied once. `null` means "nothing to
+ * unfold" — and that is what lets the host leave a plain row rather than a disclosure panel that
+ * opens onto nothing. The raw fact stays on `$event->details`, for a surface that serves data
+ * rather than a page.
  */
 final readonly class TimelineEvent
 {

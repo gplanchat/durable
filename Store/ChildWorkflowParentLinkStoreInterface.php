@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 /**
- * Associe temporairement un run enfant au parent pour finaliser le journal parent en mode async Messenger.
+ * Temporarily links a child run to its parent, to finalise the parent journal in Messenger async mode.
  */
 interface ChildWorkflowParentLinkStoreInterface
 {
@@ -14,7 +14,7 @@ interface ChildWorkflowParentLinkStoreInterface
     public function getParentExecutionId(string $childExecutionId): ?string;
 
     /**
-     * @return list<string> enfants enregistrés pour ce parent (ordre non garanti)
+     * @return list<string> children recorded for this parent (order not guaranteed)
      */
     public function getChildExecutionIdsForParent(string $parentExecutionId): array;
 

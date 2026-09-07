@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Une opération Nexus a abouti.
+ * A Nexus operation has succeeded.
  *
- * L'`eventId` de la planification est ce qui la rattache à son opération : sans lui, le profileur
- * n'aurait que des événements flottants, impossibles à recomposer en une ligne de vie.
+ * The scheduling `eventId` is what ties it back to its operation: without it, the profiler would
+ * only have floating events, impossible to recompose into a timeline.
  */
 final readonly class NexusOperationCompleted implements Event
 {

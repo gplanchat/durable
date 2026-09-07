@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 /**
- * Les handlers de query d'une exécution, tenus par le moteur.
+ * An execution's query handlers, held by the engine.
  *
- * Ils vivaient sur {@see \Gplanchat\Durable\WorkflowEnvironment} — l'objet que le moteur avait
- * sous la main, pas celui qui en avait besoin. Un auteur de workflow pouvait donc enregistrer,
- * sonder et invoquer un handler, c'est-à-dire court-circuiter la déclaration `#[AsQueryMethod]`
- * qu'il est censé écrire.
+ * They used to live on {@see \Gplanchat\Durable\WorkflowEnvironment} — the object the engine had
+ * to hand, not the one that needed them. A workflow author could therefore register, probe and
+ * invoke a handler, that is, short-circuit the `#[AsQueryMethod]` declaration they are supposed
+ * to write.
  *
- * Le registre est porté par {@see \Gplanchat\Durable\ExecutionContext}, qu'un workflow ne reçoit
- * jamais. Le chargeur de définitions y écrit au moment d'instancier la classe ; le worker y lit
- * quand une query arrive du serveur. Ni l'un ni l'autre ne passe par l'environnement.
+ * The registry is carried by {@see \Gplanchat\Durable\ExecutionContext}, which a workflow never
+ * receives. The definition loader writes to it when instantiating the class; the worker reads
+ * from it when a query arrives from the server. Neither of them goes through the environment.
  *
  * @internal
  */
 final class QueryHandlerRegistry
 {
-    /** @var array<string, callable> nom de query → handler */
+    /** @var array<string, callable> query name → handler */
     private array $handlers = [];
 
     public function register(string $queryType, callable $handler): void
@@ -36,7 +36,7 @@ final class QueryHandlerRegistry
     /**
      * @param array<mixed> $args
      *
-     * @throws \InvalidArgumentException si aucun handler n'est déclaré pour ce nom
+     * @throws \InvalidArgumentException if no handler is declared for that name
      */
     public function call(string $queryType, array $args = []): mixed
     {

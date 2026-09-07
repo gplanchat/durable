@@ -67,9 +67,9 @@ interface WorkflowHistorySourceInterface
     /**
      * Returns the recorded outcome for timer slot N, or null if it is still pending.
      *
-     * `failed` porte l'annulation du minuteur ({@see \Gplanchat\Durable\Event\TimerCancelled}) :
-     * sans ce canal, un minuteur annulé par l'annulation du workflow ne pouvait pas relever la
-     * même exception au replay.
+     * `failed` carries the timer's cancellation ({@see \Gplanchat\Durable\Event\TimerCancelled}):
+     * without that channel, a timer cancelled by the workflow's cancellation could not raise the
+     * same exception on replay.
      *
      * @return array{id: string, scheduledAt: float, failed: \Throwable|null}|null
      */

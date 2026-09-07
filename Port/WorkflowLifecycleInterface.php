@@ -9,48 +9,49 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 
 /**
- * Issues du cycle de vie d'un run, telles que le backend les enregistre.
+ * The lifecycle outcomes of a run, as the backend records them.
  *
- * {@see \Gplanchat\Durable\Worker\WorkflowFiberDriver} pilote le fiber — démarrage, replay,
- * suspension, terminaison — de façon identique pour tous les backends ; ce port porte les seules
- * décisions qui leur appartiennent en propre : le backend in-memory journalise des événements
- * ({@see \Gplanchat\Durable\Store\EventStoreWorkflowLifecycle}), le backend Temporal empile des
- * commandes ({@see \Gplanchat\Bridge\Temporal\Worker\TemporalWorkflowLifecycle}).
+ * {@see \Gplanchat\Durable\Worker\WorkflowFiberDriver} drives the fiber — start, replay,
+ * suspension, termination — identically for every backend; this port carries the only decisions
+ * that belong to them in their own right: the in-memory backend journals events
+ * ({@see \Gplanchat\Durable\Store\EventStoreWorkflowLifecycle}), the Temporal backend stacks
+ * commands ({@see \Gplanchat\Bridge\Temporal\Worker\TemporalWorkflowLifecycle}).
  *
- * Plusieurs méthodes ont le droit de **lever** pour interrompre le run : c'est ainsi que le
- * backend in-memory signale suspension, annulation et échec à son appelant, là où le backend
- * Temporal rend la main pour laisser partir les commandes de la tâche courante.
+ * Several methods are entitled to **throw** in order to interrupt the run: that is how the
+ * in-memory backend signals suspension, cancellation and failure to its caller, where the
+ * Temporal backend hands control back to let the current task's commands go out.
  */
 interface WorkflowLifecycleInterface
 {
     /**
-     * Avant tout démarrage de fiber.
+     * Before any fiber starts.
      *
-     * @throws \Throwable pour empêcher le run de démarrer
+     * @throws \Throwable to prevent the run from starting
      */
     public function onBeforeRun(string $executionId): void;
 
     /**
-     * Une annulation a-t-elle été demandée et **pas encore livrée** au workflow ?
+     * Has a cancellation been requested and **not yet delivered** to the workflow?
      *
-     * La livraison doit être unique par exécution : le fiber étant rejoué depuis le début à
-     * chaque tâche, un « oui » permanent ferait relever l'annulation dans les attentes de
-     * compensation elles-mêmes, et le workflow ne pourrait jamais compenser.
+     * Delivery must be unique per execution: since the fiber is replayed from the start on every
+     * task, a permanent "yes" would raise the cancellation inside the compensation waits
+     * themselves, and the workflow could never compensate.
      */
     public function isCancellationPending(string $executionId): bool;
 
     /**
-     * L'annulation a traversé le handler sans être avalée : l'exécution se termine annulée.
+     * The cancellation went through the handler without being swallowed: the execution ends
+     * cancelled.
      *
-     * @throws \Throwable pour propager la fin à l'appelant
+     * @throws \Throwable to propagate the ending to the caller
      */
     /**
-     * L'annulation vient d'être relevée dans le fiber ; `$cancelledOperationIds` liste les
-     * opérations retirées à cette occasion.
+     * The cancellation has just been raised inside the fiber; `$cancelledOperationIds` lists the
+     * operations withdrawn on that occasion.
      *
-     * Le backend doit pouvoir, au rejeu, rejeter **ces mêmes** opérations avec la même
-     * exception : sans quoi le `catch` du workflow ne matcherait plus et la compensation
-     * divergerait d'une tâche à l'autre.
+     * On replay the backend must be able to reject **those same** operations with the same
+     * exception: without which the workflow's `catch` would no longer match and the compensation
+     * would diverge from one task to the next.
      *
      * @param list<string> $cancelledOperationIds
      */
@@ -59,30 +60,30 @@ interface WorkflowLifecycleInterface
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void;
 
     /**
-     * Le handler est allé au bout.
+     * The handler ran all the way through.
      */
     public function onCompleted(string $executionId, mixed $result): void;
 
     /**
-     * Le fiber attend un awaitable non réglé ; la commande correspondante est déjà dans le buffer.
+     * The fiber is waiting on an unsettled awaitable; the matching command is already in the buffer.
      *
      * @param Awaitable<mixed> $pending
      *
-     * @throws \Throwable pour signaler la suspension à l'appelant plutôt que rendre la main
+     * @throws \Throwable to signal the suspension to the caller rather than hand control back
      */
     public function onSuspended(string $executionId, Awaitable $pending): void;
 
     /**
-     * Terminaison **normale** : le run courant s'arrête pour en enchaîner un nouveau.
+     * **Normal** termination: the current run stops in order to chain a new one.
      *
-     * @throws \Throwable pour propager la demande à l'appelant
+     * @throws \Throwable to propagate the request to the caller
      */
     public function onContinuedAsNew(string $executionId, ContinueAsNewRequested $request): void;
 
     /**
-     * Le handler n'a pas géré une erreur.
+     * The handler did not handle an error.
      *
-     * @throws \Throwable pour propager l'échec à l'appelant
+     * @throws \Throwable to propagate the failure to the caller
      */
     public function onFailed(string $executionId, \Throwable $failure): void;
 }

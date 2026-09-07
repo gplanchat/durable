@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Awaitable;
 
 /**
- * Enveloppe d'un awaitable issu de {@see \Gplanchat\Durable\ExecutionContext::activity()}
- * pour permettre l'annulation des perdants d'un {@see any()} / {@see race()}.
+ * Wrapper for an awaitable produced by {@see \Gplanchat\Durable\ExecutionContext::activity()}
+ * so that the losers of an {@see any()} / {@see race()} can be cancelled.
  *
  * @implements Awaitable<mixed>
  */

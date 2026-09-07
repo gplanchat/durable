@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus\Serving;
 
 /**
- * Les types d'erreur que nexus-rpc définit, et ce que le serveur en fait.
+ * The error types nexus-rpc defines, and what the server does with them.
  *
- * Rien n'est inventé ici : la table vient du SDK **nexus-rpc**, partagé par tous les langages, et
- * l'arbitrage 1b.3 l'a reprise telle quelle. La ligne de partage est *à qui la faute* — une requête
- * malformée ou un droit manquant ne s'améliorera pas en réessayant ; une surcharge ou un délai en
- * amont, peut-être.
+ * Nothing is invented here: the table comes from the **nexus-rpc** SDK, shared by every language,
+ * and arbitration 1b.3 took it as it stands. The dividing line is *whose fault it is* — a malformed
+ * request or a missing right will not get any better on a retry; an overload or an upstream delay,
+ * perhaps.
  *
- * Ce que ça coûte de se tromper est mesuré (sonde 1.7) : une erreur réessayable revient toutes les
- * ~9 secondes, sur l'horloge du `request-timeout`, jusqu'à épuisement du budget de l'opération. Un
- * gestionnaire qui refuse une entrée invalide en disant « réessaie » refuse la même entrée pendant
- * une minute et demie.
+ * What getting it wrong costs is measured (probe 1.7): a retryable error comes back every ~9
+ * seconds, on the `request-timeout` clock, until the operation's budget is exhausted. A handler
+ * that refuses an invalid input by saying "try again" refuses the same input for a minute and a
+ * half.
  */
 enum NexusHandlerErrorType: string
 {

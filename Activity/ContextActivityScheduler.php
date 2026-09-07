@@ -8,11 +8,11 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Le port d'ordonnancement, câblé sur le contexte d'exécution.
+ * The scheduling port, wired onto the execution context.
  *
- * Construit par {@see \Gplanchat\Durable\WorkflowEnvironment::activityStub()} et jamais rendu :
- * c'est ce qui fait qu'un auteur de workflow ne peut pas l'atteindre. Le contexte, lui, expose
- * bien `activity()` — mais un workflow ne reçoit jamais le contexte, il reçoit l'environnement.
+ * Built by {@see \Gplanchat\Durable\WorkflowEnvironment::activityStub()} and never handed out:
+ * that is what makes it unreachable to a workflow author. The context, for its part, does expose
+ * `activity()` — but a workflow never receives the context, it receives the environment.
  *
  * @internal
  */

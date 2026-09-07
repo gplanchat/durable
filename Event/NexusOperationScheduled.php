@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Une opération Nexus a été planifiée.
+ * A Nexus operation has been scheduled.
  *
- * Porte le site d'appel — endpoint, service, opération — parce que c'est ce qu'on cherche en
- * ouvrant un profil : quel service externe cette exécution appelle, et lequel a coûté cher.
+ * Carries the call site — endpoint, service, operation — because that is what you look for when
+ * opening a profile: which external service this execution calls, and which one was expensive.
  *
- * L'identité est l'`eventId` de la planification. Ce n'est pas un choix : c'est par lui que
- * Temporal rattache les états terminaux à leur opération, et c'est donc la seule clé qui permette
- * de recomposer une ligne de vie.
+ * The identity is the scheduling `eventId`. This is not a choice: it is through it that Temporal
+ * ties the terminal states back to their operation, and it is therefore the only key that lets a
+ * timeline be recomposed.
  */
 final readonly class NexusOperationScheduled implements Event
 {

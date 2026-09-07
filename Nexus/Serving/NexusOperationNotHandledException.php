@@ -8,12 +8,12 @@ use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusService;
 
 /**
- * Personne ne sert cette opération.
+ * Nobody serves this operation.
  *
- * L'erreur est **terminale**, et c'est le point : `NOT_IMPLEMENTED` est du côté non réessayable de
- * la table de 1b.3. La dire réessayable ferait redemander la même opération toutes les ~9 secondes
- * pendant tout le budget de l'opération (sonde 1.7), pour une réponse qui ne changera pas — le
- * gestionnaire n'apparaîtra pas entre deux tentatives.
+ * The error is **terminal**, and that is the point: `NOT_IMPLEMENTED` is on the non-retryable side
+ * of the 1b.3 table. Calling it retryable would ask for the same operation again every ~9 seconds
+ * for the whole budget of the operation (probe 1.7), for an answer that will not change — the
+ * handler will not appear between two attempts.
  */
 final class NexusOperationNotHandledException extends \RuntimeException
 {

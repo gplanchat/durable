@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Message Messenger : déposer un signal dans le journal puis relancer le workflow.
+ * Messenger message: drop a signal into the journal, then resume the workflow.
  *
  * @see \Gplanchat\Durable\Bundle\Handler\DeliverWorkflowSignalHandler
  */
 final readonly class DeliverWorkflowSignalMessage
 {
-    /** Le nom tel qu'il voyage : le message est sérialisé par Messenger, pas une enum (ADR DUR034). */
+    /** The name as it travels: the message is serialized by Messenger, not an enum (ADR DUR034). */
     public string $signalName;
 
     /**

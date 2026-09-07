@@ -7,13 +7,13 @@ namespace Gplanchat\Durable\Event;
 use Gplanchat\Durable\ParentClosePolicy;
 
 /**
- * Un workflow enfant est planifié depuis le parent (journal du **parent**).
+ * A child workflow is scheduled from the parent (journal of the **parent**).
  */
 final readonly class ChildWorkflowScheduled implements Event
 {
     /**
      * @param array<string, mixed> $input
-     * @param array<string, mixed> $schedulingMetadata Options alignées Temporal (namespace, task_queue, timeouts, …)
+     * @param array<string, mixed> $schedulingMetadata Temporal-aligned options (namespace, task_queue, timeouts, …)
      */
     public function __construct(
         private string $parentExecutionId,
@@ -54,7 +54,7 @@ final readonly class ChildWorkflowScheduled implements Event
     }
 
     /**
-     * Identifiant demandé par l’appelant (si différent de {@see childExecutionId()} en cas de génération auto).
+     * Id asked for by the caller (if different from {@see childExecutionId()} when auto-generated).
      */
     public function requestedWorkflowId(): ?string
     {

@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Une exécution a rencontré un point de changement, et la réponse qu'elle a reçue est désormais
- * la sienne — pour toujours.
+ * An execution has met a change point, and the answer it received is now its own — forever.
  *
- * C'est cet enregistrement qui distingue le versioning de la devinette : au replay, la réponse
- * vient d'ici et non du code déployé, donc une exécution en vol garde son comportement quoi qu'on
- * déploie ensuite.
+ * It is this record that tells versioning apart from guesswork: on replay, the answer comes from
+ * here and not from the deployed code, so an execution in flight keeps its behaviour whatever
+ * gets deployed next.
  */
 final readonly class VersionMarked implements Event
 {

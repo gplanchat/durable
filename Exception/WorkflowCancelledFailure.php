@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Levée **dans le fiber**, au point d'attente, quand l'annulation de l'exécution a été demandée.
+ * Thrown **inside the fiber**, at the point of waiting, when cancellation of the execution has
+ * been requested.
  *
- * Équivalent du `CanceledFailure` Temporal : le workflow peut l'attraper pour compenser, puis la
- * relancer (l'exécution se termine annulée) ou l'avaler et se terminer normalement — un workflow
- * a le droit d'ignorer une annulation.
+ * The equivalent of Temporal's `CanceledFailure`: the workflow may catch it to compensate, then
+ * rethrow it (the execution ends cancelled) or swallow it and end normally — a workflow is
+ * entitled to ignore a cancellation.
  *
- * Livrée **une seule fois** par exécution : l'opération en attente est annulée avec la raison
- * {@see \Gplanchat\Durable\ActivityCancellationReason::WORKFLOW_CANCELLED}, ce qui sert à la fois
- * de trace de livraison et de source du rejet au replay — le workflow relève donc la même
- * exception au même endroit, sans marqueur supplémentaire côté in-memory.
+ * Delivered **exactly once** per execution: the pending operation is cancelled with the reason
+ * {@see \Gplanchat\Durable\ActivityCancellationReason::WORKFLOW_CANCELLED}, which serves both
+ * as the trace of delivery and as the source of the rejection on replay — the workflow therefore
+ * throws the same exception at the same place, with no extra marker on the in-memory side.
  */
 final class WorkflowCancelledFailure extends \RuntimeException
 {

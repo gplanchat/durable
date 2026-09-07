@@ -7,12 +7,12 @@ namespace Gplanchat\Durable\Store;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 
 /**
- * Décore le magasin de métadonnées pour semer le nom dans la projection.
+ * Decorates the metadata store to seed the name into the projection.
  *
- * Seul `save()` est observé, et c'est délibéré : c'est le seul appel non ambigu, et le seul qui
- * porte le type de workflow. `delete()` veut dire trois choses selon le site qui l'appelle —
- * continue-as-new, annulation, échec — donc l'issue se lit dans le journal, pas ici. Le cycle de
- * vie des métadonnées n'en est pas modifié d'un iota.
+ * Only `save()` is observed, and that is deliberate: it is the only unambiguous call, and the only
+ * one that carries the workflow type. `delete()` means three things depending on the site that
+ * calls it — continue-as-new, cancellation, failure — so the outcome is read from the journal, not
+ * here. The metadata lifecycle is not changed by one iota.
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */

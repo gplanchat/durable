@@ -13,14 +13,14 @@ use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
 /**
- * Décore le journal pour y lire l'issue des exécutions.
+ * Decorates the journal to read the outcome of executions from it.
  *
- * Les quatre fins arrivent ici typées et en un seul endroit — `EventStoreWorkflowLifecycle` les
- * ajoute toutes —, là où le magasin de métadonnées les confond dans un même `delete()`. C'est ce
- * qui rend un décorateur possible ici et impossible là-bas.
+ * The four endings arrive here typed and in a single place — `EventStoreWorkflowLifecycle` appends
+ * them all — where the metadata store confuses them in one and the same `delete()`. That is what
+ * makes a decorator possible here and impossible over there.
  *
- * Ce cycle de vie est celui du backend journal ; Temporal utilise `TemporalWorkflowLifecycle`,
- * donc rien de tout ceci ne se déclenche sur une application Temporal.
+ * This lifecycle is the journal backend's; Temporal uses `TemporalWorkflowLifecycle`, so none of
+ * this fires on a Temporal application.
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */
@@ -57,8 +57,8 @@ final class ProjectingEventStore implements EventStoreInterface
     }
 
     /**
-     * `null` pour tout ce qui n'est pas une fin : la projection ne bouge qu'aux quatre transitions
-     * qui terminent une exécution.
+     * `null` for anything that is not an ending: the projection only moves on the four transitions
+     * that terminate an execution.
      */
     private static function outcomeOf(Event $event): ?WorkflowRunStatus
     {

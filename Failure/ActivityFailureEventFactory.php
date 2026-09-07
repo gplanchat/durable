@@ -9,8 +9,8 @@ use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 
 /**
- * Construit un événement d'échec d'activité persistable ou un événement catastrophique
- * lorsque l'échec ne peut pas être sérialisé de façon sûre pour le journal.
+ * Builds a persistable activity failure event, or a catastrophic event when the failure cannot
+ * be safely serialized for the journal.
  */
 final class ActivityFailureEventFactory
 {
