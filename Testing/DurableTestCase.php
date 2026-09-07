@@ -12,12 +12,12 @@ use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Classe de base PHPUnit pour tester des workflows avec l'infrastructure in-memory.
+ * The PHPUnit base class for testing workflows against the in-memory infrastructure.
  *
- * Fournit un accès simplifié à {@see WorkflowTestEnvironment} et des méthodes
- * d'assertion spécialisées sur l'event store.
+ * It gives short access to {@see WorkflowTestEnvironment}, and assertion methods that read the
+ * event store.
  *
- * Usage :
+ * Usage:
  * ```php
  * final class MyWorkflowTest extends DurableTestCase
  * {
@@ -43,7 +43,7 @@ abstract class DurableTestCase extends TestCase
     private ?WorkflowTestEnvironment $currentEnvironment = null;
 
     /**
-     * Crée un environnement de test in-memory et le mémorise pour les assertions.
+     * Creates an in-memory test environment and keeps it for the assertions to read.
      *
      * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers
      */
@@ -58,9 +58,9 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Raccourci : crée l'environnement et retourne directement le runner.
+     * Shortcut: creates the environment and returns the runner directly.
      *
-     * Convient pour les tests simples qui n'ont pas besoin des assertions de cette classe.
+     * Suitable for simple tests that do not need the assertions of this class.
      *
      * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers
      */
@@ -72,24 +72,24 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Vérifie que le workflow s'est terminé normalement et que son résultat est correct.
+     * Checks that the workflow finished normally and that its result is correct.
      */
     protected function assertWorkflowCompleted(string $executionId, mixed $expectedResult): void
     {
         $completed = $this->findEvent($executionId, ExecutionCompleted::class);
         Assert::assertNotNull(
             $completed,
-            \sprintf('Le workflow "%s" ne s\'est pas terminé (aucun événement ExecutionCompleted trouvé).', $executionId),
+            \sprintf('The workflow "%s" did not finish (no ExecutionCompleted event found).', $executionId),
         );
         Assert::assertEquals(
             $expectedResult,
             $completed->result(),
-            \sprintf('Le résultat du workflow "%s" ne correspond pas à l\'attendu.', $executionId),
+            \sprintf('The workflow "%s" did not return what was expected.', $executionId),
         );
     }
 
     /**
-     * Vérifie que le workflow a échoué, optionnellement avec une classe d'exception précise.
+     * Checks that the workflow failed, optionally with a specific exception class.
      *
      * @param class-string<\Throwable>|'' $expectedFailureClass
      */
@@ -98,20 +98,20 @@ abstract class DurableTestCase extends TestCase
         $failed = $this->findEvent($executionId, WorkflowExecutionFailed::class);
         Assert::assertNotNull(
             $failed,
-            \sprintf('Le workflow "%s" n\'a pas échoué (aucun événement WorkflowExecutionFailed trouvé).', $executionId),
+            \sprintf('The workflow "%s" did not fail (no WorkflowExecutionFailed event found).', $executionId),
         );
 
         if ('' !== $expectedFailureClass) {
             Assert::assertSame(
                 $expectedFailureClass,
                 $failed->failureClass(),
-                \sprintf('La classe d\'échec du workflow "%s" ne correspond pas.', $executionId),
+                \sprintf('The workflow "%s" failed with another class than the expected one.', $executionId),
             );
         }
     }
 
     /**
-     * Vérifie qu'une activité nommée a bien été planifiée (et donc exécutée) dans le workflow.
+     * Checks that a named activity was indeed scheduled (and therefore executed) in the workflow.
      */
     protected function assertActivityExecuted(string $executionId, string $activityName): void
     {
@@ -125,12 +125,12 @@ abstract class DurableTestCase extends TestCase
         }
         Assert::assertTrue(
             $found,
-            \sprintf('L\'activité "%s" n\'a pas été planifiée dans le workflow "%s".', $activityName, $executionId),
+            \sprintf('The activity "%s" was never scheduled in the workflow "%s".', $activityName, $executionId),
         );
     }
 
     /**
-     * Vérifie qu'un type d'événement précis se trouve dans l'event store pour cette exécution.
+     * Checks that a specific event type is in the event store for this execution.
      *
      * @param class-string $eventClass
      */
@@ -146,12 +146,12 @@ abstract class DurableTestCase extends TestCase
         }
         Assert::assertTrue(
             $found,
-            \sprintf('L\'événement "%s" n\'a pas été trouvé dans l\'event store pour l\'exécution "%s".', $eventClass, $executionId),
+            \sprintf('The event "%s" was not found in the event store for the execution "%s".', $eventClass, $executionId),
         );
     }
 
     /**
-     * Compte combien d'activités d'un nom donné ont été planifiées.
+     * Counts how many activities of a given name were scheduled.
      */
     protected function countActivityExecutions(string $executionId, string $activityName): int
     {
@@ -167,13 +167,13 @@ abstract class DurableTestCase extends TestCase
     }
 
     /**
-     * Retourne l'environnement courant ou lève une LogicException s'il n'a pas été initialisé.
+     * Returns the current environment, or throws a LogicException if it was not initialized.
      */
     protected function requireCurrentEnvironment(): WorkflowTestEnvironment
     {
         if (null === $this->currentEnvironment) {
             throw new \LogicException(
-                'Aucun WorkflowTestEnvironment n\'a été créé. Appelez createWorkflowTestEnvironment() dans setUp() ou au début du test.',
+                'No WorkflowTestEnvironment was created. Call createWorkflowTestEnvironment() in setUp(), or at the start of the test.',
             );
         }
 

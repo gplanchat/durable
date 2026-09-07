@@ -8,15 +8,15 @@ use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusOperationFailureKind;
 
 /**
- * Une opération Nexus n'a pas abouti, et l'exception dit **pourquoi** et **où**.
+ * A Nexus operation did not succeed, and the exception says **why** and **where**.
  *
- * Le pourquoi est {@see NexusOperationFailureKind} : quatre natures qui appellent quatre gestes
- * différents. Le où est le triplet endpoint / service / opération, exigé par le spec pour qu'un
- * échec non rattrapé nomme le site d'appel — sans lui, un workflow qui parle à trois endpoints
- * tombe sans dire lequel.
+ * The why is {@see NexusOperationFailureKind}: four natures that call for four different moves.
+ * The where is the endpoint / service / operation triplet, required by the spec so that an
+ * uncaught failure names the call site — without it, a workflow that talks to three endpoints
+ * goes down without saying which one.
  *
- * Le comportement de reprise ne voyage que sur {@see NexusOperationFailureKind::HandlerError} :
- * c'est le serveur qui l'énonce, et seulement quand le handler n'a pas tourné.
+ * The retry behaviour only travels on {@see NexusOperationFailureKind::HandlerError}: it is the
+ * server that states it, and only when the handler did not run.
  */
 final class DurableNexusOperationFailedException extends \Exception
 {
@@ -69,7 +69,7 @@ final class DurableNexusOperationFailedException extends \Exception
     }
 
     /**
-     * Ce que le serveur dit de la reprise, et seulement pour une erreur de handler.
+     * What the server says about the retry, and only for a handler error.
      */
     public function retryBehaviour(): ?string
     {

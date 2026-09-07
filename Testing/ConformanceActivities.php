@@ -7,8 +7,8 @@ namespace Gplanchat\Durable\Testing;
 use Gplanchat\Durable\Attribute\AsActivityMethod;
 
 /**
- * Le contrat d'activité que {@see EventStoreReplayConformanceTestCase} planifie. Une seule méthode,
- * dont le résultat n'est pas scalaire : c'est le retour d'activité qui traverse le journal.
+ * The activity contract that {@see EventStoreReplayConformanceTestCase} schedules. A single method,
+ * whose result is not scalar: it is the activity return value that travels through the journal.
  *
  * @see DUR041
  */

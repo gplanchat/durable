@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Échec d'activité non journalisable de façon sûre (payload JSON impossible) :
- * considéré comme défaillance grave du code / des données de l'activité.
+ * Activity failure that cannot be journalled safely (JSON payload impossible):
+ * treated as a severe failure of the activity's code / data.
  */
 final readonly class ActivityCatastrophicFailure implements Event
 {

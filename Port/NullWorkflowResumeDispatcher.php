@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 /**
- * Dispatcher no-op pour le mode inline.
+ * No-op dispatcher for inline mode.
  */
 final class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
 {

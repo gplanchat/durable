@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Fin réussie d’un workflow enfant (journal du **parent**).
+ * Successful end of a child workflow (journal of the **parent**).
  */
 final readonly class ChildWorkflowCompleted implements Event
 {

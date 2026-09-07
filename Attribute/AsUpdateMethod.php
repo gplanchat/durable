@@ -11,7 +11,7 @@ final class AsUpdateMethod
         public readonly \BackedEnum|string $name,
     ) {}
 
-    /** Le nom tel qu'il voyage : sur le fil, un update est une chaîne. */
+    /** The name as it travels: on the wire, an update is a string. */
     public function updateName(): string
     {
         return $this->name instanceof \BackedEnum ? (string) $this->name->value : $this->name;

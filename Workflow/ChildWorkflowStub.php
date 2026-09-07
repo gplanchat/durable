@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\ChildWorkflowOptions;
+use Gplanchat\Durable\Stub\StubArguments;
 
 /**
- * Proxy de planification côté workflow pour exécuter un workflow enfant typé.
+ * Workflow-side scheduling proxy for running a typed child workflow.
  *
- * Chaque appel à la méthode WorkflowMethod démarre l'enfant et rend un `Awaitable` : c'est
- * l'appelant qui attend, ce qui rend l'enfant composable — une course, un quorum, une
- * échéance. Un stub qui attendait pour l'appelant ne pouvait entrer dans aucun assemblage.
+ * Every call to the WorkflowMethod method starts the child and returns an `Awaitable`: it is the
+ * caller that awaits, which makes the child composable — a race, a quorum, a deadline. A stub
+ * that awaited on the caller's behalf could not enter any assembly.
  *
  * @template TWorkflow of object
  */
@@ -59,13 +60,6 @@ final class ChildWorkflowStub
      */
     private function argumentsToInput(array $arguments): array
     {
-        $params = $this->workflowMethod->getParameters();
-        $input = [];
-        foreach ($params as $i => $param) {
-            $key = $param->getName();
-            $input[$key] = $arguments[$i] ?? ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
-        }
-
-        return $input;
+        return StubArguments::toPayload($this->workflowMethod, $arguments);
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Port de transport des messages d'activité.
+ * Transport port for activity messages.
  *
  * @see DUR002 (CQRS repositories, ports around the event journal)
  */
@@ -15,21 +15,21 @@ interface ActivityTransportInterface
 
     public function dequeue(): ?ActivityMessage;
 
-    /** True quand aucun message n'est **prêt** ; un message différé peut rester en attente. */
+    /** True when no message is **ready**; a deferred message may still be pending. */
     public function isEmpty(): bool;
 
     /**
-     * Échéance du prochain message en attente, différé compris, ou null si la file est vraiment
-     * vide.
+     * Due time of the next pending message, deferred ones included, or null if the queue is
+     * truly empty.
      *
-     * Distinct de {@see isEmpty()} : un drain synchrone doit savoir attendre une retentative
-     * planifiée plus tard, au lieu de conclure qu'il n'y a plus rien à faire.
+     * Distinct from {@see isEmpty()}: a synchronous drain has to know how to wait for a retry
+     * scheduled later, instead of concluding that there is nothing left to do.
      */
     public function nextDueAt(): ?float;
 
     /**
-     * Retire un message encore en file pour cette exécution et cet activityId (non dequeue).
-     * Best effort : Messenger ou file déjà consommée → false.
+     * Removes a message still queued for this execution and this activityId (not a dequeue).
+     * Best effort: Messenger, or a queue already consumed → false.
      */
     public function removePendingFor(string $executionId, string $activityId): bool;
 }

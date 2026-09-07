@@ -7,17 +7,17 @@ namespace Gplanchat\Durable\Nexus;
 use Gplanchat\Durable\Awaitable\Awaitable;
 
 /**
- * Ce dont un {@see NexusStub} a besoin, et rien de plus : de quoi planifier une opération.
+ * What a {@see NexusStub} needs, and nothing more: enough to schedule an operation.
  *
- * Même montage que {@see \Gplanchat\Durable\Activity\ActivitySchedulerInterface}, et pour la même
- * raison. `nexusOperation(endpoint, service, operation, payload)` nommait trois choses par des
- * chaînes libres : le même nom s'écrivait à deux endroits, chez l'appelant et chez le gestionnaire,
- * sans rien qui les relie — et une faute de frappe y produit une opération qui attend un
- * gestionnaire dont le nom ne correspondra jamais, au lieu d'une erreur de type. C'est exactement
- * ce que DUR039 avait retiré de la surface pour les activités, et que le côté Nexus avait gardé.
+ * Same assembly as {@see \Gplanchat\Durable\Activity\ActivitySchedulerInterface}, and for the same
+ * reason. `nexusOperation(endpoint, service, operation, payload)` named three things with free
+ * strings: the same name was written in two places, at the caller and at the handler, with nothing
+ * tying them together — and a typo there produces an operation waiting for a handler whose name
+ * will never match, instead of a type error. That is exactly what DUR039 removed from the surface
+ * for activities, and what the Nexus side had kept.
  *
- * Ce port n'est pas porté par {@see \Gplanchat\Durable\WorkflowEnvironment} : l'implémenter y
- * reviendrait à rendre le verbe public sous un autre nom.
+ * This port is not carried by {@see \Gplanchat\Durable\WorkflowEnvironment}: implementing it there
+ * would amount to making the verb public under another name.
  */
 interface NexusOperationSchedulerInterface
 {

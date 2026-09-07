@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 /**
- * Aligné sur {@see \Temporal\Activity\ActivityCancellationType} (SDK Temporal PHP).
+ * Aligned with {@see \Temporal\Activity\ActivityCancellationType} (Temporal PHP SDK).
  */
 enum ActivityCancellationType: int
 {
-    /** Demande d’annulation sans attendre la fin d’exécution de l’activité. */
+    /** Requests cancellation without waiting for the activity's execution to end. */
     case TryCancel = 0;
-    /** Attendre la complétion (succès, échec ou annulation acceptée). */
+    /** Waits for completion (success, failure, or accepted cancellation). */
     case WaitCancellationCompleted = 1;
-    /** Ne pas attendre la réponse du worker après annulation. */
+    /** Does not wait for the worker's answer after cancellation. */
     case Abandon = 2;
 }

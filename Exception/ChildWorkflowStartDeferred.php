@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Le démarrage de l'enfant est confié au backend au lieu d'être exécuté en ligne : le parent
- * reprendra quand l'issue de l'enfant sera visible dans son historique.
+ * Starting the child is handed to the backend instead of being executed inline: the parent will
+ * resume when the child's outcome is visible in its history.
  *
- * - Messenger : le handler enfant append {@see \Gplanchat\Durable\Event\ChildWorkflowCompleted}
- *   / {@see \Gplanchat\Durable\Event\ChildWorkflowFailed} sur le journal du parent ;
- * - Temporal : le serveur écrit CHILD_WORKFLOW_EXECUTION_COMPLETED / _FAILED dans l'historique.
+ * - Messenger: the child handler appends {@see \Gplanchat\Durable\Event\ChildWorkflowCompleted}
+ *   / {@see \Gplanchat\Durable\Event\ChildWorkflowFailed} onto the parent's journal;
+ * - Temporal: the server writes CHILD_WORKFLOW_EXECUTION_COMPLETED / _FAILED into the history.
  */
 final class ChildWorkflowStartDeferred extends \RuntimeException
 {

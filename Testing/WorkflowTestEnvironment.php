@@ -11,12 +11,12 @@ use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 use Gplanchat\Durable\WorkflowRegistry;
 
 /**
- * Environnement de test in-memory complet pour les workflows.
+ * A complete in-memory test environment for workflows.
  *
- * Regroupe l'EventStore, le transport d'activités et le registre d'activités
- * pour offrir une façade simple à l'utilisateur du composant.
+ * It brings together the EventStore, the activity transport and the activity registry
+ * to offer a simple facade to the user of the component.
  *
- * Usage :
+ * Usage:
  * ```php
  * $env = WorkflowTestEnvironment::inMemory([
  *     'greet' => fn(array $p) => 'Hello, ' . $p['name'] . '!',
@@ -54,13 +54,13 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Crée un environnement de test in-memory avec des handlers d'activités optionnels.
+     * Creates an in-memory test environment with optional activity handlers.
      *
-     * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers Map nomActivité → callable
-     * @param int   $maxActivityRetries Plafond de retentatives quand l'activité n'en fixe pas
-     *                                  (0 = pas de plafond ; les ActivityOptions restent maîtres)
-     * @param float $budgetSeconds      Durée max d'une exécution : les tentatives d'activité étant
-     *                                  illimitées par défaut, un harnais en ligne a besoin d'une borne
+     * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers Map activityName → callable
+     * @param int   $maxActivityRetries Retry ceiling when the activity does not set one
+     *                                  (0 = no ceiling; the ActivityOptions stay in charge)
+     * @param float $budgetSeconds      Max duration of an execution: activity attempts being
+     *                                  unlimited by default, an inline harness needs a bound
      */
     public static function inMemory(
         array $activityHandlers = [],
@@ -76,9 +76,9 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Enregistre (ou remplace) un handler d'activité.
+     * Registers (or replaces) an activity handler.
      *
-     * Compatible avec {@see ActivitySpy} :
+     * Compatible with {@see ActivitySpy}:
      * ```php
      * $spy = ActivitySpy::returns('ok');
      * $env->register('my.activity', $spy);
@@ -92,12 +92,12 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Exécute un workflow jusqu'à complétion ou échec.
+     * Runs a workflow to completion or failure.
      *
      * @param callable(\Gplanchat\Durable\WorkflowEnvironment): mixed $handler
-     * @param string|null $executionId ID de l'exécution (généré aléatoirement si null)
+     * @param string|null $executionId ID of the execution (generated at random if null)
      *
-     * @return mixed Résultat retourné par le handler workflow
+     * @return mixed Result returned by the workflow handler
      */
     public function run(callable $handler, ?string $executionId = null): mixed
     {
@@ -107,9 +107,9 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Accès direct à l'EventStore pour inspecter les événements enregistrés.
+     * Direct access to the EventStore, to inspect the events it recorded.
      *
-     * Utile pour les assertions personnalisées :
+     * Useful for assertions of your own:
      * ```php
      * foreach ($env->getEventStore()->readStream($executionId) as $event) {
      *     if ($event instanceof ExecutionCompleted) { ... }
@@ -117,10 +117,10 @@ final class WorkflowTestEnvironment
      * ```
      */
     /**
-     * Enregistre un type de workflow, pour qu'il soit démarrable comme **enfant**
+     * Registers a workflow type, so that it can be started as a **child**
      * ({@see \Gplanchat\Durable\WorkflowEnvironment::executeChildWorkflow()}).
      *
-     * @param callable(array<string, mixed>): callable $factory Reçoit l'input, retourne le handler
+     * @param callable(array<string, mixed>): callable $factory Takes the input, returns the handler
      */
     public function registerWorkflow(string $workflowType, callable $factory): void
     {
@@ -128,7 +128,7 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Enregistre un workflow défini par attributs / classe.
+     * Registers a workflow defined by attributes / class.
      *
      * @param class-string $workflowClass
      */
@@ -138,28 +138,28 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Exécute un workflow **classe**, dans sa forme de production.
+     * Runs a **class** workflow, in its production form.
      *
-     * L'environnement atteint le constructeur, l'input atteint la méthode marquée
-     * {@see \Gplanchat\Durable\Attribute\AsWorkflowMethod} — exactement comme sur un backend.
+     * The environment reaches the constructor, the input reaches the method marked
+     * {@see \Gplanchat\Durable\Attribute\AsWorkflowMethod} — exactly as on a backend.
      *
-     * C'est la forme à préférer. {@see run()} prend une closure qui reçoit l'environnement : une
-     * signature qu'aucun workflow n'a depuis que l'environnement est passé au constructeur. Elle
-     * reste, pour les workflows anonymes de trois lignes, mais c'est la forme du harnais et non
-     * celle d'un workflow.
+     * This is the form to prefer. {@see run()} takes a closure that receives the environment: a
+     * signature no workflow has had since the environment is passed to the constructor. It stays,
+     * for three-line anonymous workflows, but it is the form of the harness and not that of a
+     * workflow.
      *
      * ```php
      * $result = $env->runWorkflowClass(CheckoutWorkflow::class, ['orderId' => 'ORD-1']);
      * ```
      *
      * @param class-string             $workflowClass
-     * @param array<string, mixed>     $input       Arguments métier, appariés par nom
-     * @param string|null              $executionId ID d'exécution (généré si null)
+     * @param array<string, mixed>     $input       Business arguments, matched by name
+     * @param string|null              $executionId Execution ID (generated if null)
      */
     public function runWorkflowClass(string $workflowClass, array $input = [], ?string $executionId = null): mixed
     {
-        // Idempotent : un test peut enregistrer la classe lui-même pour la démarrer aussi comme
-        // enfant, et n'a pas à savoir laquelle des deux voies l'a fait en premier.
+        // Idempotent: a test may register the class itself to start it as a child too, and does
+        // not have to know which of the two paths did it first.
         if (!$this->workflowRegistry->has($workflowClass)) {
             $this->registerWorkflowClass($workflowClass);
         }
@@ -178,7 +178,7 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Accès direct au transport d'activités (inspection de la file).
+     * Direct access to the activity transport (queue inspection).
      */
     public function getActivityTransport(): InMemoryActivityTransport
     {
@@ -186,10 +186,10 @@ final class WorkflowTestEnvironment
     }
 
     /**
-     * Accès direct au runner sous-jacent.
+     * Direct access to the underlying runner.
      *
-     * Utile quand une méthode de test nécessite de passer explicitement
-     * le runner plutôt que d'utiliser la façade.
+     * Useful when a test method requires the runner to be passed
+     * explicitly rather than using the facade.
      */
     public function getRunner(): InMemoryWorkflowRunner
     {

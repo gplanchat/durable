@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 /**
- * Le nom du service Nexus visé : quel contrat l'endpoint doit servir.
+ * The name of the Nexus service targeted: which contract the endpoint must serve.
  *
- * **Cet objet est plus strict que le serveur, et c'est délibéré** — comme
- * {@see \Gplanchat\Durable\TaskQueue}, et à l'inverse de {@see NexusEndpoint}.
+ * **This object is stricter than the server, and that is deliberate** — like
+ * {@see \Gplanchat\Durable\TaskQueue}, and the opposite of {@see NexusEndpoint}.
  *
- * Sondé sur Temporal 1.31.2 (tâche 1.1) : le serveur ne valide **rien** ici. Vide, un espace,
- * blancs en bord, tabulation interne, caractère de contrôle, mille caractères — tout est accepté,
- * et `NEXUS_OPERATION_SCHEDULED` enregistre le nom verbatim. Rien ne suit : l'opération reste
- * planifiée, à attendre un gestionnaire dont le nom ne correspondra jamais, sans une ligne
- * d'erreur. C'est exactement la panne muette d'une file de tâches mal nommée, et seule une règle
- * plus stricte que le serveur peut l'empêcher.
+ * Probed on Temporal 1.31.2 (task 1.1): the server validates **nothing** here. Empty, a space,
+ * whitespace at the edges, an inner tab, a control character, a thousand characters — everything is
+ * accepted, and `NEXUS_OPERATION_SCHEDULED` records the name verbatim. Nothing follows: the
+ * operation stays scheduled, waiting for a handler whose name will never match, without a single
+ * line of error. That is exactly the silent failure of a misnamed task queue, and only a rule
+ * stricter than the server can prevent it.
  *
- * Ce qui est refusé se limite à ce qui ne peut être qu'une faute : nom vide ou entièrement blanc,
- * blancs en bord, caractère de contrôle. **Aucune borne de longueur et aucun alphabet ne sont
- * imposés** — le serveur n'en a montré aucun, et la tâche 1.4 interdit d'écrire un invariant qui
- * n'a pas été observé. Un point, une barre oblique ou une majuscule sont donc des noms légitimes.
+ * What is refused is limited to what can only be a mistake: an empty or entirely blank name,
+ * whitespace at the edges, a control character. **No length bound and no alphabet are imposed** —
+ * the server showed none, and task 1.4 forbids writing an invariant that has not been observed. A
+ * dot, a slash or a capital letter are therefore legitimate names.
  *
- * Comme partout ailleurs, la faute de frappe qui reste un nom plausible n'est pas attrapée :
- * seul un registre des opérations réellement servies le pourrait.
+ * As everywhere else, the typo that remains a plausible name is not caught: only a registry of the
+ * operations actually served could do that.
  */
 final readonly class NexusService
 {
@@ -56,7 +56,7 @@ final readonly class NexusService
     }
 
     /**
-     * Coercition de frontière : accepte ce que l'appelant a sous la main.
+     * Boundary coercion: accepts whatever the caller has at hand.
      */
     public static function from(self|string $value): self
     {
@@ -64,7 +64,7 @@ final readonly class NexusService
     }
 
     /**
-     * Depuis une valeur de configuration éventuellement absente.
+     * From a configuration value that may be absent.
      */
     public static function fromNullable(self|string|null $value): ?self
     {

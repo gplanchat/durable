@@ -5,26 +5,26 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * L'historique d'une exécution, projeté en frise — **une fois, pour toutes les surfaces**.
+ * The history of an execution, projected into a frieze — **once, for every surface**.
  *
- * Deux tableaux de bord la dérivaient chacun du sien : Magento plaçait les actions dans le temps et
- * distinguait la file du travail, Sylius empilait des blocs sans position. Le même run, enregistré
- * par le même backend, se lisait donc différemment selon l'application ouverte — et les deux
- * surfaces qui restent à écrire n'avaient d'autre source de vérité que celle que leur auteur
- * ouvrirait en premier.
+ * Two dashboards each derived their own: Magento placed the actions in time and told the queue
+ * apart from the work, Sylius stacked blocks without position. The same run, recorded by the same
+ * backend, therefore read differently depending on which application you opened — and the two
+ * surfaces still to be written had no source of truth other than whichever one their author would
+ * open first.
  *
- * ⚠ **Cette projection mesure, elle ne dessine pas.** Tout est en secondes : `span`, `offset`,
- * `duration`. Le bloc Magento dont elle est issue rendait des flottants de 0 à 100, c'est-à-dire des
- * largeurs CSS — le cœur se serait mis à dessiner pour une surface qui ne rend aucun balisage. Mettre
- * à l'échelle est le métier de l'hôte, et c'est aussi chez lui que vit la règle qui va avec : une
- * attente de quatre millisecondes ne doit pas dessiner plus large que six millisecondes de travail.
+ * ⚠ **This projection measures, it does not draw.** Everything is in seconds: `span`, `offset`,
+ * `duration`. The Magento block it came from returned floats from 0 to 100, that is to say CSS
+ * widths — the core would have started drawing for a surface that renders no markup. Scaling is the
+ * host's business, and that is also where the rule that goes with it lives: a four-millisecond wait
+ * must not draw wider than six milliseconds of work.
  *
- * L'échelle va du premier au dernier fait **enregistré**, pas du début à la fin de l'exécution : une
- * exécution en cours n'a pas de fin, et une frise qui s'arrête au dernier fait connu ne prétend rien
- * savoir de plus.
+ * The scale runs from the first to the last **recorded** fact, not from the start to the end of the
+ * execution: a running execution has no end, and a frieze that stops at the last known fact claims
+ * to know nothing more.
  *
- * @see DUR037 l'observation d'un run est une projection
- * @see DUR049 une projection, plusieurs habillages : la présentation se décide à côté du modèle
+ * @see DUR037 run observation is a projection
+ * @see DUR049 one projection, several chromes: presentation is decided beside the model
  */
 final readonly class RunTimeline
 {
@@ -43,8 +43,8 @@ final readonly class RunTimeline
     public static function of(array $history): self
     {
         if ([] === $history) {
-            // Une exécution purgée, ou jamais vue, n'est pas une erreur d'appel : l'hôte affiche une
-            // frise vide sans avoir à distinguer « rien » de `null`.
+            // A purged execution, or one never seen, is not a caller error: the host displays an
+            // empty frieze without having to tell "nothing" apart from `null`.
             return new self(0.0, ReadableDuration::of(0.0), []);
         }
 
@@ -52,8 +52,8 @@ final readonly class RunTimeline
         $grouped = [];
         foreach ($history as $event) {
             $moments[$event->sequence] = (float) $event->recordedAt->format('U.u');
-            // Un événement sans action est à lui seul la sienne : sa séquence suffit à le
-            // distinguer, et il occupe sa ligne comme n'importe quelle autre action.
+            // An event with no action is its own all by itself: its sequence is enough to tell
+            // it apart, and it takes up its row like any other action.
             $grouped[$event->actionKey ?? ('#' . $event->sequence)][] = $event;
         }
 
@@ -69,8 +69,8 @@ final readonly class RunTimeline
 
             $actions[] = new TimelineAction(
                 $opening->kind,
-                // Le nom de l'action est celui de l'événement qui l'ouvre : c'est la planification
-                // qui connaît le nom de l'activité, ses suites ne portent qu'un numéro.
+                // The name of the action is that of the event that opens it: it is the scheduling
+                // that knows the activity's name, its follow-ups carry nothing but a number.
                 $opening->label,
                 $from,
                 $to - $from,
@@ -98,12 +98,12 @@ final readonly class RunTimeline
     }
 
     /**
-     * Les mêmes événements, déroulés dans l'ordre où ils ont été enregistrés.
+     * The same events, laid out in the order in which they were recorded.
      *
-     * La frise groupe pour répondre « combien de temps » ; un journal déroule pour répondre « dans
-     * quel ordre », et c'est ce qu'un exploitant lit en premier. Rendre le second dans l'ordre du
-     * premier ferait mentir l'ordre. Chaque ligne garde le nom de son action, ce qui permet de
-     * retrouver dans l'un ce qu'on a repéré dans l'autre.
+     * The frieze groups in order to answer "how long"; a journal lays out in order to answer "in
+     * what order", and that is what an operator reads first. Rendering the second in the order of
+     * the first would make the order lie. Each row keeps the name of its action, which makes it
+     * possible to find in the one what you spotted in the other.
      *
      * @return list<TimelineEvent>
      */
@@ -120,10 +120,10 @@ final readonly class RunTimeline
     }
 
     /**
-     * Un segment par intervalle entre deux événements consécutifs de l'action.
+     * One segment per interval between two consecutive events of the action.
      *
-     * Une action d'un seul événement n'a aucun intervalle, donc aucun segment : un repère seul dit
-     * déjà tout ce qu'il y a à dire d'un instant.
+     * An action of a single event has no interval, therefore no segment: a lone marker already
+     * says everything there is to say about an instant.
      *
      * @param list<WorkflowRunEvent> $group
      * @param array<int, float>      $moments
@@ -145,12 +145,12 @@ final readonly class RunTimeline
                 $from,
                 $to - $from,
                 ReadableDuration::of($to - $from),
-                // Ce qui précède une prise en charge est une attente, pas du travail.
+                // What precedes being picked up is a wait, not work.
                 $closing->started,
-                // Rouge sur l'intervalle qui **débouche** sur l'échec, pas sur l'action entière.
+                // Red on the interval that **leads into** the failure, not on the whole action.
                 $closing->failed,
-                // La nature de l'intervalle est nommée : une hachure sans légende est une
-                // devinette, et celui qui survole la barre est celui qui veut savoir.
+                // The kind of the interval is named: a hatched band without a caption is a
+                // guessing game, and whoever hovers the bar is the one who wants to know.
                 \sprintf(
                     '%s%s · #%d → #%d · %s → %s',
                     $closing->started ? 'waiting to be picked up · ' : '',

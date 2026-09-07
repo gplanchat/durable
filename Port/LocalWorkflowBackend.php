@@ -7,10 +7,10 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\ExecutionEngine;
 
 /**
- * Implémentation locale du backend workflow (EventStore + Messenger).
+ * Local implementation of the workflow backend (EventStore + Messenger).
  *
- * Utilise ExecutionEngine avec l'event store et le transport configurés.
- * Pas de dépendance à RoadRunner ou Temporal.
+ * Uses ExecutionEngine with the configured event store and transport.
+ * No dependency on RoadRunner or Temporal.
  *
  * @see WorkflowBackendInterface
  * @see DUR021 Symfony Messenger integration

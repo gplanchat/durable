@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 /**
- * Port pour les backends de workflow (ex. implémentation locale, Temporal).
+ * Port for workflow backends (e.g. the local implementation, Temporal).
  *
- * Cette interface permet d'abstraire le démarrage et la gestion des workflows
- * pour des implémentations alternatives (ex. driver Temporal) sans modifier
- * le noyau du composant.
+ * This interface abstracts the starting and the management of workflows
+ * for alternative implementations (e.g. a Temporal driver) without modifying
+ * the core of the component.
  *
  * @see DUR002 (CQRS repositories, ports around the event journal)
- * @see OST001 Backends d'exécution durable alternatifs (étude)
+ * @see OST001 Alternative durable execution backends (study)
  */
 interface WorkflowBackendInterface
 {
     /**
-     * Démarre une exécution de workflow.
+     * Starts a workflow execution.
      *
-     * @param string      $executionId  Identifiant unique de l'exécution
-     * @param callable    $handler      Handler du workflow (ExecutionContext, ExecutionRuntime) -> mixed
-     * @param string|null $workflowType Type enregistré (toolbar / observabilité) ; optionnel
+     * @param string      $executionId  Unique identifier of the execution
+     * @param callable    $handler      Workflow handler (ExecutionContext, ExecutionRuntime) -> mixed
+     * @param string|null $workflowType Registered type (toolbar / observability); optional
      *
-     * @return mixed Le résultat du workflow
+     * @return mixed The workflow's result
      */
     public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed;
 }

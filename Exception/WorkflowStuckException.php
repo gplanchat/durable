@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Le runner in-memory ne peut pas mener l'exécution à terme.
+ * The in-memory runner cannot carry the execution through to the end.
  *
- * Signalée plutôt que bouclée à vide : un harnais de test doit échouer, pas geler.
+ * Signalled rather than looped on empty: a test harness must fail, not freeze.
  */
 final class WorkflowStuckException extends \RuntimeException
 {
@@ -19,7 +19,7 @@ final class WorkflowStuckException extends \RuntimeException
     }
 
     /**
-     * L'exécution attend quelque chose que ce runner ne produit pas.
+     * The execution is waiting for something this runner does not produce.
      */
     public static function noProgress(string $executionId, ?string $waitingOn = null): self
     {
@@ -33,8 +33,8 @@ final class WorkflowStuckException extends \RuntimeException
     }
 
     /**
-     * L'exécution avance encore mais dépasse le budget : typiquement une activité qui échoue et
-     * que la politique par défaut retente indéfiniment.
+     * The execution is still moving forward but goes over the budget: typically an activity that
+     * fails and that the default policy retries indefinitely.
      */
     public static function budgetExhausted(string $executionId, float $budgetSeconds): self
     {

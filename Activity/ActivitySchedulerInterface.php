@@ -7,17 +7,17 @@ namespace Gplanchat\Durable\Activity;
 use Gplanchat\Durable\Awaitable\Awaitable;
 
 /**
- * Ce dont un {@see ActivityStub} a besoin, et rien de plus : de quoi planifier une activité.
+ * What an {@see ActivityStub} needs, and nothing more: enough to schedule an activity.
  *
- * Le stub recevait l'environnement entier alors qu'il n'en utilise qu'un verbe. Le lui donner
- * lui laissait de quoi dormir, courir, se relancer — et surtout obligeait à garder publique la
- * primitive `activity(string $name, array $payload)`, celle que la bibliothèque n'enseigne plus :
- * une faute de frappe y produit une activité qui n'est jamais planifiée, au lieu d'une erreur de
- * type.
+ * The stub used to receive the whole environment when it only uses one verb of it. Handing it
+ * over left it the means to sleep, to run, to restart itself — and above all it forced the
+ * primitive `activity(string $name, array $payload)` to stay public, the one the library no
+ * longer teaches: a typo there produces an activity that is never scheduled, instead of a type
+ * error.
  *
- * Ce port n'est pas porté par {@see \Gplanchat\Durable\WorkflowEnvironment} : l'implémenter y
- * reviendrait à rendre le verbe public sous un autre nom. Il est porté par un adaptateur que
- * l'environnement construit et ne rend jamais.
+ * This port is not carried by {@see \Gplanchat\Durable\WorkflowEnvironment}: implementing it
+ * there would amount to making the verb public under another name. It is carried by an adapter
+ * the environment builds and never hands out.
  */
 interface ActivitySchedulerInterface
 {

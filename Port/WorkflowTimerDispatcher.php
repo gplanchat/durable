@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 /**
- * Port pour réveiller les minuteries d'une exécution suspendue.
+ * Port for waking the timers of a suspended execution.
  *
- * Il existe parce que le cœur avait besoin d'une seule chose de Symfony Messenger, et qu'une seule
- * chose se met derrière un port plutôt que de faire dépendre le composant d'un framework :
+ * It exists because the core needed one single thing from Symfony Messenger, and one single thing
+ * goes behind a port rather than making the component depend on a framework:
  * `messageBus->dispatch(new Envelope(new FireWorkflowTimersMessage($id), [$afterCurrentBus, $delay]))`.
  *
- * **Le « après l'unité de travail courante » fait partie du contrat**, pas de l'implémentation.
- * C'est ce que `DispatchAfterCurrentBusStamp` garantit chez Symfony : le réveil ne doit pas être
- * délivré tant que la passe en cours n'a pas fini d'écrire son journal, sinon la reprise se
- * ré-entre elle-même et relit un journal à moitié écrit. Un hôte qui publie dans une file l'obtient
- * gratuitement — un autre processus consomme — mais il doit le savoir plutôt que le supposer.
+ * **The "after the current unit of work" is part of the contract**, not of the implementation.
+ * That is what `DispatchAfterCurrentBusStamp` guarantees in Symfony: the wake-up must not be
+ * delivered while the current pass has not finished writing its journal, otherwise the resume
+ * re-enters itself and reads back a half-written journal. A host that publishes into a queue gets
+ * it for free — another process consumes — but it must know that rather than assume it.
  *
  * @see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage
  */
 interface WorkflowTimerDispatcher
 {
     /**
-     * @param int $delayMs Attente avant le réveil. `0` veut dire « dès que le travail courant est
-     *                     fini », pas « tout de suite ».
+     * @param int $delayMs Wait before the wake-up. `0` means "as soon as the current work is
+     *                     finished", not "right now".
      */
     public function dispatchTimerFire(string $executionId, int $delayMs = 0): void;
 }

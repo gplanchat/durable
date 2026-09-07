@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 /**
- * Déclare qu'une classe sert les opérations d'un contrat Nexus.
+ * Declares that a class serves the operations of a Nexus contract.
  *
- * Elle nomme le contrat, et rien d'autre : les noms de service et d'opération se lisent dans le
- * contrat, une seule fois. Une faute de frappe n'a donc plus deux endroits où se glisser.
+ * It names the contract, and nothing else: the service and operation names are read from the
+ * contract, once. A typo therefore no longer has two places to slip into.
  *
- * La classe **implémente** ce contrat. C'est pourquoi un contrat qui porte des opérations remplies
- * par un workflow se sépare en deux : l'interface servie, que le gestionnaire implémente, et celle
- * qui l'étend pour l'appelant. Sans cette séparation, PHP exigerait ici des corps de méthode que
- * personne ne veut écrire.
+ * The class **implements** that contract. This is why a contract carrying operations fulfilled by
+ * a workflow splits in two: the served interface, which the handler implements, and the one that
+ * extends it for the caller. Without that split, PHP would demand method bodies here that nobody
+ * wants to write.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final readonly class AsNexusServiceHandler

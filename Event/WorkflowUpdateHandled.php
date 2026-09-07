@@ -7,11 +7,11 @@ namespace Gplanchat\Durable\Event;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
 /**
- * Mise à jour workflow traitée : arguments + résultat persistés pour le replay
- * (équivalent simplifié d’un couple request/response Temporal).
+ * Workflow update handled: arguments + result persisted for the replay
+ * (simplified equivalent of a Temporal request/response pair).
  *
- * L’ordre dans le journal donne l’ordre d’application : les updates partagent un curseur avec
- * les signaux, et c’est leur rang qui les ordonne, pas leur nature.
+ * The order in the journal gives the order of application: updates share a cursor with the
+ * signals, and it is their rank that orders them, not their nature.
  */
 final readonly class WorkflowUpdateHandled implements Event
 {
@@ -24,12 +24,12 @@ final readonly class WorkflowUpdateHandled implements Event
         private array $arguments,
         private mixed $result,
         /**
-         * L'update a échoué : l'appelant reçoit la défaillance, le workflow continue.
+         * The update failed: the caller receives the failure, the workflow carries on.
          *
-         * Un champ nullable plutôt qu'un événement frère — comme `ActivityFailed` en est un de
-         * `ActivityCompleted`. La raison est dans le protocole : Temporal n'écrit qu'un
-         * `WORKFLOW_EXECUTION_UPDATE_COMPLETED`, dont l'`Outcome` est soit un succès soit un
-         * échec (ADR DUR035, sonde 1.3).
+         * A nullable field rather than a sibling event — the way `ActivityFailed` is one of
+         * `ActivityCompleted`. The reason is in the protocol: Temporal only writes a
+         * `WORKFLOW_EXECUTION_UPDATE_COMPLETED`, whose `Outcome` is either a success or a
+         * failure (ADR DUR035, probe 1.3).
          */
         private ?FailureEnvelope $failure = null,
     ) {}

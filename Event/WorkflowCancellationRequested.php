@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Event;
 
 /**
- * Annulation demandée sur une exécution (ex. parent en {@see \Gplanchat\Durable\ParentClosePolicy::RequestCancel}).
+ * Cancellation requested on an execution (e.g. parent in {@see \Gplanchat\Durable\ParentClosePolicy::RequestCancel}).
  */
 final readonly class WorkflowCancellationRequested implements Event
 {

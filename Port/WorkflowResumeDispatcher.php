@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 /**
- * Port pour dispatcher la reprise d'un workflow (mode distribué).
+ * Port for dispatching the resume of a workflow (distributed mode).
  *
  * @see DUR021 Symfony Messenger integration (distributed resume)
  */
 interface WorkflowResumeDispatcher
 {
     /**
-     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates à
-     *        remettre à l'exécution pour la passe déclenchée par cette reprise
+     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates to
+     *        hand back to the execution for the pass this resume triggers
      */
     public function dispatchResume(string $executionId, array $pendingUpdates = []): void;
 
     /**
-     * Démarre un nouveau run (historique vierge) après continue-as-new ou équivalent.
+     * Starts a new run (blank history) after a continue-as-new or equivalent.
      *
      * @param array<string, mixed> $payload
      */

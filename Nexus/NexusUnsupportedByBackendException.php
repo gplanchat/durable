@@ -5,24 +5,24 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Nexus;
 
 /**
- * Le backend d'exécution en usage ne sait pas servir une opération Nexus.
+ * The execution backend in use cannot serve a Nexus operation.
  *
- * Nexus fait appeler par un workflow une opération que **quelqu'un d'autre** sert — autre
- * namespace, autre équipe, autre déploiement. Un backend qui tient son journal en local n'a rien
- * à quoi router cet appel, et aucun repli honnête : il ne peut ni l'exécuter, ni l'ignorer sans
- * laisser le workflow attendre un résultat que personne ne produira.
+ * Nexus has a workflow call an operation that **somebody else** serves — another namespace,
+ * another team, another deployment. A backend that keeps its journal locally has nothing to route
+ * that call to, and no honest fallback: it can neither run it, nor ignore it without leaving the
+ * workflow waiting for a result nobody will produce.
  *
- * D'où ce refus, immédiat et nommé, plutôt qu'une commande acceptée puis perdue.
+ * Hence this refusal, immediate and named, rather than a command accepted and then lost.
  */
 final class NexusUnsupportedByBackendException extends \RuntimeException
 {
     /**
-     * Le refus **à l'enregistrement**, et il ne dit pas la même chose que celui de l'appel.
+     * The refusal **at registration**, and it does not say the same thing as the one at the call.
      *
-     * Un appel sur un backend sans route échoue à l'appel : la faute devient visible au moment où
-     * elle est commise. Servir est l'inverse — un gestionnaire déclaré là n'est pas un appel qui
-     * échoue, c'est un service qui **ne reçoit jamais rien**, sans une ligne de log. Il n'y a
-     * aucune requête à faire échouer plus tard, donc le refus a lieu ici ou nulle part.
+     * A call on a backend with no route fails at the call: the mistake becomes visible the moment
+     * it is made. Serving is the opposite — a handler declared there is not a call that fails, it
+     * is a service that **never receives anything**, without a line of log. There is no request to
+     * fail later, so the refusal happens here or nowhere.
      */
     public static function forHandlerOn(string $backend): self
     {

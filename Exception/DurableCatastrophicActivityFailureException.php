@@ -7,7 +7,7 @@ namespace Gplanchat\Durable\Exception;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 
 /**
- * Activité en erreur dont la représentation n'a pas pu être persistée dans l'event store.
+ * Activity in error whose representation could not be persisted in the event store.
  */
 final class DurableCatastrophicActivityFailureException extends \RuntimeException
 {

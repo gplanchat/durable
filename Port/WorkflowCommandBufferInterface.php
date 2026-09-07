@@ -37,9 +37,9 @@ interface WorkflowCommandBufferInterface
     /**
      * Records a new activity to schedule (COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK for Temporal).
      *
-     * Reçoit les options telles que l'appelant les a construites : leurs invariants traversent,
-     * et c'est au backend de les traduire vers ses primitives et d'horodater la mise en file avec
-     * sa propre horloge.
+     * Receives the options exactly as the caller built them: their invariants carry through, and
+     * it is up to the backend to translate them into its own primitives and to timestamp the
+     * enqueuing with its own clock.
      *
      * @param array<string, mixed> $payload
      */
@@ -48,9 +48,9 @@ interface WorkflowCommandBufferInterface
     /**
      * Records a new timer to start (COMMAND_TYPE_START_TIMER for Temporal).
      *
-     * Reçoit le **délai**, pas une échéance : le backend in-memory a besoin d'un instant à
-     * comparer à son horloge, le serveur Temporal exige une durée. Chacun fait son arithmétique,
-     * le cœur ne lit aucune horloge.
+     * Receives the **delay**, not a deadline: the in-memory backend needs an instant to compare
+     * against its clock, the Temporal server demands a duration. Each does its own arithmetic,
+     * the core reads no clock.
      */
     public function startTimer(string $timerId, Duration $delay, string $summary): void;
 
@@ -92,15 +92,15 @@ interface WorkflowCommandBufferInterface
     public function completeWorkflow(mixed $result): void;
 
     /**
-     * Records the outcome of a child workflow executed **inline** (backend in-memory sans
-     * démarrage différé Messenger), dans le journal du parent.
+     * Records the outcome of a child workflow executed **inline** (in-memory backend with no
+     * Messenger deferred start), in the parent's journal.
      *
-     * Sans équivalent Temporal : le serveur écrit lui-même CHILD_WORKFLOW_EXECUTION_COMPLETED.
+     * With no Temporal equivalent: there the server writes CHILD_WORKFLOW_EXECUTION_COMPLETED.
      */
     public function completeChildWorkflow(string $childExecutionId, mixed $result): void;
 
     /**
-     * Pendant en échec de {@see completeChildWorkflow()}.
+     * The failure counterpart of {@see completeChildWorkflow()}.
      */
     public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
 
@@ -121,11 +121,11 @@ interface WorkflowCommandBufferInterface
      * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
      */
     /**
-     * Planifie une opération Nexus : un appel servi par un endpoint extérieur.
+     * Schedules a Nexus operation: a call served by an outside endpoint.
      *
      * @param array<string, mixed> $payload
      *
-     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException if the backend cannot route the call
      */
     public function scheduleNexusOperation(
         string $operationId,
@@ -138,9 +138,9 @@ interface WorkflowCommandBufferInterface
     ): void;
 
     /**
-     * Demande l'annulation d'une opération Nexus encore en vol.
+     * Requests the cancellation of a Nexus operation still in flight.
      *
-     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException si le backend ne sait pas router l'appel
+     * @throws \Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException if the backend cannot route the call
      */
     public function cancelNexusOperation(string $operationId, string $reason): void;
 

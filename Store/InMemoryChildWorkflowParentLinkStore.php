@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 /**
- * @internal implémentation par défaut (bundle + tests)
+ * @internal default implementation (bundle + tests)
  */
 final class InMemoryChildWorkflowParentLinkStore implements ChildWorkflowParentLinkStoreInterface
 {

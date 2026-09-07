@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Représente une cause précédente sérialisée depuis l'historique d'échec d'activité
- * (la classe d'origine est conservée en texte pour les logs / traces).
+ * Represents a previous cause serialised from the activity failure history
+ * (the original class is kept as text for logs / traces).
  */
 final class ActivityFailureCauseException extends \RuntimeException
 {

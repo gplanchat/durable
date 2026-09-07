@@ -9,9 +9,9 @@ use Gplanchat\Durable\Attribute\AsActivityMethod;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
- * Résout les métadonnées d'un contrat d'activité (nom par méthode) depuis les attributs.
+ * Resolves an activity contract's metadata (name per method) from the attributes.
  *
- * Utilise un cache PSR-6 pour éviter la réflexion sur le chemin chaud.
+ * Uses a PSR-6 cache to avoid reflection on the hot path.
  */
 final class ActivityContractResolver
 {

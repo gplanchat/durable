@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Transport;
 
 /**
- * Ne met rien en file : activités exécutées ailleurs (ex. worker Temporal natif avec interpréteur miroir).
+ * Queues nothing: activities executed elsewhere (e.g. native Temporal worker with mirror interpreter).
  */
 final class NoopActivityTransport implements ActivityTransportInterface
 {

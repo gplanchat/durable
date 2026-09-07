@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * De quelle nature est un événement — et, par lui, l'action qu'il ouvre.
+ * What kind an event is — and, through it, the action it opens.
  *
- * ⚠ **Ce n'est plus une voie.** La frise rangeait par nature — « les activités », « les signaux » —
- * ce qui obligeait l'exploitant à recoller trois lignes de l'œil pour savoir combien de temps *une*
- * activité avait duré. Elle range désormais par **action** ({@see RunTimeline}), et cette
- * énumération n'y sert plus qu'à colorer : une action a la nature de l'événement qui l'ouvre.
+ * ⚠ **This is no longer a lane.** The frieze used to file by kind — "activities", "signals" — which
+ * forced the operator to piece three rows back together by eye to work out how long *one* activity
+ * had lasted. It now files by **action** ({@see RunTimeline}), and this enumeration serves there
+ * only to colour: an action has the kind of the event that opens it.
  *
- * Le jeu est celui que les tableaux de bord distinguent, pas celui que les backends enregistrent :
- * les minuteurs, les workflows enfants et les effets de bord sont bel et bien journalisés, et
- * tombent sur `Other` — **listés, pas masqués** : les faire disparaître ferait mentir l'ordre des
- * événements, qui est ce qu'un exploitant vient lire en premier. Ils ont bien leur ligne, puisque
- * la ligne vient de l'action et non de la nature.
+ * The set is the one dashboards distinguish, not the one backends record: timers, child workflows
+ * and side effects are indeed journalled, and fall through to `Other` — **listed, not hidden**:
+ * making them disappear would make the order of events lie, and that order is what an operator
+ * comes to read first. They do get their row, since the row comes from the action and not from the
+ * kind.
  *
- * `Query` n'est jamais produite par le journal : aucune requête n'y est enregistrée, elles sont
- * répondues à chaud. Seul le backend Temporal peut en produire, et c'est un fait qu'un backend a et
- * que l'autre n'a pas — pas une lacune à combler.
+ * `Query` is never produced by the journal: no query is recorded there, they are answered on the
+ * fly. Only the Temporal backend can produce one, and that is a fact one backend has and the other
+ * does not — not a gap to be filled.
  */
 enum WorkflowRunEventKind: string
 {
@@ -31,10 +31,10 @@ enum WorkflowRunEventKind: string
     case Query = 'query';
 
     /**
-     * Le seul endroit d'une exécution où l'attente est **servie par quelqu'un d'autre** — autre
-     * équipe, autre espace de noms, autre déploiement. D'où sa nature propre plutôt que `Other` :
-     * un exploitant qui voit un workflow bloqué sans voir l'opération qu'il attend cherchera la
-     * panne dans son propre système, là où elle est à l'extérieur.
+     * The one place in an execution where the wait is **served by someone else** — another team,
+     * another namespace, another deployment. Hence a kind of its own rather than `Other`: an
+     * operator who sees a blocked workflow without seeing the operation it is waiting on will
+     * look for the failure in their own system, when it is on the outside.
      */
     case Nexus = 'nexus';
     case Other = 'other';
