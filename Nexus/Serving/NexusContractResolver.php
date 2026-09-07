@@ -9,14 +9,14 @@ use Gplanchat\Durable\Attribute\AsNexusService;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
- * Lit un contrat Nexus : son nom de service, et le nom d'opération de chacune de ses méthodes.
+ * Reads a Nexus contract: its service name, and the operation name of each of its methods.
  *
- * **Il descend les interfaces parentes**, là où {@see \Gplanchat\Durable\Activity\ActivityContractResolver}
- * les ignore. Ce n'est pas une divergence gratuite : un contrat Nexus se sépare en deux, celui que
- * le gestionnaire implémente — les opérations auxquelles il répond tout de suite — et celui qui
- * l'étend pour l'appelant. C'est cette séparation qui évite d'écrire des méthodes vides pour les
- * opérations qu'un workflow remplit. Sauter les méthodes héritées ferait disparaître de la vue de
- * l'appelant les opérations déclarées sur le contrat servi : déclarées, servies, et introuvables.
+ * **It walks down parent interfaces**, where {@see \Gplanchat\Durable\Activity\ActivityContractResolver}
+ * ignores them. This is not a gratuitous divergence: a Nexus contract splits in two, the one the
+ * handler implements — the operations it answers straight away — and the one that extends it for
+ * the caller. It is that separation which avoids writing empty methods for the operations a
+ * workflow fulfils. Skipping inherited methods would make the operations declared on the served
+ * contract vanish from the caller's view: declared, served, and nowhere to be found.
  */
 final class NexusContractResolver
 {
@@ -30,7 +30,7 @@ final class NexusContractResolver
     /**
      * @param class-string $contract
      *
-     * @throws \LogicException si le contrat ne déclare pas son nom de service
+     * @throws \LogicException if the contract does not declare its service name
      */
     public function serviceName(string $contract): string
     {
@@ -48,9 +48,9 @@ final class NexusContractResolver
     /**
      * @param class-string $contract
      *
-     * @return array<string, string> nom de méthode => nom d'opération
+     * @return array<string, string> method name => operation name
      *
-     * @throws \LogicException si deux méthodes réclament le même nom d'opération
+     * @throws \LogicException if two methods claim the same operation name
      */
     public function operations(string $contract): array
     {
@@ -85,7 +85,7 @@ final class NexusContractResolver
         $operations = [];
         $seen = [];
 
-        // Sans filtre sur la classe déclarante : les méthodes héritées comptent, c'est le point.
+        // No filter on the declaring class: inherited methods count, that is the whole point.
         foreach ((new \ReflectionClass($contract))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             if ($method->isStatic()) {
                 continue;

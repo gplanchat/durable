@@ -9,24 +9,24 @@ use Gplanchat\Durable\Nexus\Serving\NexusContractResolver;
 use Gplanchat\Durable\Stub\StubArguments;
 
 /**
- * Proxy de planification côté appelant.
+ * Caller-side scheduling proxy.
  *
- * N'expose que les méthodes marquées {@see \Gplanchat\Durable\Attribute\AsNexusOperation} du
- * contrat ; chaque appel rend un {@see Awaitable} et délègue au port d'ordonnancement.
+ * Exposes only the contract's methods marked {@see \Gplanchat\Durable\Attribute\AsNexusOperation};
+ * every call returns an {@see Awaitable} and delegates to the scheduling port.
  *
- * Le contrat est le **même objet** des deux côtés de la frontière : le gestionnaire implémente
- * l'interface servie, l'appelant lit celle qui l'étend. Le nom de service et les noms d'opération
- * ne s'écrivent donc qu'une fois, dans le contrat, et non une fois chez chacun.
+ * The contract is the **same object** on both sides of the boundary: the handler implements the
+ * served interface, the caller reads the one that extends it. The service name and the operation
+ * names are therefore written only once, in the contract, and not once on each side.
  *
- * L'endpoint, lui, reste un paramètre du stub et non du contrat : il dit *où* le service est servi,
- * ce qui est une affaire de déploiement et change d'un environnement à l'autre, quand le contrat ne
- * change pas.
+ * The endpoint, for its part, stays a parameter of the stub and not of the contract: it says
+ * *where* the service is served, which is a deployment matter and changes from one environment to
+ * another, while the contract does not change.
  *
  * @template TContract of object
  */
 final class NexusStub
 {
-    /** @var array<string, string> nom de méthode => nom d'opération */
+    /** @var array<string, string> method name => operation name */
     private array $methodToOperation;
 
     private NexusService $service;

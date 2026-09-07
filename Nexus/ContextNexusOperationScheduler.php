@@ -8,10 +8,10 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\ExecutionContext;
 
 /**
- * Le port d'ordonnancement Nexus, câblé sur le contexte d'exécution.
+ * The Nexus scheduling port, wired onto the execution context.
  *
- * Construit par {@see \Gplanchat\Durable\WorkflowEnvironment::nexusStub()} et jamais rendu. Le
- * contexte, lui, expose bien `nexusOperation()` — mais un workflow ne reçoit jamais le contexte.
+ * Built by {@see \Gplanchat\Durable\WorkflowEnvironment::nexusStub()} and never returned. The
+ * context does expose `nexusOperation()` — but a workflow never receives the context.
  *
  * @internal
  */
