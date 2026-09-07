@@ -8,12 +8,12 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Stub\StubArguments;
 
 /**
- * Proxy de planification côté workflow.
+ * Scheduling proxy on the workflow side.
  *
- * Expose uniquement les méthodes marquées #[AsActivityMethod] du contrat ;
- * chaque appel retourne un Awaitable et délègue à {@see ActivitySchedulerInterface}.
+ * Exposes only the contract's methods marked #[AsActivityMethod];
+ * each call returns an Awaitable and delegates to {@see ActivitySchedulerInterface}.
  *
- * À initialiser dans le constructeur du workflow pour configurer retry et gestion d'erreur via ActivityOptions.
+ * To be initialised in the workflow constructor, to configure retry and error handling through ActivityOptions.
  *
  * @template TActivity of object
  */

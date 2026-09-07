@@ -8,34 +8,34 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\TaskQueue;
 
 /**
- * Options de planification d’activité (équivalent {@see \Temporal\Activity\ActivityOptions}).
+ * Activity scheduling options (the equivalent of {@see \Temporal\Activity\ActivityOptions}).
  *
- * Trois concepts, pas quatorze champs : jusqu'où réessayer ({@see RetryLimit}), à quel rythme
- * ({@see $initialInterval} / {@see $backoffCoefficient} / {@see $maximumInterval}), et dans
- * quelles bornes temporelles ({@see ActivityTimeouts}).
+ * Three concepts, not fourteen fields: how far to retry ({@see RetryLimit}), at what pace
+ * ({@see $initialInterval} / {@see $backoffCoefficient} / {@see $maximumInterval}), and within
+ * which time bounds ({@see ActivityTimeouts}).
  *
- * La sérialisation reste plate et en secondes : c'est ce que porte l'historique des exécutions
- * en cours, côté journal comme côté Temporal.
+ * The serialisation stays flat and in seconds: that is what the history of in-flight executions
+ * carries, on the journal side as on the Temporal side.
  */
 final readonly class ActivityOptions
 {
-    /** Défaut Temporal du plafond d'intervalle, exprimé en multiples de l'intervalle initial. */
+    /** Temporal's default interval ceiling, expressed as a multiple of the initial interval. */
     public const DEFAULT_MAXIMUM_INTERVAL_FACTOR = 100.0;
 
-    /** Jusqu'où l'on est prêt à réessayer ; illimité par défaut, comme Temporal. */
+    /** How far we are willing to retry; unlimited by default, like Temporal. */
     public RetryLimit $retryLimit;
 
-    /** Délai avant la première retentative après un échec. */
+    /** Delay before the first retry after a failure. */
     public Duration $initialInterval;
 
     /**
-     * Plafond du délai entre deux retentatives. Null applique le défaut Temporal,
-     * {@see DEFAULT_MAXIMUM_INTERVAL_FACTOR} × l'intervalle initial — indispensable dès lors que
-     * les tentatives sont illimitées, sans quoi le backoff exponentiel diverge.
+     * Ceiling on the delay between two retries. Null applies the Temporal default,
+     * {@see DEFAULT_MAXIMUM_INTERVAL_FACTOR} × the initial interval — indispensable as soon as
+     * attempts are unlimited, without which the exponential backoff diverges.
      */
     public ?Duration $maximumInterval;
 
-    /** Les bornes temporelles de l'activité, prises ensemble. */
+    /** The activity's time bounds, taken together. */
     public ActivityTimeouts $timeouts;
 
     /**
@@ -44,18 +44,18 @@ final readonly class ActivityOptions
     public function __construct(
         ?RetryLimit $retryLimit = null,
         ?Duration $initialInterval = null,
-        /** Coefficient d’exponential backoff entre retentatives. */
+        /** Exponential backoff coefficient between retries. */
         public float $backoffCoefficient = 2.0,
         ?Duration $maximumInterval = null,
-        /** Exceptions qui ne déclenchent pas de retry (class-string[]). */
+        /** Exceptions that do not trigger a retry (class-string[]). */
         public array $nonRetryableExceptions = [],
-        /** File d’attente cible (routage applicatif ; non utilisée par tous les transports). */
+        /** Target queue (application-level routing; not used by every transport). */
         public ?TaskQueue $taskQueue = null,
-        /** ID métier d’activité (sinon UUID). */
+        /** Business activity ID (a UUID otherwise). */
         public ?string $activityId = null,
         ?ActivityTimeouts $timeouts = null,
         public ActivityCancellationType $cancellationType = ActivityCancellationType::TryCancel,
-        /** Résumé affichage UI (champ « summary » côté Temporal). */
+        /** Summary for UI display (the "summary" field on the Temporal side). */
         public ?string $summary = null,
     ) {
         $this->retryLimit = $retryLimit ?? RetryLimit::unlimited();
@@ -70,22 +70,22 @@ final readonly class ActivityOptions
     }
 
     /**
-     * Le même objet, écrit comme on le pense.
+     * The same object, written the way one thinks it.
      *
-     * Le constructeur ordonne ses paramètres comme le fil les sérialise ; à l'usage, la question
-     * qu'on se pose d'abord est « combien de tentatives, et bornées à combien de temps ? » — deux
-     * réponses qui vivaient aux positions 1 et 8, donc inatteignables sans arguments nommés.
-     * Cette fabrique remet ces deux-là en tête et accepte les scalaires équivalents :
+     * The constructor orders its parameters the way the wire serialises them; in use, the question
+     * one asks first is "how many attempts, and bounded to how much time?" — two answers that
+     * lived at positions 1 and 8, hence unreachable without named arguments. This factory puts
+     * those two back in front and accepts the equivalent scalars:
      *
-     *     ActivityOptions::of(3, 30)                    // 3 tentatives, 30 s chacune
+     *     ActivityOptions::of(3, 30)                    // 3 attempts, 30 s each
      *     ActivityOptions::of(5, 120, 2, [Refused::class])
      *
-     * Les coercitions restent explicites et sans valeur magique : un entier est un **nombre de
-     * tentatives** ({@see RetryLimit::ofAttempts()}, qui refuse 0 au lieu d'y lire « illimité »),
-     * une durée nue est la borne d'**une** tentative ({@see ActivityTimeouts::attempt()}), et un
-     * flottant s'exprime en secondes. Rien ici que le constructeur ne sache faire : tous ses
-     * paramètres sont couverts, pour n'avoir jamais à réécrire un `of()` en `new` sur le premier
-     * besoin d'un champ rare.
+     * The coercions stay explicit and free of magic values: an integer is a **number of
+     * attempts** ({@see RetryLimit::ofAttempts()}, which refuses 0 rather than reading
+     * "unlimited" into it), a bare duration is the bound of **one** attempt
+     * ({@see ActivityTimeouts::attempt()}), and a float is expressed in seconds. Nothing here the
+     * constructor cannot do: all of its parameters are covered, so that an `of()` never has to be
+     * rewritten as a `new` on the first need for a rare field.
      *
      * @param list<class-string<\Throwable>> $nonRetryableExceptions
      */
@@ -123,8 +123,8 @@ final readonly class ActivityOptions
     }
 
     /**
-     * Délai à appliquer **avant** la tentative n° {@code $nextAttempt} (1-based), après l’échec
-     * de la tentative précédente. Nul pour la première tentative.
+     * Delay to apply **before** attempt no. {@code $nextAttempt} (1-based), after the failure of
+     * the previous attempt. Zero for the first attempt.
      */
     public function retryDelayBeforeAttempt(int $nextAttempt): Duration
     {
@@ -133,9 +133,9 @@ final readonly class ActivityOptions
         }
 
         $factor = $this->backoffCoefficient ** (float) ($nextAttempt - 2);
-        // Sans borne de tentatives, l'exposant finit par dépasser le flottant — vers la
-        // millième tentative avec les défauts. Le produit est de toute façon plafonné : un
-        // facteur débordé veut dire « le plafond », pas une erreur d'arithmétique.
+        // With no bound on attempts, the exponent eventually overflows the float — around the
+        // thousandth attempt with the defaults. The product is capped anyway: an overflowed
+        // factor means "the ceiling", not an arithmetic error.
         if (is_infinite($factor)) {
             return $this->effectiveMaximumInterval();
         }
@@ -146,7 +146,7 @@ final readonly class ActivityOptions
     }
 
     /**
-     * Plafond d'intervalle réellement appliqué, défaut Temporal compris.
+     * The interval ceiling actually applied, Temporal default included.
      */
     public function effectiveMaximumInterval(): Duration
     {

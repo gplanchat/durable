@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Activity;
 
 /**
- * Adapte un appel worker (payload tableau, clés = noms des paramètres du contrat) vers la méthode du handler.
+ * Adapts a worker call (array payload, keys = the contract's parameter names) onto the handler's method.
  *
- * Il vivait dans le paquet du bundle Symfony, sans en importer une ligne. Magento en a besoin du
- * mot pour mot — son conteneur n'a pas les tags, mais une fois le contrat résolu l'adaptation est
- * la même — et le recopier serait la duplication que ce dépôt refuse ailleurs. Il descend donc à
- * côté de {@see ActivityContractResolver}, qui le nourrit.
+ * It used to live in the Symfony bundle package, without importing a single line of it. Magento
+ * needs it word for word — its container has no tags, but once the contract is resolved the
+ * adaptation is the same — and copying it over would be the duplication this repository refuses
+ * elsewhere. So it comes down next to {@see ActivityContractResolver}, which feeds it.
  *
- * Nexus s'en sert aussi, à travers {@see \Gplanchat\Durable\Nexus\Serving\NexusHandlerInvoker} :
- * une opération servie et une activité posent le même problème — une charge clée par nom, une
- * méthode de contrat à appeler. Il reste donc dans `Activity\` par son histoire, mais son texte ne
- * dit plus « activité » là où il parle des deux.
+ * Nexus uses it too, through {@see \Gplanchat\Durable\Nexus\Serving\NexusHandlerInvoker}: a served
+ * operation and an activity pose the same problem — a payload keyed by name, a contract method to
+ * call. It therefore stays in `Activity\` by its history, but its text no longer says "activity"
+ * where it speaks of both.
  */
 final class PayloadToContractMethodInvoker
 {
