@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * Le workflow n'a pas attrapé une erreur issue d'une activité (ou une erreur catastrophique) :
- * l'intégration doit traiter cela comme un bug d'algorithme / de robustesse du workflow.
+ * The workflow did not catch an error coming from an activity (or a catastrophic error):
+ * the integration must treat this as a bug in the workflow's algorithm / robustness.
  */
 final class DurableWorkflowAlgorithmFailureException extends \RuntimeException
 {

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * L'exécution s'est arrêtée sur une annulation demandée : terminaison **normale**, pas un échec.
+ * The execution stopped on a requested cancellation: a **normal** termination, not a failure.
  *
- * Propagée par {@see \Gplanchat\Durable\ExecutionEngine} pour que l'appelant cesse de redélivrer
- * la reprise (cf. {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler}).
+ * Propagated by {@see \Gplanchat\Durable\ExecutionEngine} so that the caller stops redelivering
+ * the resume (cf. {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler}).
  */
 final class WorkflowCancelledException extends \RuntimeException
 {

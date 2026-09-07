@@ -7,10 +7,10 @@ namespace Gplanchat\Durable\Exception;
 use Gplanchat\Durable\ContinueAsNewOptions;
 
 /**
- * Levée par {@see \Gplanchat\Durable\ExecutionContext::continueAsNew()} pour terminer le run courant
- * et enchaîner un nouveau run avec un historique vierge (même logique métier Temporal continue-as-new).
+ * Thrown by {@see \Gplanchat\Durable\ExecutionContext::continueAsNew()} to end the current run
+ * and chain a new run with a blank history (same business logic as Temporal continue-as-new).
  *
- * Le moteur append {@see \Gplanchat\Durable\Event\WorkflowContinuedAsNew} puis propage cette exception.
+ * The engine appends {@see \Gplanchat\Durable\Event\WorkflowContinuedAsNew} then propagates this exception.
  */
 final class ContinueAsNewRequested extends \RuntimeException
 {
