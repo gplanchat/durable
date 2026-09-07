@@ -48,11 +48,11 @@ final class StubArguments
     public static function toPayload(\ReflectionFunctionAbstract $method, array $arguments): array
     {
         $payload = [];
-        $connus = [];
+        $known = [];
 
         foreach ($method->getParameters() as $i => $param) {
             $name = $param->getName();
-            $connus[$name] = true;
+            $known[$name] = true;
 
             // A variadic has neither a default value nor an obligation: it cannot be missing, and
             // it has no place of its own in a named payload.
@@ -60,10 +60,10 @@ final class StubArguments
                 continue;
             }
 
-            $parPosition = \array_key_exists($i, $arguments);
-            $parNom = \array_key_exists($name, $arguments);
+            $byPosition = \array_key_exists($i, $arguments);
+            $byName = \array_key_exists($name, $arguments);
 
-            if ($parPosition && $parNom) {
+            if ($byPosition && $byName) {
                 throw new \BadMethodCallException(\sprintf(
                     'Parameter $%s of %s() was given both positionally and by name.',
                     $name,
@@ -71,13 +71,13 @@ final class StubArguments
                 ));
             }
 
-            if ($parPosition) {
+            if ($byPosition) {
                 $payload[$name] = $arguments[$i];
 
                 continue;
             }
 
-            if ($parNom) {
+            if ($byName) {
                 $payload[$name] = $arguments[$name];
 
                 continue;
@@ -100,12 +100,12 @@ final class StubArguments
         }
 
         foreach ($arguments as $key => $_) {
-            if (\is_string($key) && !isset($connus[$key])) {
+            if (\is_string($key) && !isset($known[$key])) {
                 throw new \BadMethodCallException(\sprintf(
                     'Unknown named parameter $%s for %s(); known parameters: %s.',
                     $key,
                     self::describe($method),
-                    implode(', ', array_map(static fn(string $n): string => '$' . $n, array_keys($connus))),
+                    implode(', ', array_map(static fn(string $n): string => '$' . $n, array_keys($known))),
                 ));
             }
         }
