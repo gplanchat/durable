@@ -5,29 +5,30 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 /**
- * Le côté écriture de l'observation d'un run (DUR037).
+ * The write side of run observation (DUR037).
  *
- * Le catalogue répond « quelles exécutions existent, et ce qu'elles sont devenues » ; ce port est
- * ce qui le lui apprend. Les deux sont séparés parce que le tableau de bord n'a aucune raison de
- * pouvoir écrire, et parce qu'un backend peut très bien alimenter une projection qu'il ne lit pas.
+ * The catalog answers "which executions exist, and what became of them"; this port is what teaches
+ * it that. The two are kept apart because the dashboard has no reason to be able to write, and
+ * because a backend may perfectly well feed a projection it does not read.
  *
- * Deux méthodes, et c'est tout ce que les décorateurs
- * {@see \Gplanchat\Durable\Store\ProjectingEventStore} et
- * {@see \Gplanchat\Durable\Store\ProjectingWorkflowMetadataStore} appellent. Elles portaient déjà
- * ces noms côté SQL avant d'être une interface — l'extraire n'a rien renommé.
+ * Two methods, and that is all the
+ * {@see \Gplanchat\Durable\Store\ProjectingEventStore} and
+ * {@see \Gplanchat\Durable\Store\ProjectingWorkflowMetadataStore} decorators call. They already
+ * carried these names on the SQL side before being an interface — extracting it renamed nothing.
  *
  * @see DUR037
  */
 interface WorkflowRunProjectionInterface
 {
     /**
-     * Une exécution démarre. Le **nom** ne peut venir que du magasin de métadonnées :
-     * `ExecutionStarted` ne porte pas le type de workflow.
+     * An execution starts. The **name** can only come from the metadata store:
+     * `ExecutionStarted` does not carry the workflow type.
      */
     public function recordStart(string $executionId, string $workflowType): void;
 
     /**
-     * Ce que l'exécution est devenue. Vient du journal, seul endroit où l'issue est un fait.
+     * What the execution became. It comes from the journal, the only place where the outcome is a
+     * fact.
      */
     public function recordOutcome(string $executionId, WorkflowRunStatus $status): void;
 }
