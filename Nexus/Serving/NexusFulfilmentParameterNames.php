@@ -7,35 +7,35 @@ namespace Gplanchat\Durable\Nexus\Serving;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
 /**
- * Les noms de paramètres d'un workflow qui remplit une opération doivent être ceux du contrat.
+ * The parameter names of a workflow that fulfils an operation must be those of the contract.
  *
- * **La panne que ce garde remplace est muette.** La charge d'une opération Nexus est clée par nom
- * aux deux bouts : l'appelant l'écrit depuis la signature du contrat, et le workflow la relit par
- * `mapInputToArguments()`. Un paramètre renommé d'un seul côté ne casse rien à l'écriture, ne lève
- * rien à l'exécution, et arrive simplement à `null`. Le seul moment où l'on peut encore le dire est
- * l'enregistrement, avant qu'une tâche n'arrive.
+ * **The failure this guard replaces is silent.** The payload of a Nexus operation is keyed by name
+ * at both ends: the caller writes it from the contract's signature, and the workflow reads it back
+ * through `mapInputToArguments()`. A parameter renamed on one side only breaks nothing at writing
+ * time, raises nothing at execution time, and simply arrives as `null`. The only moment where it
+ * can still be said is registration, before a task arrives.
  *
- * **Pourquoi le garde est ici et non chez un hôte.** Il l'a été : `NexusHandlerPass` le portait en
- * privé, donc le refus n'existait que pour les applications Symfony. Un second hôte servant —
- * `gplanchat/durable-laravel`, qui déclare ses gestionnaires dans `config/durable.php` — l'aurait
- * réécrit à l'identique, ou, plus probablement, ne l'aurait pas écrit du tout. Deux réflexions et
- * une lecture de `#[AsWorkflowMethod]` ne demandent aucun conteneur : rien dans ce contrôle
- * n'appartenait à un framework.
+ * **Why the guard is here and not in a host.** It was in one: `NexusHandlerPass` carried it
+ * privately, so the refusal only existed for Symfony applications. A second serving host —
+ * `gplanchat/durable-laravel`, which declares its handlers in `config/durable.php` — would have
+ * rewritten it identically, or, more likely, would not have written it at all. Two reflections and
+ * one read of `#[AsWorkflowMethod]` require no container: nothing in this check belonged to a
+ * framework.
  *
- * **Un paramètre facultatif passe**, et ce n'est pas une tolérance : donner une valeur par défaut à
- * un paramètre que le contrat ne porte pas est une décision — c'est dire « si personne ne me
- * l'envoie, voici ce que je fais ». C'est l'absence de défaut qui trahit l'attente déçue.
+ * **An optional parameter passes**, and that is not a tolerance: giving a default value to a
+ * parameter the contract does not carry is a decision — it is saying "if nobody sends it to me,
+ * here is what I do". It is the absence of a default that betrays the disappointed expectation.
  */
 final class NexusFulfilmentParameterNames
 {
     /**
-     * @param string       $refusedBy      ce que le lecteur doit aller corriger : la balise Symfony,
-     *                                     la clé de configuration Laravel — le mécanisme qui refuse,
-     *                                     pas la classe qui l'implémente
+     * @param string       $refusedBy      what the reader must go and fix: the Symfony tag, the
+     *                                     Laravel configuration key — the mechanism that refuses,
+     *                                     not the class that implements it
      * @param class-string $contract
      * @param class-string $workflowClass
      *
-     * @throws \LogicException si un paramètre obligatoire du workflow ne correspond à rien
+     * @throws \LogicException if a required parameter of the workflow matches nothing
      */
     public static function assertMatch(
         string $refusedBy,
