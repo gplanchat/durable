@@ -31,7 +31,7 @@ use Gplanchat\Durable\Workflow\QueryHandlerRegistry;
 
 final class ExecutionContext
 {
-    /** Ce qu'un message de divergence montre d'une empreinte de charge avant de la couper. */
+    /** How much of a payload fingerprint a divergence message shows before cutting it. */
     private const DIVERGENCE_PRINT_LIMIT = 256;
 
     private ?QueryHandlerRegistry $queryHandlers = null;

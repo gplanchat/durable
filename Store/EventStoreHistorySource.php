@@ -164,7 +164,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     }
 
     /**
-     * Toujours null, et ce n'est pas un oubli.
+     * Always null, and that is not an oversight.
      *
      * This backend refuses Nexus operations by design (DUR036): none of its histories carries one
      * the workflow would have scheduled. The only `NexusOperationScheduled` that can cross a stream

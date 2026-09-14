@@ -154,10 +154,10 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         // A change point this workflow never declared: null on both sides. That is what
         // distinguishes "not reached yet" from "version 0", and an adapter answering 0 would
         // have an execution take the old branch it was never entitled to.
-        self::assertNull($fromSubject->versionForChangeId('jamais-declare'));
+        self::assertNull($fromSubject->versionForChangeId('never-declared'));
         self::assertSame(
-            $fromReference->versionForChangeId('jamais-declare'),
-            $fromSubject->versionForChangeId('jamais-declare'),
+            $fromReference->versionForChangeId('never-declared'),
+            $fromSubject->versionForChangeId('never-declared'),
         );
     }
 

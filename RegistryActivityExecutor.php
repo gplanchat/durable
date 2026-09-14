@@ -31,8 +31,8 @@ final class RegistryActivityExecutor implements ActivityExecutor
     {
         $handler = $this->handlers[$activityName] ?? null;
 
-        // Le localisateur en dernier : un enregistrement direct l'emporte, ce qui laisse un test
-        // remplacer un gestionnaire sans reconstruire le conteneur.
+        // The locator comes last: a direct registration wins, which lets a test replace a
+        // handler without rebuilding the container.
         if (null === $handler && $this->lazyHandlers?->has($activityName)) {
             $handler = $this->lazyHandlers->get($activityName);
         }

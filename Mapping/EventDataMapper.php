@@ -36,7 +36,7 @@ use Gplanchat\Durable\ParentClosePolicy;
  * Maps **journal records** to domain {@see Event} instances and back.
  *
  * A record is the JSON-shaped payload used everywhere the journal is stored or transported:
- * - rows in {@see \Gplanchat\Durable\Store\InMemoryEventStore} ou tout autre {@see \Gplanchat\Durable\Store\EventStoreInterface};
+ * - rows in {@see \Gplanchat\Durable\Store\InMemoryEventStore} or any other {@see \Gplanchat\Durable\Store\EventStoreInterface};
  * - items embedded in Temporal **gRPC** workflow history (e.g. {@code WORKFLOW_EXECUTION_STARTED} input
  *   decoded by {@see \Gplanchat\Bridge\Temporal\Codec\JsonPlainPayload}).
  *
