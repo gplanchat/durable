@@ -19,12 +19,12 @@ final class ActivityContractResolver
     private const CACHE_TTL = 3600;
 
     /**
-     * Les métadonnées déjà résolues dans ce processus.
+     * The metadata already resolved in this process.
      *
-     * Elles dérivent des attributs, donc du code : elles ne peuvent pas changer tant que le
-     * processus vit. Sans cette mémoire, un résolveur sans pool — et le pool est `null` par défaut —
-     * refait la réflexion à chaque appel d'activité, et un résolveur avec pool refait un
-     * aller-retour au pool, qui sur un Redis est un aller-retour réseau.
+     * They derive from attributes, hence from code: they cannot change while the process lives.
+     * Without this memo, a resolver with no pool — and the pool is `null` by default — redoes the
+     * reflection on every activity call, and a resolver with a pool makes a round trip to the pool,
+     * which on Redis is a network round trip.
      *
      * @var array<class-string, array<string, string>>
      */
