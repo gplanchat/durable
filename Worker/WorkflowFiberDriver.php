@@ -61,7 +61,16 @@ final class WorkflowFiberDriver
 
         while ($fiber->isSuspended()) {
             if (!$suspended instanceof Awaitable) {
-                break;
+                // Workflow code suspended its own fiber with something the engine cannot wait on.
+                // Falling out of the loop here used to return null with no lifecycle call, and the
+                // caller took that null for a result: the run was marked completed with no
+                // ExecutionCompleted in the journal (#315). It is a failure, and it is written down.
+                $this->lifecycle->onFailed($executionId, new \LogicException(\sprintf(
+                    'The workflow suspended with a value of type %s; only an Awaitable can be awaited. Use $env->await(), never Fiber::suspend() directly.',
+                    get_debug_type($suspended),
+                )));
+
+                return null;
             }
 
             if (!$suspended->isSettled()) {
