@@ -97,12 +97,17 @@ final class ResumeWorkflowHandler
             // Normal termination: do not dispatch the resume again, otherwise the cancellation
             // would be redelivered indefinitely. The parent is notified as for a failure.
             $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);
-            $this->metadataStore->delete($executionId);
+            // Marked, not deleted — as on the success path below. A completed row is inactive, so
+            // no resume picks it up; deleting it would also destroy the start payload, which on a
+            // backend that writes no `ExecutionStarted` lives nowhere else.
+            $this->metadataStore->markCompleted($executionId);
 
             return;
         } catch (\Throwable $e) {
             $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);
-            $this->metadataStore->delete($executionId);
+            // An execution that failed is the one an operator most wants to look at: keeping what
+            // it was started with costs a row and answers "given what?".
+            $this->metadataStore->markCompleted($executionId);
 
             throw $e;
         }
