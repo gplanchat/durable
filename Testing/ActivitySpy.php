@@ -133,7 +133,7 @@ final class ActivitySpy
         Assert::assertNotEmpty($this->calls, 'The activity spy was never called.');
         Assert::assertEquals(
             $expectedArgs,
-            $this->calls[\count($this->calls) - 1],
+            $this->calls[array_key_last($this->calls)],
             'The arguments of the last call do not match.',
         );
     }

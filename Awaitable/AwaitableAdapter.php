@@ -24,7 +24,7 @@ final class AwaitableAdapter implements Awaitable
             throw new \RuntimeException('Awaitable is not settled');
         }
         if (!$this->deferred->isFulfilled()) {
-            throw $this->deferred->reason();
+            throw $this->deferred->reason() ?? new \LogicException('Awaitable is rejected without a reason');
         }
 
         return $this->deferred->value();

@@ -43,7 +43,7 @@ final readonly class ActivityFailed implements Event
             $envelope->message,
             $envelope->code,
             $envelope->context,
-            (string) ($envelope->trace ?? ''),
+            $envelope->trace ?? '',
             $envelope->previousChain,
             $activityName,
             $attempt,

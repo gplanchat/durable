@@ -14,7 +14,7 @@ final class NativeUuidV7Generator implements UuidGeneratorInterface
 {
     public function generate(): string
     {
-        $ms = (int) (microtime(true) * 1000);
+        $ms = (int) (microtime(true) * 1000.0);
 
         $bytes = random_bytes(10);
 
