@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\Activity\ActivityStub;
 use Gplanchat\Durable\Attribute\Activities;
+use Gplanchat\Durable\Attribute\AsActivityMethod;
 use Gplanchat\Durable\Attribute\AsQueryMethod;
 use Gplanchat\Durable\Attribute\AsSignalMethod;
 use Gplanchat\Durable\Attribute\AsUpdateMethod;
@@ -73,7 +74,7 @@ final class WorkflowDefinitionLoader
         $reflection = new \ReflectionClass($workflowClass);
         $workflowType = $this->resolveWorkflowType($reflection);
         $method = $this->resolveWorkflowMethod($reflection);
-        // Read here, once: a replay only runs the plan.
+        // Read and checked here, once: a replay only runs the plan.
         $arguments = $this->planArguments($method);
 
         $factory = function (array $input) use ($workflowClass, $method, $arguments): callable {
@@ -193,7 +194,7 @@ final class WorkflowDefinitionLoader
 
     /**
      * One closure per parameter, in order, that produces its argument from the environment and the
-     * input.
+     * input. Throws on a stub whose contract cannot be resolved, so the error comes at registration.
      *
      * @return list<\Closure(WorkflowEnvironment, array<string, mixed>): mixed>
      */
@@ -211,10 +212,17 @@ final class WorkflowDefinitionLoader
             $type = $param->getType();
             $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : (string) $type;
             $attributes = $param->getAttributes(Activities::class);
+            $where = \sprintf('%s::%s() parameter $%s', $method->getDeclaringClass()->getName(), $method->getName(), $param->getName());
 
             if ([] !== $attributes) {
+                if (ActivityStub::class !== $typeName) {
+                    throw new \InvalidArgumentException(\sprintf('%s carries #[Activities] but is typed %s, expected ActivityStub.', $where, $typeName));
+                }
                 $contract = $attributes[0]->newInstance()->contract;
+                self::assertActivityContract($contract);
                 $plan[] = static fn(WorkflowEnvironment $env): ActivityStub => $env->activityStub($contract);
+            } elseif (ActivityStub::class === $typeName) {
+                throw new \InvalidArgumentException(\sprintf('%s is an ActivityStub without #[Activities(Contract::class)]: the loader cannot tell which contract to stub.', $where));
             } elseif (WorkflowEnvironment::class === $typeName) {
                 $plan[] = static fn(WorkflowEnvironment $env): WorkflowEnvironment => $env;
             } elseif ($wholeInput) {
@@ -227,6 +235,20 @@ final class WorkflowDefinitionLoader
         }
 
         return $plan;
+    }
+
+    private static function assertActivityContract(string $contract): void
+    {
+        if (!interface_exists($contract) && !class_exists($contract)) {
+            throw new \InvalidArgumentException(\sprintf('#[Activities(%s)] names no class or interface.', $contract));
+        }
+        foreach ((new \ReflectionClass($contract))->getMethods() as $method) {
+            if ([] !== $method->getAttributes(AsActivityMethod::class)) {
+                return;
+            }
+        }
+
+        throw new \InvalidArgumentException(\sprintf('%s declares no #[AsActivityMethod]: it is not an activity contract.', $contract));
     }
 
     /**
