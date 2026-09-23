@@ -121,7 +121,7 @@ final class WorkflowDefinitionLoader
     public function workflowMethodParameters(string $workflowClass): array
     {
         $parameters = [];
-        foreach ($this->resolveWorkflowMethod(new \ReflectionClass($workflowClass))->getParameters() as $parameter) {
+        foreach (self::inputParameters($this->resolveWorkflowMethod(new \ReflectionClass($workflowClass))) as $parameter) {
             $parameters[$parameter->getName()] = $parameter->isDefaultValueAvailable();
         }
 
@@ -193,6 +193,16 @@ final class WorkflowDefinitionLoader
     }
 
     /**
+     * The workflow method's parameters the caller passes, in order: every parameter but the injected ones.
+     *
+     * @return list<\ReflectionParameter>
+     */
+    public static function inputParameters(\ReflectionMethod $method): array
+    {
+        return array_values(array_filter($method->getParameters(), static fn(\ReflectionParameter $p): bool => !self::isInjected($p)));
+    }
+
+    /**
      * One closure per parameter, in order, that produces its argument from the environment and the
      * input. Throws on a stub whose contract cannot be resolved, so the error comes at registration.
      *
@@ -200,7 +210,7 @@ final class WorkflowDefinitionLoader
      */
     private function planArguments(\ReflectionMethod $method): array
     {
-        $inputs = array_values(array_filter($method->getParameters(), static fn(\ReflectionParameter $p): bool => !self::isInjected($p)));
+        $inputs = self::inputParameters($method);
         // `run(array $input)` receives the whole input; injected parameters beside it do not change that.
         $wholeInput = 1 === \count($inputs)
             && $inputs[0]->getType() instanceof \ReflectionNamedType

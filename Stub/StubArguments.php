@@ -39,18 +39,22 @@ final class StubArguments
      * @param array<int|string, mixed> $arguments as `__call` received them: the positional ones
      *                                            under indices, the named ones under their name
      *
+     * @param list<\ReflectionParameter>|null $parameters the parameters a caller passes, when some of
+     *                                             `$method`'s are supplied by something else; all of
+     *                                             them by default
+     *
      * @return array<string, mixed> the named payload, one contract parameter per key
      *
      * @throws \BadMethodCallException if a named argument matches no parameter, if a required
      *                                 parameter is not supplied, or if a parameter is served both
      *                                 positionally and by name
      */
-    public static function toPayload(\ReflectionFunctionAbstract $method, array $arguments): array
+    public static function toPayload(\ReflectionFunctionAbstract $method, array $arguments, ?array $parameters = null): array
     {
         $payload = [];
         $known = [];
 
-        foreach ($method->getParameters() as $i => $param) {
+        foreach ($parameters ?? $method->getParameters() as $i => $param) {
             $name = $param->getName();
             $known[$name] = true;
 
