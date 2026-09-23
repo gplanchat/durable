@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Workflow;
 
+use Gplanchat\Durable\Activity\ActivityStub;
+use Gplanchat\Durable\Attribute\Activities;
 use Gplanchat\Durable\Attribute\AsQueryMethod;
 use Gplanchat\Durable\Attribute\AsSignalMethod;
 use Gplanchat\Durable\Attribute\AsUpdateMethod;
@@ -71,15 +73,17 @@ final class WorkflowDefinitionLoader
         $reflection = new \ReflectionClass($workflowClass);
         $workflowType = $this->resolveWorkflowType($reflection);
         $method = $this->resolveWorkflowMethod($reflection);
+        // Read here, once: a replay only runs the plan.
+        $arguments = $this->planArguments($method);
 
-        $factory = function (array $input) use ($workflowClass, $method): callable {
-            return function (WorkflowEnvironment $env, ?QueryHandlerRegistry $queries = null) use ($workflowClass, $method, $input): mixed {
+        $factory = function (array $input) use ($workflowClass, $method, $arguments): callable {
+            return function (WorkflowEnvironment $env, ?QueryHandlerRegistry $queries = null) use ($workflowClass, $method, $arguments, $input): mixed {
                 $instance = $this->instantiate($workflowClass, $env);
                 $this->registerQueryHandlers($workflowClass, $instance, $queries ?? new QueryHandlerRegistry());
                 $this->registerSignalHandlers($workflowClass, $instance, $env);
                 $this->registerUpdateHandlers($workflowClass, $instance, $env);
 
-                return $method->invokeArgs($instance, $this->mapInputToArguments($method, $input));
+                return $method->invokeArgs($instance, array_map(static fn(\Closure $argument): mixed => $argument($env, $input), $arguments));
             };
         };
 
@@ -175,29 +179,54 @@ final class WorkflowDefinitionLoader
     }
 
     /**
-     * @param array<string, mixed> $input
-     *
-     * @return array<int, mixed>
+     * Whether the loader supplies this parameter itself rather than reading it from the input: the
+     * environment, and the activity stubs. Every reader of a workflow method's signature asks this
+     * one question, so the input never counts a parameter the caller cannot pass.
      */
-    private function mapInputToArguments(\ReflectionMethod $method, array $input): array
+    public static function isInjected(\ReflectionParameter $parameter): bool
     {
-        $params = $method->getParameters();
-        if (1 === \count($params)) {
-            $param = $params[0];
-            if ($param->getType() instanceof \ReflectionNamedType
-                && 'array' === $param->getType()->getName()
-                && \in_array($param->getName(), ['input', 'payload'], true)) {
-                return [$input];
+        $type = $parameter->getType();
+
+        return [] !== $parameter->getAttributes(Activities::class)
+            || ($type instanceof \ReflectionNamedType && \in_array($type->getName(), [WorkflowEnvironment::class, ActivityStub::class], true));
+    }
+
+    /**
+     * One closure per parameter, in order, that produces its argument from the environment and the
+     * input.
+     *
+     * @return list<\Closure(WorkflowEnvironment, array<string, mixed>): mixed>
+     */
+    private function planArguments(\ReflectionMethod $method): array
+    {
+        $inputs = array_values(array_filter($method->getParameters(), static fn(\ReflectionParameter $p): bool => !self::isInjected($p)));
+        // `run(array $input)` receives the whole input; injected parameters beside it do not change that.
+        $wholeInput = 1 === \count($inputs)
+            && $inputs[0]->getType() instanceof \ReflectionNamedType
+            && 'array' === $inputs[0]->getType()->getName()
+            && \in_array($inputs[0]->getName(), ['input', 'payload'], true);
+
+        $plan = [];
+        foreach ($method->getParameters() as $param) {
+            $type = $param->getType();
+            $typeName = $type instanceof \ReflectionNamedType ? $type->getName() : (string) $type;
+            $attributes = $param->getAttributes(Activities::class);
+
+            if ([] !== $attributes) {
+                $contract = $attributes[0]->newInstance()->contract;
+                $plan[] = static fn(WorkflowEnvironment $env): ActivityStub => $env->activityStub($contract);
+            } elseif (WorkflowEnvironment::class === $typeName) {
+                $plan[] = static fn(WorkflowEnvironment $env): WorkflowEnvironment => $env;
+            } elseif ($wholeInput) {
+                $plan[] = static fn(WorkflowEnvironment $env, array $input): array => $input;
+            } else {
+                $key = $param->getName();
+                $default = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : null;
+                $plan[] = static fn(WorkflowEnvironment $env, array $input): mixed => \array_key_exists($key, $input) ? $input[$key] : $default;
             }
         }
 
-        $args = [];
-        foreach ($params as $param) {
-            $key = $param->getName();
-            $args[] = \array_key_exists($key, $input) ? $input[$key] : ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
-        }
-
-        return $args;
+        return $plan;
     }
 
     /**
