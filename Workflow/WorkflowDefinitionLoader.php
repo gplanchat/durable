@@ -239,8 +239,10 @@ final class WorkflowDefinitionLoader
                 $plan[] = static fn(WorkflowEnvironment $env, array $input): array => $input;
             } else {
                 $key = $param->getName();
-                $default = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : null;
-                $plan[] = static fn(WorkflowEnvironment $env, array $input): mixed => \array_key_exists($key, $input) ? $input[$key] : $default;
+                // The default is evaluated per execution: a `new` initializer must not be shared between runs.
+                $plan[] = static fn(WorkflowEnvironment $env, array $input): mixed => \array_key_exists($key, $input)
+                    ? $input[$key]
+                    : ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
             }
         }
 
