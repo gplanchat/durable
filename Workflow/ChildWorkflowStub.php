@@ -60,6 +60,7 @@ final class ChildWorkflowStub
      */
     private function argumentsToInput(array $arguments): array
     {
-        return StubArguments::toPayload($this->workflowMethod, $arguments);
+        // A parent passes the input only: the child's injected parameters are the loader's to supply.
+        return StubArguments::toPayload($this->workflowMethod, $arguments, WorkflowDefinitionLoader::inputParameters($this->workflowMethod));
     }
 }
