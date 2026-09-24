@@ -18,7 +18,7 @@ namespace Gplanchat\Durable\Awaitable;
  * {@see \Gplanchat\Durable\WorkflowEnvironment::await()} waits. The `otherwise()` is the
  * `catch` around the `await()`. See ADR DUR033.
  *
- * @template TValue
+ * @template-covariant TValue
  */
 interface Awaitable
 {
