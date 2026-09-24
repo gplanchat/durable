@@ -23,6 +23,7 @@ use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
+use Gplanchat\Durable\Event\WorkflowCancellationDelivered;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -332,6 +333,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 new FailureEnvelope(\LogicException::class, 'rejected', 9, ['ctx' => $nested], '#0 {main}', []),
             ),
             new WorkflowCancellationRequested($executionId, 'user asked', 'parent-1'),
+            new WorkflowCancellationDelivered($executionId, ['act-1', 'timer-1']),
+            new WorkflowCancellationDelivered($executionId, []),
             new WorkflowExecutionCancelled($executionId, 'user asked', 'parent-1'),
             new WorkflowContinuedAsNew($executionId, 'Next\\Type', ['carry' => $nested], ['reason' => 'history size']),
             WorkflowExecutionFailed::fromStoredPayload($executionId, [

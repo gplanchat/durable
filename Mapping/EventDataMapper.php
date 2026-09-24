@@ -23,6 +23,7 @@ use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
+use Gplanchat\Durable\Event\WorkflowCancellationDelivered;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -163,6 +164,10 @@ final class EventDataMapper
                 ) : null,
             ),
             WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($executionId, $payload),
+            WorkflowCancellationDelivered::class => new WorkflowCancellationDelivered(
+                $executionId,
+                array_values(array_map(strval(...), (array) ($payload['targets'] ?? []))),
+            ),
             WorkflowExecutionCancelled::class => new WorkflowExecutionCancelled(
                 $executionId,
                 (string) ($payload['reason'] ?? ''),

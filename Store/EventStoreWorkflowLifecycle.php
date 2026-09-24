@@ -10,6 +10,7 @@ use Gplanchat\Durable\Awaitable\AwaitableInspector;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCancelled;
+use Gplanchat\Durable\Event\WorkflowCancellationDelivered;
 use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
@@ -46,9 +47,10 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     }
 
     /**
-     * Requested, and not yet delivered: the delivery is traced by the cancellation of an
-     * operation with the workflow_cancelled reason — without that bound, every replay would raise
-     * the cancellation again, including inside the compensation waits.
+     * Requested, and not yet delivered: the delivery is traced by {@see WorkflowCancellationDelivered}
+     * — without that bound, every replay would raise the cancellation again, including inside
+     * the compensation waits. Journals written before that event existed carry the delivery only
+     * as an operation cancelled with the workflow_cancelled reason, which still counts.
      */
     public function isCancellationPending(string $executionId): bool
     {
@@ -63,8 +65,9 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             ) {
                 $requested = false;
             }
-            if (($event instanceof ActivityCancelled || $event instanceof TimerCancelled)
-                && ActivityCancellationReason::WORKFLOW_CANCELLED === $event->reason()
+            if ($event instanceof WorkflowCancellationDelivered
+                || (($event instanceof ActivityCancelled || $event instanceof TimerCancelled)
+                    && ActivityCancellationReason::WORKFLOW_CANCELLED === $event->reason())
             ) {
                 return false;
             }
@@ -75,9 +78,10 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void
     {
-        // Nothing to add: ActivityCancelled / TimerCancelled already carry the
-        // workflow_cancelled reason, which serves both as the delivery trace and as the source
-        // of the rejection on replay.
+        // ActivityCancelled / TimerCancelled already carry the workflow_cancelled reason, which
+        // rejects those awaits on replay. A condition has no such event: this one is what places
+        // the delivery in the journal for it (#317).
+        $this->eventStore->append(new WorkflowCancellationDelivered($executionId, $cancelledOperationIds));
     }
 
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void

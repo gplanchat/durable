@@ -19,6 +19,7 @@ use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
+use Gplanchat\Durable\Event\WorkflowCancellationDelivered;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
@@ -395,6 +396,19 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         foreach ($this->eventStore->readStream($this->executionId) as $event) {
             if ($event instanceof TimerCompleted && $event->timerId() === $timerId) {
                 return $position;
+            }
+            ++$position;
+        }
+
+        return null;
+    }
+
+    public function cancellationDelivery(): ?array
+    {
+        $position = 0;
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof WorkflowCancellationDelivered) {
+                return ['position' => $position, 'targets' => $event->targets()];
             }
             ++$position;
         }

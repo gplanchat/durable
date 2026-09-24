@@ -157,7 +157,7 @@ final class WorkflowEnvironment
         // an irreducible one — a timer that never fires would be one more command in the history,
         // for a wake-up that never comes.
         if ($deadline->isInfinite()) {
-            $this->applyMessagesUntil($awaitable, null);
+            $this->applyMessagesUntil($awaitable, $this->context->cancellationMessageBound());
 
             return $this->runtime->await($awaitable, $this->context);
         }
@@ -165,9 +165,11 @@ final class WorkflowEnvironment
         $timer = $this->timer($deadline, 'deadline');
         // The deadline bounds how far messages are applied: the DUR032 rule lives here, and not in
         // any reading of the history.
+        $firedAt = $timer instanceof TimerAwaitable ? $this->context->timerCompletionPosition($timer->timerId()) : null;
+        $cancelledAt = $this->context->cancellationMessageBound();
         $this->applyMessagesUntil(
             $awaitable,
-            $timer instanceof TimerAwaitable ? $this->context->timerCompletionPosition($timer->timerId()) : null,
+            null === $firedAt || null === $cancelledAt ? $firedAt ?? $cancelledAt : min($firedAt, $cancelledAt),
         );
 
         return $this->awaitUnderDeadline($awaitable, $timer, $deadline, self::describe($awaitable));

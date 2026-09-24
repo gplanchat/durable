@@ -61,6 +61,9 @@ final class ExecutionContext
      */
     private int $messageCursor = 0;
 
+    /** Whether the workflow's cancellation has been raised in the fiber during this pass. */
+    private bool $cancellationRaised = false;
+
     public function __construct(
         private readonly string $executionId,
         private readonly WorkflowHistorySourceInterface $historySource,
@@ -662,6 +665,32 @@ final class ExecutionContext
     public function timerCompletionPosition(string $timerId): ?int
     {
         return $this->historySource->timerCompletionPosition($timerId);
+    }
+
+    /**
+     * @return array{position: int, targets: list<string>}|null
+     */
+    public function cancellationDelivery(): ?array
+    {
+        return $this->historySource->cancellationDelivery();
+    }
+
+    public function markCancellationRaised(): void
+    {
+        $this->cancellationRaised = true;
+    }
+
+    /**
+     * Past this position, messages wait: the cancellation recorded there was delivered on a
+     * condition, and has not been raised again in this pass. Applying a later message first
+     * could settle that condition and walk the replay past the catch that compensated (#317).
+     * A delivery that withdrew operations needs no bound: the journal rejects those awaits.
+     */
+    public function cancellationMessageBound(): ?int
+    {
+        $delivery = $this->cancellationRaised ? null : $this->historySource->cancellationDelivery();
+
+        return null !== $delivery && [] === $delivery['targets'] ? $delivery['position'] : null;
     }
 
     /**

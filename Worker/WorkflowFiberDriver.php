@@ -79,10 +79,17 @@ final class WorkflowFiberDriver
                 // operation is cancelled with the workflow_cancelled reason, which doubles as the
                 // delivery trace — on replay, the awaitable is rejected by the journal at the same
                 // place.
-                if (!$cancellationDelivered && $this->lifecycle->isCancellationPending($executionId)) {
+                // A delivery recorded on a condition withdrew nothing the journal could reject: it is
+                // raised again here, where the replay reaches the same await, and not recorded twice.
+                $recorded = $cancellationDelivered ? null : $context->cancellationDelivery();
+                $replayedOnCondition = null !== $recorded && [] === $recorded['targets'];
+                if (!$cancellationDelivered && ($replayedOnCondition || $this->lifecycle->isCancellationPending($executionId))) {
                     $cancellationDelivered = true;
+                    $context->markCancellationRaised();
                     $failure = new WorkflowCancelledFailure($executionId, ActivityCancellationReason::WORKFLOW_CANCELLED);
-                    $this->lifecycle->onCancellationDelivered($executionId, self::cancelPending($context, $suspended));
+                    if (!$replayedOnCondition) {
+                        $this->lifecycle->onCancellationDelivered($executionId, self::cancelPending($context, $suspended));
+                    }
 
                     try {
                         $suspended = $fiber->throw($failure);
