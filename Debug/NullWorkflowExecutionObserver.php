@@ -18,10 +18,8 @@ namespace Gplanchat\Durable\Debug;
  */
 final class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
 {
-    #[\Override]
     public function onWorkflowRun(string $executionId, string $workflowType, bool $isResume): void {}
 
-    #[\Override]
     public function onActivityExecuted(
         string $executionId,
         string $activityId,

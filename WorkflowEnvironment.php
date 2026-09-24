@@ -455,13 +455,6 @@ final class WorkflowEnvironment
     }
 
     /**
-     * @template T
-     *
-     * @param \Closure(): T $closure
-     *
-     * @return T
-     */
-    /**
      * Declares that this workflow's behaviour changed here, and returns the one that applies to the
      * execution in progress.
      *
@@ -489,6 +482,13 @@ final class WorkflowEnvironment
         return $this->context->version($changeId, $minSupported, $maxSupported);
     }
 
+    /**
+     * @template T
+     *
+     * @param \Closure(): T $closure
+     *
+     * @return T
+     */
     public function sideEffect(\Closure $closure): mixed
     {
         return $this->await($this->context->sideEffect($closure));

@@ -7,8 +7,8 @@ namespace Gplanchat\Durable\Event;
 /**
  * The current run ends in order to chain a new run with the given payload / type.
  *
- * The history of the **new** `executionId` must be empty; the dispatch is the responsibility of
- * {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} or of the caller.
+ * The new run's history opens with an `ExecutionStarted` that names this run (#322); the dispatch
+ * is the responsibility of {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler} or of the caller.
  */
 final readonly class WorkflowContinuedAsNew implements Event
 {
