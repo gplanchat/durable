@@ -9,7 +9,6 @@ use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCompleted;
-use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
@@ -136,11 +135,9 @@ final class ActivityMessageProcessor
                 true,
                 null,
             );
-            $this->eventStore->append(new ActivityTaskCompleted(
-                $message->executionId,
-                $message->activityId,
-                $result,
-            ));
+            // One event on success (#262): the attempt's result is the settled result, and a second
+            // `ActivityTaskCompleted` with the same body only doubled the timeline row. Failures keep
+            // the split, one `ActivityTaskFailed` per attempt for one outcome.
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
