@@ -130,7 +130,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             $options->parentClosePolicy,
             $options->workflowId,
             [
-                'parentClosePolicy' => $options->parentClosePolicy,
+                'parentClosePolicy' => $options->parentClosePolicy->value,
                 'workflowId' => $options->workflowId,
             ] + $options->toSchedulingMetadata(),
         ));
