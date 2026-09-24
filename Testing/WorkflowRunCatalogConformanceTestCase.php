@@ -101,8 +101,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         }
         $this->endRun('ended', WorkflowRunStatus::Completed);
 
+        $page = $this->catalogUnderTest()->listRuns();
+        self::assertSame($this->canTellAPickup(), $page->tellsWaitingForWorker, 'the page says whether the fact can be read at all');
         $runs = [];
-        foreach ($this->catalogUnderTest()->listRuns()->runs as $run) {
+        foreach ($page->runs as $run) {
             $runs[$run->runId] = $run;
         }
 

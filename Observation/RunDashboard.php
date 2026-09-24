@@ -105,14 +105,17 @@ final class RunDashboard
             ],
             'runs' => array_map($this->describe(...), $page->runs),
             'kpis' => self::outcomeCounters($page->runs),
-            // Not an outcome bucket: a subset of the running ones, over the same page (#447).
-            'waitingForWorker' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
             'pagination' => [
                 'cursor' => $cursor,
                 'nextCursor' => $page->nextCursor,
                 'hasNext' => null !== $page->nextCursor,
             ],
             'status' => $status,
+        ] + ($page->tellsWaitingForWorker ? [
+            // Not an outcome bucket: a subset of the running ones, over the same page (#447). Left
+            // out when the backend cannot tell, since zero would claim that none waits.
+            'waitingForWorker' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
+        ] : []) + [
             'selectedRun' => null === $selected ? null : $this->describe($selected) + [
                 // The frieze is computed in the core, next to the facts it projects: grouping
                 // into actions, placing in time and telling the queue apart from the work are not

@@ -123,7 +123,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
                 : null,
         ), $window);
 
-        return new WorkflowRunPage($runs, $hasMore ? end($window) : null);
+        return new WorkflowRunPage($runs, $hasMore ? end($window) : null, tellsWaitingForWorker: true);
     }
 
     public function readHistory(WorkflowRunDescription $run): array
