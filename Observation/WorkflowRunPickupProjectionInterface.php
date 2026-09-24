@@ -13,7 +13,8 @@ namespace Gplanchat\Durable\Observation;
  * not leaves that fact absent.
  *
  * {@see \Gplanchat\Durable\Store\ProjectingEventStore} calls it when the worker appends the first
- * `ExecutionStarted`, which only a worker appends.
+ * `ExecutionStarted`, which a worker appends — except a continued run's, written by the worker that
+ * ended its predecessor (#322).
  */
 interface WorkflowRunPickupProjectionInterface
 {

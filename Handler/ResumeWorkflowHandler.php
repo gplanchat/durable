@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Handler;
 
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
@@ -92,10 +93,16 @@ final class ResumeWorkflowHandler
 
             return;
         } catch (ContinueAsNewRequested $e) {
-            $this->metadataStore->delete($executionId);
-            $newExecutionId = ExecutionId::generate()->toString();
+            // Superseded, not deleted (#322): the row is what the old run was started with.
+            $this->metadataStore->markCompleted($executionId);
+            $newExecutionId = $e->nextExecutionId ?? ExecutionId::generate()->toString();
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
             $this->metadataStore->save($newExecutionId, $nextAlias, $e->payload);
+            // resume() never writes a start: this one is the only place the new run names its predecessor.
+            $this->eventStore->append(new ExecutionStarted($newExecutionId, [
+                'workflowType' => $nextAlias,
+                'continuedFromExecutionId' => $executionId,
+            ]));
             $this->resumeDispatcher->dispatchNewWorkflowRun($newExecutionId, $nextAlias, $e->payload);
 
             return;

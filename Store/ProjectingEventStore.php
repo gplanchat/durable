@@ -37,8 +37,12 @@ final class ProjectingEventStore implements EventStoreInterface
     {
         $this->inner->append($event);
 
-        // Only a worker appends ExecutionStarted: the run has been picked up.
-        if ($event instanceof ExecutionStarted && $this->projection instanceof WorkflowRunPickupProjectionInterface) {
+        // A worker appends ExecutionStarted when it picks the run up. Except for a continued run: the
+        // worker that ended its predecessor writes its start, and its pickup is recorded when a worker
+        // takes its message (#322, #447).
+        if ($event instanceof ExecutionStarted
+            && !isset($event->payload()['continuedFromExecutionId'])
+            && $this->projection instanceof WorkflowRunPickupProjectionInterface) {
             $this->projection->recordPickup($event->executionId());
         }
 

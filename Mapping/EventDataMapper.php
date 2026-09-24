@@ -146,6 +146,7 @@ final class EventDataMapper
                 (string) $payload['nextWorkflowType'],
                 \is_array($payload['nextPayload'] ?? null) ? $payload['nextPayload'] : [],
                 \is_array($payload['continuationMetadata'] ?? null) ? $payload['continuationMetadata'] : [],
+                isset($payload['newExecutionId']) ? (string) $payload['newExecutionId'] : null,
             ),
             WorkflowSignalReceived::class => new WorkflowSignalReceived(
                 $executionId,

@@ -21,7 +21,16 @@ final class ContinueAsNewRequested extends \RuntimeException
         public readonly string $workflowType,
         public readonly array $payload,
         public readonly ?ContinueAsNewOptions $options = null,
+        public readonly ?string $nextExecutionId = null,
     ) {
         parent::__construct(\sprintf('Continue as new: workflow type %s', $workflowType));
+    }
+
+    /**
+     * The id is chosen when the old journal is written, so that the journal can name it (#322).
+     */
+    public function withNextExecutionId(string $nextExecutionId): self
+    {
+        return new self($this->workflowType, $this->payload, $this->options, $nextExecutionId);
     }
 }

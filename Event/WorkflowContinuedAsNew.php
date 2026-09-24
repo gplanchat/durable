@@ -15,13 +15,20 @@ final readonly class WorkflowContinuedAsNew implements Event
     /**
      * @param array<string, mixed> $nextPayload
      * @param array<string, mixed> $continuationMetadata Serialised {@see \Temporal\Workflow\ContinueAsNewOptions} equivalent (task_queue, timeouts, …)
+     * @param ?string $newExecutionId The run that continues this one; null on a journal written before #322
      */
     public function __construct(
         private string $executionId,
         private string $nextWorkflowType,
         private array $nextPayload,
         private array $continuationMetadata = [],
+        private ?string $newExecutionId = null,
     ) {}
+
+    public function newExecutionId(): ?string
+    {
+        return $this->newExecutionId;
+    }
 
     public function executionId(): string
     {
@@ -60,6 +67,9 @@ final readonly class WorkflowContinuedAsNew implements Event
         ];
         if ([] !== $this->continuationMetadata) {
             $p['continuationMetadata'] = $this->continuationMetadata;
+        }
+        if (null !== $this->newExecutionId) {
+            $p['newExecutionId'] = $this->newExecutionId;
         }
 
         return $p;

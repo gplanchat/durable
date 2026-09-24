@@ -336,7 +336,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             new WorkflowCancellationDelivered($executionId, ['act-1', 'timer-1']),
             new WorkflowCancellationDelivered($executionId, []),
             new WorkflowExecutionCancelled($executionId, 'user asked', 'parent-1'),
-            new WorkflowContinuedAsNew($executionId, 'Next\\Type', ['carry' => $nested], ['reason' => 'history size']),
+            new WorkflowContinuedAsNew($executionId, 'Next\\Type', ['carry' => $nested], ['reason' => 'history size'], 'exec-next'),
             WorkflowExecutionFailed::fromStoredPayload($executionId, [
                 'kind' => WorkflowExecutionFailed::KIND_WORKFLOW_HANDLER,
                 'failureClass' => \RuntimeException::class,

@@ -23,6 +23,7 @@ use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\WorkflowFailureClassifier;
 use Gplanchat\Durable\ParentClosureReason;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
@@ -122,11 +123,13 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onContinuedAsNew(string $executionId, ContinueAsNewRequested $request): void
     {
+        $request = $request->withNextExecutionId(ExecutionId::generate()->toString());
         $this->eventStore->append(new WorkflowContinuedAsNew(
             $executionId,
             $request->workflowType,
             $request->payload,
             null !== $request->options ? $request->options->toMetadata() : [],
+            $request->nextExecutionId,
         ));
 
         throw $request;
