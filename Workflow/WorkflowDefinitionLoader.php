@@ -228,9 +228,17 @@ final class WorkflowDefinitionLoader
                 if (ActivityStub::class !== $typeName) {
                     throw new \InvalidArgumentException(\sprintf('%s carries #[Activities] but is typed %s, expected ActivityStub.', $where, $typeName));
                 }
-                $contract = $attributes[0]->newInstance()->contract;
+                $activities = $attributes[0]->newInstance();
+                $contract = $activities->contract;
                 self::assertActivityContract($contract);
-                $plan[] = static fn(WorkflowEnvironment $env): ActivityStub => $env->activityStub($contract);
+
+                // Built once, here, so an impossible option fails the registration, not the first call.
+                try {
+                    $options = $activities->options();
+                } catch (\InvalidArgumentException $e) {
+                    throw new \InvalidArgumentException(\sprintf('%s: %s', $where, $e->getMessage()), 0, $e);
+                }
+                $plan[] = static fn(WorkflowEnvironment $env): ActivityStub => $env->activityStub($contract, $options);
             } elseif (ActivityStub::class === $typeName) {
                 throw new \InvalidArgumentException(\sprintf('%s is an ActivityStub without #[Activities(Contract::class)]: the loader cannot tell which contract to stub.', $where));
             } elseif (WorkflowEnvironment::class === $typeName) {
