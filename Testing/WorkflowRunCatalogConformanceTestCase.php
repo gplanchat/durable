@@ -45,6 +45,32 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     abstract protected function endRun(string $executionId, WorkflowRunStatus $outcome): void;
 
+    /**
+     * Whether this catalog can tell a run nobody has picked up yet. Optional: a catalog that cannot
+     * leaves the fact absent, and the suite checks that instead.
+     */
+    protected function canTellAPickup(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Records that a worker picked the execution up, as your worker does when it consumes the resume
+     * (the core's `ResumeWorkflowHandler` calls `recordPickup()`). Called only when
+     * {@see canTellAPickup()} is true. Note that {@see startRun()} may or may not count as a pickup
+     * depending on the backend; the suite only relies on {@see dispatchRun()} for a run not picked up.
+     */
+    protected function pickUp(string $executionId): void {}
+
+    /**
+     * Makes a running execution exist that no worker has picked up yet: dispatched, not consumed.
+     * By default the same as {@see startRun()}, for a catalog that cannot tell the difference.
+     */
+    protected function dispatchRun(string $executionId, string $workflowType): void
+    {
+        $this->startRun($executionId, $workflowType);
+    }
+
     // -----------------------------------------------------------------------------------------
 
     public function testAnEmptyCatalogListsNothing(): void
@@ -66,6 +92,33 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame('exec-1', $runs[0]->runId);
         self::assertSame('App\\OrderWorkflow', $runs[0]->workflowName);
         self::assertSame(WorkflowRunStatus::Running, $runs[0]->status);
+    }
+
+    public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
+    {
+        $this->dispatchRun('waiting', 'App\\OrderWorkflow');
+        $this->dispatchRun('picked', 'App\\OrderWorkflow');
+        $this->startRun('ended', 'App\\OrderWorkflow');
+        if ($this->canTellAPickup()) {
+            $this->pickUp('picked');
+        }
+        $this->endRun('ended', WorkflowRunStatus::Completed);
+
+        $page = $this->catalogUnderTest()->listRuns();
+        self::assertSame($this->canTellAPickup(), $page->tellsWaitingForWorker, 'the page says whether the fact can be read at all');
+        $runs = [];
+        foreach ($page->runs as $run) {
+            $runs[$run->runId] = $run;
+        }
+
+        self::assertNull($runs['picked']->waitingForWorkerSince);
+        self::assertNull($runs['ended']->waitingForWorkerSince, 'an ended run waits for nothing');
+        if (!$this->canTellAPickup()) {
+            self::assertNull($runs['waiting']->waitingForWorkerSince, 'a fact the catalog cannot tell is absent');
+
+            return;
+        }
+        self::assertEquals($runs['waiting']->startedAt, $runs['waiting']->waitingForWorkerSince);
     }
 
     /**
