@@ -6,9 +6,11 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
@@ -34,6 +36,11 @@ final class ProjectingEventStore implements EventStoreInterface
     public function append(Event $event): void
     {
         $this->inner->append($event);
+
+        // Only a worker appends ExecutionStarted: the run has been picked up.
+        if ($event instanceof ExecutionStarted && $this->projection instanceof WorkflowRunPickupProjectionInterface) {
+            $this->projection->recordPickup($event->executionId());
+        }
 
         $status = self::outcomeOf($event);
         if (null !== $status) {

@@ -8,6 +8,7 @@ use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\JournalRunHistoryReader;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
+use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
@@ -41,12 +42,12 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
  * @see DUR037 observing a run is a projection
  * @see DUR041 this catalog replays the port's conformance suite
  */
-final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, WorkflowRunProjectionInterface
+final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, WorkflowRunProjectionInterface, WorkflowRunPickupProjectionInterface
 {
     private const BACKEND = 'in-memory';
 
     /**
-     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null}>
+     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null, pickedUp: bool}>
      */
     private array $runs = [];
 
@@ -64,7 +65,15 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             'status' => WorkflowRunStatus::Running,
             'startedAt' => $this->runs[$executionId]['startedAt'] ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
             'endedAt' => null,
+            'pickedUp' => $this->runs[$executionId]['pickedUp'] ?? false,
         ];
+    }
+
+    public function recordPickup(string $executionId): void
+    {
+        if (isset($this->runs[$executionId])) {
+            $this->runs[$executionId]['pickedUp'] = true;
+        }
     }
 
     /**
@@ -109,6 +118,9 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             $this->runs[$runId]['status'],
             $this->runs[$runId]['startedAt'],
             $this->runs[$runId]['endedAt'],
+            waitingForWorkerSince: WorkflowRunStatus::Running === $this->runs[$runId]['status'] && !$this->runs[$runId]['pickedUp']
+                ? $this->runs[$runId]['startedAt']
+                : null,
         ), $window);
 
         return new WorkflowRunPage($runs, $hasMore ? end($window) : null);

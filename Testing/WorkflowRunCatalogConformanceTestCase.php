@@ -45,6 +45,20 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     abstract protected function endRun(string $executionId, WorkflowRunStatus $outcome): void;
 
+    /**
+     * Whether this catalog can tell a run nobody has picked up yet. Optional: a catalog that cannot
+     * leaves the fact absent, and the suite checks that instead.
+     */
+    protected function canTellAPickup(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Records that a worker picked the execution up. Called only when {@see canTellAPickup()} is true.
+     */
+    protected function pickUp(string $executionId): void {}
+
     // -----------------------------------------------------------------------------------------
 
     public function testAnEmptyCatalogListsNothing(): void
@@ -66,6 +80,31 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame('exec-1', $runs[0]->runId);
         self::assertSame('App\\OrderWorkflow', $runs[0]->workflowName);
         self::assertSame(WorkflowRunStatus::Running, $runs[0]->status);
+    }
+
+    public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
+    {
+        $this->startRun('waiting', 'App\\OrderWorkflow');
+        $this->startRun('picked', 'App\\OrderWorkflow');
+        $this->startRun('ended', 'App\\OrderWorkflow');
+        if ($this->canTellAPickup()) {
+            $this->pickUp('picked');
+        }
+        $this->endRun('ended', WorkflowRunStatus::Completed);
+
+        $runs = [];
+        foreach ($this->catalogUnderTest()->listRuns()->runs as $run) {
+            $runs[$run->runId] = $run;
+        }
+
+        self::assertNull($runs['picked']->waitingForWorkerSince);
+        self::assertNull($runs['ended']->waitingForWorkerSince, 'an ended run waits for nothing');
+        if (!$this->canTellAPickup()) {
+            self::assertNull($runs['waiting']->waitingForWorkerSince, 'a fact the catalog cannot tell is absent');
+
+            return;
+        }
+        self::assertEquals($runs['waiting']->startedAt, $runs['waiting']->waitingForWorkerSince);
     }
 
     /**

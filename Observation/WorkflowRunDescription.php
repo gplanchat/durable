@@ -14,6 +14,10 @@ namespace Gplanchat\Durable\Observation;
  * `groupId` carries the grouping when the backend has one — Temporal keeps the workflow id across
  * continuations and gives each execution its own run id. The DBAL backend has no such notion and
  * leaves it absent.
+ *
+ * `waitingForWorkerSince` is set while a running execution has not been picked up by any worker: it
+ * was dispatched, and nothing consumed it (#447). It is absent once a worker picked it up, on an
+ * ended run, and on a backend that cannot tell.
  */
 final readonly class WorkflowRunDescription
 {
@@ -24,5 +28,6 @@ final readonly class WorkflowRunDescription
         public ?\DateTimeImmutable $startedAt = null,
         public ?\DateTimeImmutable $endedAt = null,
         public ?string $groupId = null,
+        public ?\DateTimeImmutable $waitingForWorkerSince = null,
     ) {}
 }
