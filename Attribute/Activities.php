@@ -37,6 +37,7 @@ use Gplanchat\Durable\TaskQueue;
 final class Activities
 {
     /**
+     * @param class-string $contract
      * @param list<string> $nonRetryable exception classes; checked in {@see options()}, since an
      *                                   attribute argument is checked by nobody else
      */
@@ -89,6 +90,16 @@ final class Activities
         foreach ($durations as $parameter => $value) {
             $seconds[$parameter] = null === $value ? null : self::named($parameter, static fn(): Duration => Duration::seconds($value));
         }
+        // Temporal refuses these retry policies when the activity is scheduled, on every workflow
+        // task; the value objects accept them, so they are caught here, at registration.
+        if (null !== $this->backoffCoefficient && $this->backoffCoefficient < 1.0) {
+            throw new \InvalidArgumentException(\sprintf('#[Activities] backoffCoefficient: %s would shrink the delay between retries; it must be 1 or more.', $this->backoffCoefficient));
+        }
+        $first = $seconds['initialInterval']?->toSeconds() ?? 1.0;
+        if (null !== $seconds['maximumInterval'] && $seconds['maximumInterval']->toSeconds() < $first) {
+            throw new \InvalidArgumentException(\sprintf('#[Activities] maximumInterval: %ss is shorter than the first retry delay, %ss.', $seconds['maximumInterval']->toSeconds(), $first));
+        }
+
         $nonRetryable = [];
         foreach ($this->nonRetryable as $class) {
             if (!is_a($class, \Throwable::class, true)) {
