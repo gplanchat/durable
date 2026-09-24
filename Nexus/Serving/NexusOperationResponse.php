@@ -22,6 +22,7 @@ namespace Gplanchat\Durable\Nexus\Serving;
  */
 final readonly class NexusOperationResponse
 {
+    /** @param array<mixed> $workflowInput */
     private function __construct(
         public bool $isImmediate,
         public mixed $result,

@@ -155,6 +155,9 @@ final class WorkflowFiberDriver
      * the abandoned context refuses) belongs to a pass that is already over: it is dropped, not
      * reported as the outcome of the run.
      *
+     * @phpstan-param \Fiber<mixed, mixed, mixed, mixed>|null $fiber
+     * @psalm-param \Fiber|null $fiber
+     *
      * @param-out null $fiber
      */
     private static function abandon(ExecutionContext $context, ?\Fiber &$fiber): void
@@ -170,6 +173,9 @@ final class WorkflowFiberDriver
     /**
      * Drops the last reference, which destroys the fiber and runs its `finally` blocks: whatever
      * they throw comes out of here, which a bare assignment would hide from static analysis.
+     *
+     * @phpstan-param \Fiber<mixed, mixed, mixed, mixed>|null $fiber
+     * @psalm-param \Fiber|null $fiber
      *
      * @param-out null $fiber
      */
