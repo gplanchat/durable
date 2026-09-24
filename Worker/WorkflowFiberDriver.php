@@ -154,8 +154,7 @@ final class WorkflowFiberDriver
      * as a Temporal eviction does. What they throw then (an await in a force-closed fiber, work
      * the abandoned context refuses) belongs to a pass that is already over: it is dropped, not
      * reported as the outcome of the run.
-     */
-    /**
+     *
      * @param-out null $fiber
      */
     private static function abandon(ExecutionContext $context, ?\Fiber &$fiber): void
