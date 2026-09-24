@@ -86,6 +86,18 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     protected function recordWait(string $executionId, ?string $waitingOn): void {}
 
+    /**
+     * The execution id a description reports, the one {@see startRun()} was given. By default the
+     * run id, as on a backend where one execution is one run. A backend that gives each run an id of
+     * its own and keeps the execution id as the grouping (Temporal, DUR037) returns `groupId`.
+     *
+     * @see DUR037
+     */
+    protected function executionIdOf(WorkflowRunDescription $run): string
+    {
+        return $run->runId;
+    }
+
     // -----------------------------------------------------------------------------------------
 
     public function testAnEmptyCatalogListsNothing(): void
@@ -104,7 +116,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertCount(1, $runs);
         self::assertInstanceOf(WorkflowRunDescription::class, $runs[0]);
-        self::assertSame('exec-1', $runs[0]->runId);
+        self::assertSame('exec-1', $this->executionIdOf($runs[0]));
         self::assertSame('App\\OrderWorkflow', $runs[0]->workflowName);
         self::assertSame(WorkflowRunStatus::Running, $runs[0]->status);
     }
@@ -123,7 +135,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame($this->canTellAPickup(), $page->tellsWaitingForWorker, 'the page says whether the fact can be read at all');
         $runs = [];
         foreach ($page->runs as $run) {
-            $runs[$run->runId] = $run;
+            $runs[$this->executionIdOf($run)] = $run;
         }
 
         self::assertNull($runs['picked']->waitingForWorkerSince);
@@ -149,7 +161,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         $runs = [];
         foreach ($this->catalogUnderTest()->listRuns()->runs as $run) {
-            $runs[$run->runId] = $run;
+            $runs[$this->executionIdOf($run)] = $run;
         }
 
         self::assertNull($runs['ended']->waitingOn, 'an ended run waits for nothing');
@@ -182,6 +194,12 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         yield 'continued as new' => [WorkflowRunStatus::ContinuedAsNew];
     }
 
+    /**
+     * A run that continues as new leaves two rows, the one that ends and its successor (DUR037 §5):
+     * on a backend that groups runs, the successor, and only it, may be listed beside the ended run:
+     * another run, still running, of the same group. Without a grouping nothing tells it from a
+     * stray row, so the ended run stays alone, as for every other outcome.
+     */
     #[DataProvider('terminalStatuses')]
     public function testAnOutcomeIsVisibleOnTheDescription(WorkflowRunStatus $outcome): void
     {
@@ -189,10 +207,22 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         $this->endRun('exec-1', $outcome);
 
         $runs = $this->catalogUnderTest()->listRuns()->runs;
+        $ended = array_values(array_filter($runs, static fn(WorkflowRunDescription $run): bool => !$run->status->isRunning()));
+        $others = array_values(array_filter($runs, static fn(WorkflowRunDescription $run): bool => $run->status->isRunning()));
 
-        self::assertCount(1, $runs);
-        self::assertSame($outcome, $runs[0]->status);
-        self::assertFalse($runs[0]->status->isRunning());
+        self::assertCount(1, $ended);
+        self::assertSame($outcome, $ended[0]->status);
+        self::assertSame('exec-1', $this->executionIdOf($ended[0]));
+        if (WorkflowRunStatus::ContinuedAsNew !== $outcome || null === $ended[0]->groupId) {
+            self::assertSame([], $others);
+
+            return;
+        }
+        self::assertLessThanOrEqual(1, \count($others), 'a continue-as-new leaves one successor at most');
+        foreach ($others as $successor) {
+            self::assertNotSame($ended[0]->runId, $successor->runId, 'the successor is another run');
+            self::assertSame($ended[0]->groupId, $successor->groupId, 'the successor belongs to the same group');
+        }
     }
 
     public function testFilteringByStatusReturnsOnlyMatchingRuns(): void
@@ -205,10 +235,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         $catalog = $this->catalogUnderTest();
 
-        self::assertSame(['exec-running'], self::idsOf($catalog->listRuns(WorkflowRunStatus::Running)->runs));
-        self::assertSame(['exec-done'], self::idsOf($catalog->listRuns(WorkflowRunStatus::Completed)->runs));
-        self::assertSame(['exec-failed'], self::idsOf($catalog->listRuns(WorkflowRunStatus::Failed)->runs));
-        self::assertSame([], self::idsOf($catalog->listRuns(WorkflowRunStatus::Cancelled)->runs));
+        self::assertSame(['exec-running'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Running)->runs));
+        self::assertSame(['exec-done'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed)->runs));
+        self::assertSame(['exec-failed'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Failed)->runs));
+        self::assertSame([], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Cancelled)->runs));
     }
 
     public function testNoFilterListsEveryOutcomeTogether(): void
@@ -219,7 +249,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertSame(
             ['exec-done', 'exec-running'],
-            self::sorted(self::idsOf($this->catalogUnderTest()->listRuns()->runs)),
+            self::sorted($this->idsOf($this->catalogUnderTest()->listRuns()->runs)),
         );
     }
 
@@ -318,7 +348,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         do {
             $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit);
-            foreach (self::idsOf($page->runs) as $id) {
+            foreach ($this->idsOf($page->runs) as $id) {
                 self::assertNotContains($id, $seen, \sprintf('%s showed up twice while paging', $id));
                 $seen[] = $id;
             }
@@ -335,9 +365,9 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      *
      * @return list<string>
      */
-    private static function idsOf(array $runs): array
+    private function idsOf(array $runs): array
     {
-        return array_map(static fn(WorkflowRunDescription $run): string => $run->runId, $runs);
+        return array_map(fn(WorkflowRunDescription $run): string => $this->executionIdOf($run), $runs);
     }
 
     /**
