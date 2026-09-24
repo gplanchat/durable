@@ -15,7 +15,7 @@ final class KeyPatternPayloadRedactor implements PayloadRedactorInterface
     public const MASK = '***';
 
     public function __construct(
-        private readonly string $keyPattern = '/password|secret|token|authorization|card/i',
+        private readonly string $keyPattern = '/password|secret|token|authorization|card|api[_-]?key/i',
         private readonly int $maxStringBytes = 1024,
     ) {}
 
