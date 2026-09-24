@@ -30,8 +30,8 @@ final readonly class RunPageCursor
     }
 
     /**
-     * A cursor that does not decode is the first page, not an error: a hand-edited URL restarts the
-     * listing instead of failing it.
+     * A cursor that does not decode, or whose start is not a date, is the first page, not an error:
+     * a hand-edited URL restarts the listing instead of failing it.
      */
     public static function decode(?string $cursor): ?self
     {
@@ -46,6 +46,11 @@ final readonly class RunPageCursor
 
         [$startedAt, $executionId] = explode("\0", $raw, 2);
 
-        return '' === $startedAt ? null : new self($startedAt, $executionId);
+        // The start goes to SQL as a date: one that is not would fail the whole query on PostgreSQL.
+        if ('' === $startedAt || false === date_create($startedAt)) {
+            return null;
+        }
+
+        return new self($startedAt, $executionId);
     }
 }
