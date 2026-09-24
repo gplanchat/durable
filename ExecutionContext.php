@@ -227,9 +227,21 @@ final class ExecutionContext
      * position —, so an execution can be on the old side of one and on the new side of the
      * other.
      *
+     * An execution whose version falls outside `$minSupported..$maxSupported` is refused rather
+     * than switched: its branch was deleted, or the history comes from newer code. That is a
+     * deployment problem, so the task fails and the execution stays resumable (#321).
+     *
+     * Limit: "already went through here" is deduced from recorded work ahead (activity, timer,
+     * child, Nexus operation, side effect). An execution that passed this point under the old
+     * code and is now waiting only on a condition has none, so a `version()` inserted before
+     * that wait takes `$maxSupported`. Recorded messages cannot tell it apart: a signal recorded
+     * before the point but not applied yet looks the same.
+     *
      * @param string $changeId     the name of this change point, stable over time
      * @param int    $minSupported the oldest version this code can still play
      * @param int    $maxSupported the most recent one, the one a fresh execution will take
+     *
+     * @throws WorkflowTaskFailure when the execution's version is outside the supported range
      */
     public function version(string $changeId, int $minSupported, int $maxSupported): int
     {
@@ -241,7 +253,7 @@ final class ExecutionContext
 
         $recorded = $this->historySource->versionForChangeId($changeId);
         if (null !== $recorded) {
-            return $this->decidedVersions[$changeId] = $recorded;
+            return $this->decidedVersions[$changeId] = $this->supportedVersion($changeId, $recorded, $minSupported, $maxSupported);
         }
 
         // No marker, and recorded work still ahead: this execution went through here before
@@ -249,12 +261,29 @@ final class ExecutionContext
         // the answer is deduced from the history rather than added to it, which makes it
         // stable by construction.
         if ($this->hasRecordedWorkAhead()) {
-            return ChangePoint::DEFAULT_VERSION;
+            return $this->supportedVersion($changeId, ChangePoint::DEFAULT_VERSION, $minSupported, $maxSupported);
         }
 
         $this->commandBuffer->recordVersion($changeId, $maxSupported);
 
         return $this->decidedVersions[$changeId] = $maxSupported;
+    }
+
+    private function supportedVersion(string $changeId, int $version, int $minSupported, int $maxSupported): int
+    {
+        if ($version < $minSupported || $version > $maxSupported) {
+            throw new WorkflowTaskFailure(\sprintf(
+                'Execution "%s" is on version %d of change point "%s", and this code plays %d..%d only. '
+                . 'Deploy code that still supports it, or let the execution finish first.',
+                $this->executionId,
+                $version,
+                $changeId,
+                $minSupported,
+                $maxSupported,
+            ));
+        }
+
+        return $version;
     }
 
     /**
