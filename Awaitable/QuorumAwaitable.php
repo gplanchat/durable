@@ -51,11 +51,6 @@ final class QuorumAwaitable implements CompositeAwaitable
         return $this->awaitables;
     }
 
-    public function required(): int
-    {
-        return $this->required;
-    }
-
     public function isSettled(): bool
     {
         [$fulfilled, $failed] = $this->partition();

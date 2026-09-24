@@ -22,19 +22,4 @@ final class WorkflowQueryRunner
         return WorkflowQueryEvaluator::lastExecutionResult($this->eventStore, $executionId);
     }
 
-    /**
-     * @return list<array{name: string, payload: array<string, mixed>}>
-     */
-    public function signalsReceived(string $executionId): array
-    {
-        return WorkflowQueryEvaluator::signalsReceived($this->eventStore, $executionId);
-    }
-
-    /**
-     * @return list<array{name: string, arguments: array<string, mixed>, result: mixed}>
-     */
-    public function updatesHandled(string $executionId): array
-    {
-        return WorkflowQueryEvaluator::updatesHandled($this->eventStore, $executionId);
-    }
 }
