@@ -36,6 +36,9 @@ final class RunDashboard
     public function __construct(
         private readonly ?WorkflowRunCatalogInterface $catalog,
         private readonly ?\Closure $now = null,
+        // What masks each event's details: the application's own, as for the profiler and
+        // diagnose, when the host hands it; #488's key pattern otherwise (#507).
+        private readonly ?PayloadRedactorInterface $redactor = null,
     ) {}
 
     /**
@@ -121,7 +124,7 @@ final class RunDashboard
                 // into actions, placing in time and telling the queue apart from the work are not
                 // the host's business, otherwise the same run reads differently from one surface
                 // to the next.
-                'timeline' => RunTimeline::of($this->catalog->readHistory($selected)),
+                'timeline' => RunTimeline::of($this->catalog->readHistory($selected), $this->redactor),
             ],
         ];
     }
@@ -152,6 +155,10 @@ final class RunDashboard
             // for every surface (DUR049).
             $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
             $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->now ?? static fn(): \DateTimeImmutable => new \DateTimeImmutable('now', new \DateTimeZone('UTC')))());
+        }
+        if (null !== $run->waitingOn) {
+            // What the run last suspended on (#324), worded once for every surface, as above.
+            $described['waitingOn'] = 'waiting on ' . $run->waitingOn;
         }
 
         return $described;

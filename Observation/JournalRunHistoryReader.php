@@ -221,7 +221,11 @@ final class JournalRunHistoryReader
         return null === $scheduledEventId ? null : 'nexus:' . $scheduledEventId;
     }
 
-    private static function phaseOf(Event $event): ?WorkflowRunEventPhase
+    /**
+     * What happened to the event's action (#261). Public so the profiler, which reads raw events
+     * rather than this reader's rows, says the same thing as the run pages.
+     */
+    public static function phaseOf(Event $event): ?WorkflowRunEventPhase
     {
         return match (true) {
             self::isFailure($event) => WorkflowRunEventPhase::Failed,

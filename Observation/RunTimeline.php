@@ -39,9 +39,12 @@ final readonly class RunTimeline
 
     /**
      * @param list<WorkflowRunEvent> $history
+     * @param PayloadRedactorInterface|null $redactor what masks the details every host prints; #488's
+     *                                              key pattern unless a host hands its own (#507)
      */
-    public static function of(array $history): self
+    public static function of(array $history, ?PayloadRedactorInterface $redactor = null): self
     {
+        $redactor ??= new KeyPatternPayloadRedactor();
         if ([] === $history) {
             // A purged execution, or one never seen, is not a caller error: the host displays an
             // empty frieze without having to tell "nothing" apart from `null`.
@@ -86,7 +89,7 @@ final readonly class RunTimeline
                             $event->recordedAt->format('H:i:s.v'),
                             $event->label,
                         ),
-                        RecordedDetails::of($event->details),
+                        RecordedDetails::of(self::masked($redactor, $event->details)),
                         $opening->label,
                     ),
                     $group,
@@ -117,6 +120,18 @@ final readonly class RunTimeline
         usort($rows, static fn(TimelineEvent $left, TimelineEvent $right): int => $left->event->sequence <=> $right->event->sequence);
 
         return $rows;
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     *
+     * @return array<string, mixed>
+     */
+    private static function masked(PayloadRedactorInterface $redactor, array $details): array
+    {
+        $masked = $redactor->redact(RecordedDetails::storable($details));
+
+        return \is_array($masked) ? $masked : [];
     }
 
     /**

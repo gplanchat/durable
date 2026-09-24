@@ -72,6 +72,21 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
+     * Whether this catalog keeps what a suspended run waits on (#324). Optional, as the pickup.
+     */
+    protected function canTellAWait(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Records what the execution waits on, as the core's `ResumeWorkflowHandler` does at each
+     * suspension; null when the wait has no words, which clears the previous one. Called only when
+     * {@see canTellAWait()} is true.
+     */
+    protected function recordWait(string $executionId, ?string $waitingOn): void {}
+
+    /**
      * The execution id a description reports, the one {@see startRun()} was given. By default the
      * run id, as on a backend where one execution is one run. A backend that gives each run an id of
      * its own and keeps the execution id as the grouping (Temporal, DUR037) returns `groupId`.
@@ -131,6 +146,41 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
             return;
         }
         self::assertEquals($runs['waiting']->startedAt, $runs['waiting']->waitingForWorkerSince);
+    }
+
+    public function testASuspendedRunSaysWhatItWaitsOnAndAnEndedRunDoesNot(): void
+    {
+        $this->startRun('asleep', 'App\\OrderWorkflow');
+        $this->startRun('ended', 'App\\OrderWorkflow');
+        if ($this->canTellAWait()) {
+            $this->recordWait('asleep', 'timer due at 2026-09-24T10:00:00+00:00');
+            $this->recordWait('asleep', 'activity charge attempt 2 in flight');
+            $this->recordWait('ended', 'activity charge attempt 1 in flight');
+        }
+        $this->endRun('ended', WorkflowRunStatus::Completed);
+
+        $runs = [];
+        foreach ($this->catalogUnderTest()->listRuns()->runs as $run) {
+            $runs[$this->executionIdOf($run)] = $run;
+        }
+
+        self::assertNull($runs['ended']->waitingOn, 'an ended run waits for nothing');
+        self::assertSame(
+            $this->canTellAWait() ? 'activity charge attempt 2 in flight' : null,
+            $runs['asleep']->waitingOn,
+            'the latest wait wins; a fact the catalog cannot tell is absent',
+        );
+    }
+
+    public function testAWaitWithoutWordsClearsThePreviousOne(): void
+    {
+        $this->startRun('exec-1', 'App\\OrderWorkflow');
+        if ($this->canTellAWait()) {
+            $this->recordWait('exec-1', 'activity charge attempt 1 in flight');
+            $this->recordWait('exec-1', null);
+        }
+
+        self::assertNull($this->catalogUnderTest()->listRuns()->runs[0]->waitingOn, 'a stale wait sends the operator to the wrong place');
     }
 
     /**

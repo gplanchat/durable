@@ -7,8 +7,6 @@ namespace Gplanchat\Durable\Query;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
-use Gplanchat\Durable\Event\WorkflowSignalReceived;
-use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -32,43 +30,6 @@ final class WorkflowQueryEvaluator
         }
 
         return $last;
-    }
-
-    /**
-     * @return list<array{name: string, payload: array<string, mixed>}>
-     */
-    public static function signalsReceived(EventStoreInterface $store, string $executionId): array
-    {
-        $out = [];
-        foreach ($store->readStream($executionId) as $event) {
-            if ($event instanceof WorkflowSignalReceived) {
-                $out[] = [
-                    'name' => $event->signalName(),
-                    'payload' => $event->signalPayload(),
-                ];
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * @return list<array{name: string, arguments: array<string, mixed>, result: mixed}>
-     */
-    public static function updatesHandled(EventStoreInterface $store, string $executionId): array
-    {
-        $out = [];
-        foreach ($store->readStream($executionId) as $event) {
-            if ($event instanceof WorkflowUpdateHandled) {
-                $out[] = [
-                    'name' => $event->updateName(),
-                    'arguments' => $event->arguments(),
-                    'result' => $event->result(),
-                ];
-            }
-        }
-
-        return $out;
     }
 
     /**

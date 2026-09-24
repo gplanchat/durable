@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Observation\WaitReason;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
+use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
 
 /**
  * Decorates the journal to read the outcome of executions from it.
@@ -44,6 +47,11 @@ final class ProjectingEventStore implements EventStoreInterface
             && !isset($event->payload()['continuedFromExecutionId'])
             && $this->projection instanceof WorkflowRunPickupProjectionInterface) {
             $this->projection->recordPickup($event->executionId());
+        }
+
+        // The run waits on this activity while a worker runs it: the attempt number is only known here.
+        if ($event instanceof ActivityTaskStarted && $this->projection instanceof WorkflowRunWaitProjectionInterface) {
+            $this->projection->recordWait($event->executionId(), WaitReason::attempt($event));
         }
 
         $status = self::outcomeOf($event);

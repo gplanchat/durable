@@ -11,6 +11,7 @@ use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
+use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 
 /**
@@ -42,12 +43,12 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
  * @see DUR037 observing a run is a projection
  * @see DUR041 this catalog replays the port's conformance suite
  */
-final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, WorkflowRunProjectionInterface, WorkflowRunPickupProjectionInterface
+final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, WorkflowRunProjectionInterface, WorkflowRunPickupProjectionInterface, WorkflowRunWaitProjectionInterface
 {
     private const BACKEND = 'in-memory';
 
     /**
-     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null, pickedUp: bool}>
+     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null, pickedUp: bool, waitingOn?: string|null}>
      */
     private array $runs = [];
 
@@ -73,6 +74,13 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
     {
         if (isset($this->runs[$executionId])) {
             $this->runs[$executionId]['pickedUp'] = true;
+        }
+    }
+
+    public function recordWait(string $executionId, ?string $waitingOn): void
+    {
+        if (isset($this->runs[$executionId])) {
+            $this->runs[$executionId]['waitingOn'] = $waitingOn;
         }
     }
 
@@ -121,6 +129,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             waitingForWorkerSince: WorkflowRunStatus::Running === $this->runs[$runId]['status'] && !$this->runs[$runId]['pickedUp']
                 ? $this->runs[$runId]['startedAt']
                 : null,
+            waitingOn: WorkflowRunStatus::Running === $this->runs[$runId]['status'] ? $this->runs[$runId]['waitingOn'] ?? null : null,
         ), $window);
 
         return new WorkflowRunPage($runs, $hasMore ? end($window) : null, tellsWaitingForWorker: true);

@@ -37,15 +37,4 @@ enum ActivityRetryState: string
      */
     case TransportRetryDisabled = 'transport_retry_disabled';
 
-    /**
-     * True if the event describes a definitive stop following a genuine business failure
-     * (as opposed to an infrastructure marker).
-     */
-    public function isTerminalBusinessFailure(): bool
-    {
-        return match ($this) {
-            self::NonRetryableFailure, self::MaximumAttemptsReached, self::Timeout, self::RetryPolicyNotSet => true,
-            self::InProgress, self::TransportRetryDisabled => false,
-        };
-    }
 }

@@ -25,6 +25,7 @@ use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\WorkflowFailureClassifier;
+use Gplanchat\Durable\Observation\WaitReason;
 use Gplanchat\Durable\ParentClosureReason;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
@@ -117,7 +118,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             null,
             $waitingOnTimer,
             $waitingOnTimer,
-            AwaitableInspector::describeCondition($pending),
+            WaitReason::describe($pending, $this->eventStore, $executionId),
         );
     }
 
