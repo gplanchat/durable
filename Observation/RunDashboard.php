@@ -153,6 +153,10 @@ final class RunDashboard
             $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
             $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->now ?? static fn(): \DateTimeImmutable => new \DateTimeImmutable('now', new \DateTimeZone('UTC')))());
         }
+        if (null !== $run->waitingOn) {
+            // What the run last suspended on (#324), worded once for every surface, as above.
+            $described['waitingOn'] = 'waiting on ' . $run->waitingOn;
+        }
 
         return $described;
     }

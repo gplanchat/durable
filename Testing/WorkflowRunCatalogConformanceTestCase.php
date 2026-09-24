@@ -71,6 +71,20 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         $this->startRun($executionId, $workflowType);
     }
 
+    /**
+     * Whether this catalog keeps what a suspended run waits on (#324). Optional, as the pickup.
+     */
+    protected function canTellAWait(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Records what the execution waits on, as the core's `ResumeWorkflowHandler` does at each
+     * suspension. Called only when {@see canTellAWait()} is true.
+     */
+    protected function recordWait(string $executionId, string $waitingOn): void {}
+
     // -----------------------------------------------------------------------------------------
 
     public function testAnEmptyCatalogListsNothing(): void
@@ -119,6 +133,30 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
             return;
         }
         self::assertEquals($runs['waiting']->startedAt, $runs['waiting']->waitingForWorkerSince);
+    }
+
+    public function testASuspendedRunSaysWhatItWaitsOnAndAnEndedRunDoesNot(): void
+    {
+        $this->startRun('asleep', 'App\\OrderWorkflow');
+        $this->startRun('ended', 'App\\OrderWorkflow');
+        if ($this->canTellAWait()) {
+            $this->recordWait('asleep', 'timer due at 2026-09-24T10:00:00+00:00');
+            $this->recordWait('asleep', 'activity charge attempt 2 in flight');
+            $this->recordWait('ended', 'activity charge attempt 1 in flight');
+        }
+        $this->endRun('ended', WorkflowRunStatus::Completed);
+
+        $runs = [];
+        foreach ($this->catalogUnderTest()->listRuns()->runs as $run) {
+            $runs[$run->runId] = $run;
+        }
+
+        self::assertNull($runs['ended']->waitingOn, 'an ended run waits for nothing');
+        self::assertSame(
+            $this->canTellAWait() ? 'activity charge attempt 2 in flight' : null,
+            $runs['asleep']->waitingOn,
+            'the latest wait wins; a fact the catalog cannot tell is absent',
+        );
     }
 
     /**
