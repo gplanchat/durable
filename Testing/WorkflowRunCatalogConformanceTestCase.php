@@ -146,8 +146,9 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
     /**
      * A run that continues as new leaves two rows, the one that ends and its successor (DUR037 §5):
-     * the successor, and only it, may be listed beside the ended run. It is another run, still
-     * running, of the same group — absent on both sides where the backend has no grouping.
+     * on a backend that groups runs, the successor, and only it, may be listed beside the ended run:
+     * another run, still running, of the same group. Without a grouping nothing tells it from a
+     * stray row, so the ended run stays alone, as for every other outcome.
      */
     #[DataProvider('terminalStatuses')]
     public function testAnOutcomeIsVisibleOnTheDescription(WorkflowRunStatus $outcome): void
@@ -162,7 +163,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertCount(1, $ended);
         self::assertSame($outcome, $ended[0]->status);
         self::assertSame('exec-1', $this->executionIdOf($ended[0]));
-        if (WorkflowRunStatus::ContinuedAsNew !== $outcome) {
+        if (WorkflowRunStatus::ContinuedAsNew !== $outcome || null === $ended[0]->groupId) {
             self::assertSame([], $others);
 
             return;
