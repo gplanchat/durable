@@ -74,9 +74,9 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     /**
      * The execution id a description reports, the one {@see startRun()} was given. By default the
      * run id, as on a backend where one execution is one run. A backend that gives each run an id of
-     * its own and keeps the execution id as the grouping (Temporal, DUR006) returns `groupId`.
+     * its own and keeps the execution id as the grouping (Temporal, DUR037) returns `groupId`.
      *
-     * @see DUR006
+     * @see DUR037
      */
     protected function executionIdOf(WorkflowRunDescription $run): string
     {
