@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 
@@ -117,6 +118,29 @@ final class ActivityEventJournal
         }
 
         return $last;
+    }
+
+    /**
+     * Returns true if the given attempt already failed and was journalled as such. On the
+     * Messenger path a failure that is retried leaves only this event: no `ActivityFailed` is
+     * written until the last attempt, so {@see self::settledOutcomeForDelivery()} cannot see it.
+     */
+    public static function hasActivityTaskFailedForAttempt(
+        EventStoreInterface $eventStore,
+        string $executionId,
+        string $activityId,
+        int $attempt,
+    ): bool {
+        foreach ($eventStore->readStream($executionId) as $event) {
+            if ($event instanceof ActivityTaskFailed
+                && $event->activityId() === $activityId
+                && $event->attempt() === $attempt
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

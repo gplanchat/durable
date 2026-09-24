@@ -42,10 +42,18 @@ final class ActivityMessageProcessor
 
     public function process(ActivityMessage $message): void
     {
-        if (ActivityEventJournal::hasTerminalOutcomeForActivity(
+        // A redelivery of an attempt that already ran is answered by the journal, not run again:
+        // re-running a failed attempt would also queue its retry a second time (#319).
+        if (null !== ActivityEventJournal::settledOutcomeForDelivery(
             $this->eventStore,
             $message->executionId,
             $message->activityId,
+            $message->attempt,
+        ) || ActivityEventJournal::hasActivityTaskFailedForAttempt(
+            $this->eventStore,
+            $message->executionId,
+            $message->activityId,
+            $message->attempt,
         )) {
             return;
         }
