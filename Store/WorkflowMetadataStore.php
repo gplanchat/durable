@@ -8,7 +8,7 @@ namespace Gplanchat\Durable\Store;
  * Port for persisting the workflow metadata (type, payload) needed for the re-dispatch.
  *
  * After a success, the row is kept with {@see markCompleted} so that the type stays consultable
- * (profiler, observability); {@see WorkflowRunHandler} resumes ignore the finished rows.
+ * (profiler, observability); {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler} resumes ignore the finished rows.
  *
  * @see DUR021 Symfony Messenger integration (distributed resume)
  */

@@ -17,6 +17,10 @@ final readonly class ExecutionId implements \Stringable
 
     public static function fromString(string $value): self
     {
+        if ('' === $value) {
+            throw new \InvalidArgumentException('An execution id cannot be empty.');
+        }
+
         return new self($value);
     }
 

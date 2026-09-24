@@ -38,8 +38,7 @@ final class ChildWorkflowStub
 
     /**
      * @param array<int, mixed> $arguments
-     */
-    /**
+     *
      * @return \Gplanchat\Durable\Awaitable\Awaitable<mixed>
      */
     public function __call(string $name, array $arguments): \Gplanchat\Durable\Awaitable\Awaitable
