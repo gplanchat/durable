@@ -11,6 +11,7 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
+use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
@@ -50,6 +51,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         private readonly ActivityTransportInterface $activityTransport,
         private readonly string $executionId,
         ?callable $clock = null,
+        private readonly ?EventStoreHistorySource $history = null,
     ) {
         $this->clock = $clock ?? static fn(): float => microtime(true);
     }
@@ -64,7 +66,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             'first_queued_at' => $queuedAt,
         ];
 
-        $this->eventStore->append(new ActivityScheduled(
+        $this->append(new ActivityScheduled(
             $this->executionId,
             $activityId,
             $activityName,
@@ -84,7 +86,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     public function startTimer(string $timerId, Duration $delay, string $summary): void
     {
         // This backend compares deadlines against its clock: here is where the delay becomes one.
-        $this->eventStore->append(new TimerScheduled(
+        $this->append(new TimerScheduled(
             $this->executionId,
             $timerId,
             ($this->clock)() + $delay->toSeconds(),
@@ -94,7 +96,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function recordSideEffect(string $sideEffectId, mixed $result): void
     {
-        $this->eventStore->append(new SideEffectRecorded(
+        $this->append(new SideEffectRecorded(
             $this->executionId,
             $sideEffectId,
             $result,
@@ -103,7 +105,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
     {
-        $this->eventStore->append(new WorkflowUpdateHandled(
+        $this->append(new WorkflowUpdateHandled(
             $this->executionId,
             $updateName,
             $arguments,
@@ -120,7 +122,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     ): void {
         // The wire form is built here: the journal records the flat metadata the old code was
         // already giving it, including the two keys the core used to add by hand.
-        $this->eventStore->append(new ChildWorkflowScheduled(
+        $this->append(new ChildWorkflowScheduled(
             $this->executionId,
             $childExecutionId,
             $childWorkflowType,
@@ -136,7 +138,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function completeWorkflow(mixed $result): void
     {
-        $this->eventStore->append(new ExecutionCompleted(
+        $this->append(new ExecutionCompleted(
             $this->executionId,
             $result,
         ));
@@ -144,7 +146,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function completeChildWorkflow(string $childExecutionId, mixed $result): void
     {
-        $this->eventStore->append(new ChildWorkflowCompleted(
+        $this->append(new ChildWorkflowCompleted(
             $this->executionId,
             $childExecutionId,
             $result,
@@ -155,7 +157,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     {
         // Through the projector, like an async child: the kind, class and context come from the
         // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
-        $this->eventStore->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
+        $this->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
             $this->eventStore,
             $this->executionId,
             $childExecutionId,
@@ -165,12 +167,12 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function recordVersion(string $changeId, int $version): void
     {
-        $this->eventStore->append(new VersionMarked($this->executionId, $changeId, $version));
+        $this->append(new VersionMarked($this->executionId, $changeId, $version));
     }
 
     public function failWorkflow(\Throwable $reason): void
     {
-        $this->eventStore->append(WorkflowExecutionFailed::workflowHandlerFailure(
+        $this->append(WorkflowExecutionFailed::workflowHandlerFailure(
             $this->executionId,
             $reason,
         ));
@@ -186,13 +188,13 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
             }
         }
 
-        $this->eventStore->append(new TimerCancelled($this->executionId, $timerId, $reason));
+        $this->append(new TimerCancelled($this->executionId, $timerId, $reason));
     }
 
     public function cancelActivity(string $activityId, string $reason): void
     {
         $this->activityTransport->removePendingFor($this->executionId, $activityId);
-        $this->eventStore->append(new ActivityCancelled(
+        $this->append(new ActivityCancelled(
             $this->executionId,
             $activityId,
             $reason,
@@ -214,5 +216,11 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     public function cancelNexusOperation(string $operationId, string $reason): void
     {
         throw NexusUnsupportedByBackendException::forBackend('journal');
+    }
+
+    private function append(Event $event): void
+    {
+        $this->eventStore->append($event);
+        $this->history?->recorded($event);
     }
 }

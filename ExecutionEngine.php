@@ -37,14 +37,16 @@ final class ExecutionEngine
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
 
+        $history = new EventStoreHistorySource($this->eventStore, $executionId);
         $context = new ExecutionContext(
             $executionId,
-            new EventStoreHistorySource($this->eventStore, $executionId),
+            $history,
             new EventStoreCommandBuffer(
                 $this->eventStore,
                 $this->runtime->getActivityTransport(),
                 $executionId,
                 $this->runtime->nowSeconds(...),
+                $history,
             ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,
@@ -73,14 +75,16 @@ final class ExecutionEngine
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
 
+        $history = new EventStoreHistorySource($this->eventStore, $executionId);
         $context = new ExecutionContext(
             $executionId,
-            new EventStoreHistorySource($this->eventStore, $executionId),
+            $history,
             new EventStoreCommandBuffer(
                 $this->eventStore,
                 $this->runtime->getActivityTransport(),
                 $executionId,
                 $this->runtime->nowSeconds(...),
+                $history,
             ),
             $this->childWorkflowRunner,
             $this->uuidGenerator,

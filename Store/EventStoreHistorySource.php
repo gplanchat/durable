@@ -13,6 +13,7 @@ use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
+use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
 use Gplanchat\Durable\Event\TimerCancelled;
@@ -42,6 +43,33 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         private readonly string $executionId,
     ) {}
 
+    /** @var list<Event>|null */
+    private ?array $events = null;
+
+    /**
+     * What this pass itself appended, for a snapshot already read: a `version()` asked twice, or a
+     * child failure read back right after it was journalled, must see it without reading the
+     * stream again.
+     */
+    public function recorded(Event $event): void
+    {
+        if (null !== $this->events) {
+            $this->events[] = $event;
+        }
+    }
+
+    /**
+     * The stream is read once per pass and every query is answered from that snapshot (#320):
+     * reading it per query made a replay quadratic in the journal's length, one query per call
+     * on DBAL. A pass lives as long as its ExecutionContext.
+     *
+     * @return list<Event>
+     */
+    private function events(): array
+    {
+        return $this->events ??= iterator_to_array($this->eventStore->readStream($this->executionId), false);
+    }
+
     public function findActivitySlotResult(int $slot): ?array
     {
         $scheduledIds = [];
@@ -50,7 +78,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         $catastrophicByActivityId = [];
         $cancelledReasonByActivityId = [];
 
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ActivityScheduled) {
                 $scheduledIds[] = $event->activityId();
             }
@@ -102,7 +130,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
 
     public function versionForChangeId(string $changeId): ?int
     {
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof VersionMarked && $event->changeId() === $changeId) {
                 return $event->version();
             }
@@ -114,7 +142,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function activityNameForSlot(int $slot): ?string
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ActivityScheduled) {
                 if ($index === $slot) {
                     // An empty string is not a name: it is "nothing recorded". The port
@@ -131,7 +159,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function activityPayloadForSlot(int $slot): ?array
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ActivityScheduled) {
                 if ($index === $slot) {
                     // `payload()` returns the event's envelope; the activity's arguments are one
@@ -150,7 +178,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function childWorkflowInputForSlot(int $slot): ?array
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
                     $input = $event->payload()['input'] ?? null;
@@ -182,7 +210,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function childWorkflowTypeForSlot(int $slot): ?string
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
                     return '' === $event->childWorkflowType() ? null : $event->childWorkflowType();
@@ -207,7 +235,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function findScheduledActivityId(int $slot): ?string
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ActivityScheduled) {
                 if ($index === $slot) {
                     return $event->activityId();
@@ -224,7 +252,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         $scheduledIds = [];
         $completedIds = [];
         $cancelledReasons = [];
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof TimerScheduled) {
                 $scheduledIds[] = $event->timerId();
             }
@@ -260,7 +288,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function findScheduledTimerId(int $slot): ?string
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof TimerScheduled) {
                 if ($index === $slot) {
                     return $event->timerId();
@@ -275,7 +303,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function hasSideEffectForSlot(int $slot): bool
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof SideEffectRecorded) {
                 if ($index === $slot) {
                     return true;
@@ -290,7 +318,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function findSideEffectForSlot(int $slot): mixed
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof SideEffectRecorded) {
                 if ($index === $slot) {
                     return $event->result();
@@ -305,7 +333,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function findChildWorkflowForSlot(int $slot): ?array
     {
         $scheduledIds = [];
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 $scheduledIds[] = $event->childExecutionId();
             }
@@ -316,7 +344,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             return null;
         }
 
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId() === $childId) {
                 return ['childExecutionId' => $childId, 'result' => $event->result(), 'failed' => null];
             }
@@ -343,7 +371,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function findScheduledChildExecutionId(int $slot): ?string
     {
         $index = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
                     return $event->childExecutionId();
@@ -359,7 +387,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     {
         $position = 0;
         $seen = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             // Signals and updates share the same cursor: what orders them is their rank in the
             // journal, not their kind.
             if ($event instanceof WorkflowSignalReceived) {
@@ -393,7 +421,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function timerCompletionPosition(string $timerId): ?int
     {
         $position = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof TimerCompleted && $event->timerId() === $timerId) {
                 return $position;
             }
@@ -406,7 +434,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
     public function cancellationDelivery(): ?array
     {
         $position = 0;
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->events() as $event) {
             if ($event instanceof WorkflowCancellationDelivered) {
                 return ['position' => $position, 'targets' => $event->targets()];
             }

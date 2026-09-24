@@ -167,8 +167,8 @@ final class InMemoryWorkflowRunner
     {
         return new ExecutionContext(
             $executionId,
-            new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...)),
+            $history = new EventStoreHistorySource($this->eventStore, $executionId),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
         );
     }
 
@@ -176,8 +176,8 @@ final class InMemoryWorkflowRunner
     {
         $context = new ExecutionContext(
             $executionId,
-            new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...)),
+            $history = new EventStoreHistorySource($this->eventStore, $executionId),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
             null,
         );
         $runtime->runUntilIdle($context, $budgetSeconds);

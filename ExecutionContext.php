@@ -61,6 +61,9 @@ final class ExecutionContext
      */
     private int $messageCursor = 0;
 
+    /** @var array<string, int> the version each change point resolved to in this pass */
+    private array $decidedVersions = [];
+
     /** Whether the workflow's cancellation has been raised in the fiber during this pass. */
     private bool $cancellationRaised = false;
 
@@ -230,9 +233,15 @@ final class ExecutionContext
      */
     public function version(string $changeId, int $minSupported, int $maxSupported): int
     {
+        // Decided once per pass: the history is a snapshot taken when the pass began (#320), so
+        // it does not show the marker this pass has just written.
+        if (isset($this->decidedVersions[$changeId])) {
+            return $this->decidedVersions[$changeId];
+        }
+
         $recorded = $this->historySource->versionForChangeId($changeId);
         if (null !== $recorded) {
-            return $recorded;
+            return $this->decidedVersions[$changeId] = $recorded;
         }
 
         // No marker, and recorded work still ahead: this execution went through here before
@@ -245,7 +254,7 @@ final class ExecutionContext
 
         $this->commandBuffer->recordVersion($changeId, $maxSupported);
 
-        return $maxSupported;
+        return $this->decidedVersions[$changeId] = $maxSupported;
     }
 
     /**
