@@ -32,4 +32,20 @@ final readonly class DeliverWorkflowSignalMessage
         $this->signalName = $signalName instanceof \BackedEnum ? (string) $signalName->value : $signalName;
         $this->requestId = $requestId ?? bin2hex(random_bytes(16));
     }
+
+    /**
+     * A message queued before this property existed comes back without it. It gets an id here,
+     * drawn anew on each redelivery: such a message is delivered at least once, not exactly once.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function __unserialize(array $data): void
+    {
+        foreach ($data as $name => $value) {
+            if ('requestId' !== $name) {
+                $this->{$name} = $value;
+            }
+        }
+        $this->requestId = \is_string($data['requestId'] ?? null) ? $data['requestId'] : bin2hex(random_bytes(16));
+    }
 }

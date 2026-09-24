@@ -29,4 +29,20 @@ final readonly class DeliverWorkflowUpdateMessage
     ) {
         $this->updateId = $updateId ?? bin2hex(random_bytes(16));
     }
+
+    /**
+     * A message queued before this property existed comes back without it. It gets an id here,
+     * drawn anew on each redelivery: such a message is delivered at least once, not exactly once.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function __unserialize(array $data): void
+    {
+        foreach ($data as $name => $value) {
+            if ('updateId' !== $name) {
+                $this->{$name} = $value;
+            }
+        }
+        $this->updateId = \is_string($data['updateId'] ?? null) ? $data['updateId'] : bin2hex(random_bytes(16));
+    }
 }
