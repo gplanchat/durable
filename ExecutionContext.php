@@ -583,7 +583,9 @@ final class ExecutionContext
             return $deferred->awaitable();
         } catch (\Throwable $e) {
             $this->commandBuffer->failChildWorkflow($childExecutionId, $e);
-            $deferred->reject(new DurableChildWorkflowFailedException(
+            // Read back from the journal when it holds the failure already, so the pass rejects
+            // with the exception the replay will build: same kind, class, and no previous (#318).
+            $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)['failed'] ?? new DurableChildWorkflowFailedException(
                 $childExecutionId,
                 $e->getMessage(),
                 (int) $e->getCode(),

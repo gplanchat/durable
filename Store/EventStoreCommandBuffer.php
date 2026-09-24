@@ -10,7 +10,6 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
-use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\SideEffectRecorded;
@@ -29,6 +28,7 @@ use Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
 
 /**
  * Implements WorkflowCommandBufferInterface by appending domain events to EventStoreInterface
@@ -153,11 +153,13 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void
     {
-        $this->eventStore->append(new ChildWorkflowFailed(
+        // Through the projector, like an async child: the kind, class and context come from the
+        // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
+        $this->eventStore->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
+            $this->eventStore,
             $this->executionId,
             $childExecutionId,
-            $reason->getMessage(),
-            (int) $reason->getCode(),
+            $reason,
         ));
     }
 
