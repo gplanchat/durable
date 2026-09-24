@@ -46,6 +46,10 @@ namespace Gplanchat\Durable\Observation;
  * outcomes, decided by someone, and painting them as breakdowns would send people looking for a
  * breakdown where there is only a decision.
  *
+ * `phase` says what happened to the action at this event — requested, started, failed, settled —
+ * so the rows of one activity no longer read alike (#261). `started` and `failed` stay for the
+ * frieze, which only needs those two. `attempt` is the try a worker-side event belongs to.
+ *
  * @phpstan-type Details array<string, mixed>
  */
 final readonly class WorkflowRunEvent
@@ -62,5 +66,7 @@ final readonly class WorkflowRunEvent
         public ?string $actionKey = null,
         public bool $started = false,
         public bool $failed = false,
+        public ?WorkflowRunEventPhase $phase = null,
+        public ?int $attempt = null,
     ) {}
 }
