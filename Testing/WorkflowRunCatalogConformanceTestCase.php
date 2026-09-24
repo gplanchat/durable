@@ -81,9 +81,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
     /**
      * Records what the execution waits on, as the core's `ResumeWorkflowHandler` does at each
-     * suspension. Called only when {@see canTellAWait()} is true.
+     * suspension; null when the wait has no words, which clears the previous one. Called only when
+     * {@see canTellAWait()} is true.
      */
-    protected function recordWait(string $executionId, string $waitingOn): void {}
+    protected function recordWait(string $executionId, ?string $waitingOn): void {}
 
     // -----------------------------------------------------------------------------------------
 
@@ -157,6 +158,17 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
             $runs['asleep']->waitingOn,
             'the latest wait wins; a fact the catalog cannot tell is absent',
         );
+    }
+
+    public function testAWaitWithoutWordsClearsThePreviousOne(): void
+    {
+        $this->startRun('exec-1', 'App\\OrderWorkflow');
+        if ($this->canTellAWait()) {
+            $this->recordWait('exec-1', 'activity charge attempt 1 in flight');
+            $this->recordWait('exec-1', null);
+        }
+
+        self::assertNull($this->catalogUnderTest()->listRuns()->runs[0]->waitingOn, 'a stale wait sends the operator to the wrong place');
     }
 
     /**

@@ -77,7 +77,8 @@ final class ResumeWorkflowHandler
             $result = $this->engine->resume($executionId, $handler, $workflowTypeForJournal, $pendingUpdates);
         } catch (WorkflowSuspendedException $e) {
             // The catalog that records pickups usually records waits too (#324): one projection, two facts.
-            if (null !== $e->waitingOn() && $this->pickups instanceof WorkflowRunWaitProjectionInterface) {
+            // Recorded even without words, so that it clears the previous wait instead of leaving it stale.
+            if ($this->pickups instanceof WorkflowRunWaitProjectionInterface) {
                 $this->pickups->recordWait($executionId, $e->waitingOn());
             }
             if ($e->shouldDispatchResume()) {

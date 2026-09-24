@@ -14,7 +14,9 @@ namespace Gplanchat\Durable\Observation;
 interface WorkflowRunWaitProjectionInterface
 {
     /**
-     * The latest wait replaces the previous one. Read only while the run is running.
+     * The latest wait replaces the previous one; null, a wait without words (a child workflow, a
+     * Nexus operation), clears it rather than leave the previous one standing. Read only while the
+     * run is running.
      */
-    public function recordWait(string $executionId, string $waitingOn): void;
+    public function recordWait(string $executionId, ?string $waitingOn): void;
 }

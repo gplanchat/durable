@@ -48,7 +48,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
     private const BACKEND = 'in-memory';
 
     /**
-     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null, pickedUp: bool, waitingOn?: string}>
+     * @var array<string, array{workflowType: string, status: WorkflowRunStatus, startedAt: \DateTimeImmutable, endedAt: \DateTimeImmutable|null, pickedUp: bool, waitingOn?: string|null}>
      */
     private array $runs = [];
 
@@ -77,7 +77,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         }
     }
 
-    public function recordWait(string $executionId, string $waitingOn): void
+    public function recordWait(string $executionId, ?string $waitingOn): void
     {
         if (isset($this->runs[$executionId])) {
             $this->runs[$executionId]['waitingOn'] = $waitingOn;
