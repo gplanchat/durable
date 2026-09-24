@@ -49,14 +49,26 @@ final class CancellingCompositeAwaitable implements Awaitable
             return $this->inner->getResult();
         }
 
+        $failure = null;
+
         try {
-            return $this->inner->getResult();
-        } finally {
-            AwaitableCancellation::cancelUnsettled(
-                $this->context,
-                $this->inner,
-                ActivityCancellationReason::RACE_SUPERSEDED,
-            );
+            $result = $this->inner->getResult();
+        } catch (\Throwable $e) {
+            $failure = $e;
         }
+
+        // Not in a `finally`: a journal that refuses the cancellation is an error of its own, and
+        // must not be taken for, or hidden behind, the verdict of a branch (C-6, #329).
+        AwaitableCancellation::cancelUnsettled(
+            $this->context,
+            $this->inner,
+            ActivityCancellationReason::RACE_SUPERSEDED,
+        );
+
+        if (null !== $failure) {
+            throw $failure;
+        }
+
+        return $result;
     }
 }

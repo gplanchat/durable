@@ -14,8 +14,8 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  * Runs a child workflow on its own `executionId` (a log distinct from the parent's).
  *
  * **inline** mode (the default): {@see InMemoryWorkflowRunner} until completion.
- * **async_messenger** mode: dispatches {@see Transport\WorkflowRunMessage} only;
- * the parent resumes through {@see Bundle\Handler\WorkflowRunHandler}, which appends
+ * **async_messenger** mode: dispatches the child's run through {@see Port\WorkflowResumeDispatcher} only;
+ * the parent resumes through {@see Handler\ResumeWorkflowHandler}, which appends
  * {@see Event\ChildWorkflowCompleted} / {@see Event\ChildWorkflowFailed}.
  */
 final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
@@ -73,6 +73,6 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 
-        return $runner->run($childExecutionId, $handler);
+        return $runner->run($childExecutionId, $handler, $workflowType);
     }
 }

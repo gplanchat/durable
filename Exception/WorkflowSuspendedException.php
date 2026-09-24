@@ -33,7 +33,7 @@ final class WorkflowSuspendedException extends \RuntimeException
     }
 
     /**
-     * If true, {@see \Gplanchat\Durable\Bundle\Handler\WorkflowRunHandler} sends a {@see \Gplanchat\Durable\Transport\WorkflowRunMessage} resume
+     * If true, {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler} sends a {@see \Gplanchat\Durable\Transport\ResumeWorkflowMessage} resume
      * (activity / timer to be moved forward by a worker).
      */
     public function shouldDispatchResume(): bool
