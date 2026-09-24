@@ -194,7 +194,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         foreach ([$fromReference, $fromSubject] as $history) {
             $fired = $history->findTimerSlotResult(0);
             self::assertNotNull($fired, 'the timer fired, on both sides');
-            self::assertNull($fired['failed']);
+            self::assertNull($fired->failed);
         }
         self::assertSame(
             $fromReference->timerCompletionPosition($referenceTimer),

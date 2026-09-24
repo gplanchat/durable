@@ -29,6 +29,7 @@ use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Port\History\TimerOutcome;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 
 /**
@@ -247,7 +248,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findTimerSlotResult(int $slot): ?array
+    public function findTimerSlotResult(int $slot): ?TimerOutcome
     {
         $scheduledIds = [];
         $completedIds = [];
@@ -270,11 +271,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === ($cancelledReasons[$timerId] ?? null)) {
-            return [
-                'id' => $timerId,
-                'scheduledAt' => 0.0,
-                'failed' => new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED),
-            ];
+            return new TimerOutcome($timerId, new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED));
         }
 
         // A race loser simply stays unsettled: it never had a winner to announce.
@@ -282,7 +279,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             return null;
         }
 
-        return ['id' => $timerId, 'scheduledAt' => 0.0, 'failed' => null];
+        return new TimerOutcome($timerId);
     }
 
     public function findScheduledTimerId(int $slot): ?string

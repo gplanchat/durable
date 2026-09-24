@@ -86,10 +86,8 @@ interface WorkflowHistorySourceInterface
      * `failed` carries the timer's cancellation ({@see \Gplanchat\Durable\Event\TimerCancelled}):
      * without that channel, a timer cancelled by the workflow's cancellation could not raise the
      * same exception on replay.
-     *
-     * @return array{id: string, scheduledAt: float, failed: \Throwable|null}|null
      */
-    public function findTimerSlotResult(int $slot): ?array;
+    public function findTimerSlotResult(int $slot): ?History\TimerOutcome;
 
     /**
      * Returns the timer ID that was scheduled at slot N, or null.

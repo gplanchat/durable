@@ -828,13 +828,13 @@ final class ExecutionContext
         $replay = $this->historySource->findTimerSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== ($replay['failed'] ?? null)) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
                 $deferred->resolve(null);
             }
 
-            return new TimerAwaitable($deferred->awaitable(), $replay['id']);
+            return new TimerAwaitable($deferred->awaitable(), $replay->timerId);
         }
 
         $scheduled = $this->historySource->findScheduledTimerId($slotIndex);
