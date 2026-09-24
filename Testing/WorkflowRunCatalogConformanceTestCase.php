@@ -144,6 +144,11 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         yield 'continued as new' => [WorkflowRunStatus::ContinuedAsNew];
     }
 
+    /**
+     * A run that continues as new leaves two rows, the one that ends and its successor (DUR037 §5):
+     * the successor, and only it, may be listed beside the ended run. It is another run, still
+     * running, of the same group — absent on both sides where the backend has no grouping.
+     */
     #[DataProvider('terminalStatuses')]
     public function testAnOutcomeIsVisibleOnTheDescription(WorkflowRunStatus $outcome): void
     {
@@ -151,10 +156,22 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         $this->endRun('exec-1', $outcome);
 
         $runs = $this->catalogUnderTest()->listRuns()->runs;
+        $ended = array_values(array_filter($runs, static fn(WorkflowRunDescription $run): bool => !$run->status->isRunning()));
+        $others = array_values(array_filter($runs, static fn(WorkflowRunDescription $run): bool => $run->status->isRunning()));
 
-        self::assertCount(1, $runs);
-        self::assertSame($outcome, $runs[0]->status);
-        self::assertFalse($runs[0]->status->isRunning());
+        self::assertCount(1, $ended);
+        self::assertSame($outcome, $ended[0]->status);
+        self::assertSame('exec-1', $this->executionIdOf($ended[0]));
+        if (WorkflowRunStatus::ContinuedAsNew !== $outcome) {
+            self::assertSame([], $others);
+
+            return;
+        }
+        self::assertLessThanOrEqual(1, \count($others), 'a continue-as-new leaves one successor at most');
+        foreach ($others as $successor) {
+            self::assertNotSame($ended[0]->runId, $successor->runId, 'the successor is another run');
+            self::assertSame($ended[0]->groupId, $successor->groupId, 'the successor belongs to the same group');
+        }
     }
 
     public function testFilteringByStatusReturnsOnlyMatchingRuns(): void
