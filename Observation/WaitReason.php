@@ -28,6 +28,9 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  */
 final class WaitReason
 {
+    /**
+     * @param Awaitable<mixed> $awaitable
+     */
     public static function describe(Awaitable $awaitable, EventStoreInterface $events, string $executionId): ?string
     {
         $condition = AwaitableInspector::describeCondition($awaitable);
@@ -68,6 +71,9 @@ final class WaitReason
         return \sprintf('activity %s attempt %d in flight', $event->activityName(), $event->attempt());
     }
 
+    /**
+     * @param Awaitable<mixed> $awaitable
+     */
     private static function firstLeaf(Awaitable $awaitable): TimerAwaitable|ActivityAwaitable|null
     {
         if ($awaitable instanceof TimerAwaitable || $awaitable instanceof ActivityAwaitable) {
