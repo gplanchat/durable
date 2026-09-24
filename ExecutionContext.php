@@ -64,6 +64,9 @@ final class ExecutionContext
     /** @var array<string, int> the version each change point resolved to in this pass */
     private array $decidedVersions = [];
 
+    /** Set once the pass has ended and its fiber is being destroyed. */
+    private bool $abandoned = false;
+
     /** Whether the workflow's cancellation has been raised in the fiber during this pass. */
     private bool $cancellationRaised = false;
 
@@ -142,7 +145,7 @@ final class ExecutionContext
         if (null === $scheduled) {
             // The options travel as they are; the enqueue timestamp belongs to the backend,
             // which alone owns a clock.
-            $this->commandBuffer->scheduleActivity($activityId, $name, $payload, $options);
+            $this->buffer()->scheduleActivity($activityId, $name, $payload, $options);
         }
 
         return new ActivityAwaitable($deferred->awaitable(), $activityId);
@@ -201,7 +204,7 @@ final class ExecutionContext
         $this->pendingNexusOperations[$operationId] = $deferred;
 
         if (null === $scheduled) {
-            $this->commandBuffer->scheduleNexusOperation(
+            $this->buffer()->scheduleNexusOperation(
                 $operationId,
                 $endpoint,
                 $service,
@@ -227,9 +230,21 @@ final class ExecutionContext
      * position —, so an execution can be on the old side of one and on the new side of the
      * other.
      *
+     * An execution whose version falls outside `$minSupported..$maxSupported` is refused rather
+     * than switched: its branch was deleted, or the history comes from newer code. That is a
+     * deployment problem, so the task fails and the execution stays resumable (#321).
+     *
+     * Limit: "already went through here" is deduced from recorded work ahead (activity, timer,
+     * child, Nexus operation, side effect). An execution that passed this point under the old
+     * code and is now waiting only on a condition has none, so a `version()` inserted before
+     * that wait takes `$maxSupported`. Recorded messages cannot tell it apart: a signal recorded
+     * before the point but not applied yet looks the same.
+     *
      * @param string $changeId     the name of this change point, stable over time
      * @param int    $minSupported the oldest version this code can still play
      * @param int    $maxSupported the most recent one, the one a fresh execution will take
+     *
+     * @throws WorkflowTaskFailure when the execution's version is outside the supported range
      */
     public function version(string $changeId, int $minSupported, int $maxSupported): int
     {
@@ -241,7 +256,7 @@ final class ExecutionContext
 
         $recorded = $this->historySource->versionForChangeId($changeId);
         if (null !== $recorded) {
-            return $this->decidedVersions[$changeId] = $recorded;
+            return $this->decidedVersions[$changeId] = $this->supportedVersion($changeId, $recorded, $minSupported, $maxSupported);
         }
 
         // No marker, and recorded work still ahead: this execution went through here before
@@ -249,12 +264,29 @@ final class ExecutionContext
         // the answer is deduced from the history rather than added to it, which makes it
         // stable by construction.
         if ($this->hasRecordedWorkAhead()) {
-            return ChangePoint::DEFAULT_VERSION;
+            return $this->supportedVersion($changeId, ChangePoint::DEFAULT_VERSION, $minSupported, $maxSupported);
         }
 
-        $this->commandBuffer->recordVersion($changeId, $maxSupported);
+        $this->buffer()->recordVersion($changeId, $maxSupported);
 
         return $this->decidedVersions[$changeId] = $maxSupported;
+    }
+
+    private function supportedVersion(string $changeId, int $version, int $minSupported, int $maxSupported): int
+    {
+        if ($version < $minSupported || $version > $maxSupported) {
+            throw new WorkflowTaskFailure(\sprintf(
+                'Execution "%s" is on version %d of change point "%s", and this code plays %d..%d only. '
+                . 'Deploy code that still supports it, or let the execution finish first.',
+                $this->executionId,
+                $version,
+                $changeId,
+                $minSupported,
+                $maxSupported,
+            ));
+        }
+
+        return $version;
     }
 
     /**
@@ -502,7 +534,7 @@ final class ExecutionContext
         }
 
         $result = $closure();
-        $this->commandBuffer->recordSideEffect($this->uuid(), $result);
+        $this->buffer()->recordSideEffect($this->uuid(), $result);
         $deferred->resolve($result);
 
         return $deferred->awaitable();
@@ -573,7 +605,7 @@ final class ExecutionContext
         }
 
         if (null === $scheduledId) {
-            $this->commandBuffer->scheduleChildWorkflow($childExecutionId, $childWorkflowType, $input, $options);
+            $this->buffer()->scheduleChildWorkflow($childExecutionId, $childWorkflowType, $input, $options);
         }
 
         if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStart()) {
@@ -586,12 +618,12 @@ final class ExecutionContext
             // parent's log with the child's result, and never wrote the ChildWorkflowCompleted
             // that findChildWorkflowForSlot() looks for on replay — so the child was re-run on
             // every resume of the parent.
-            $this->commandBuffer->completeChildWorkflow($childExecutionId, $result);
+            $this->buffer()->completeChildWorkflow($childExecutionId, $result);
             $deferred->resolve($result);
         } catch (ChildWorkflowStartDeferred) {
             return $deferred->awaitable();
         } catch (\Throwable $e) {
-            $this->commandBuffer->failChildWorkflow($childExecutionId, $e);
+            $this->buffer()->failChildWorkflow($childExecutionId, $e);
             // Read back from the journal when it holds the failure already, so the pass rejects
             // with the exception the replay will build: same kind, class, and no previous (#318).
             $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)['failed'] ?? new DurableChildWorkflowFailedException(
@@ -667,7 +699,7 @@ final class ExecutionContext
      */
     public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
     {
-        $this->commandBuffer->recordUpdateHandled($updateName, $arguments, $result, $failure);
+        $this->buffer()->recordUpdateHandled($updateName, $arguments, $result, $failure);
     }
 
     /**
@@ -684,6 +716,16 @@ final class ExecutionContext
     public function cancellationDelivery(): ?array
     {
         return $this->historySource->cancellationDelivery();
+    }
+
+    /**
+     * The pass is over: its fiber is about to be destroyed, and PHP will run the workflow's
+     * `finally` blocks as it does (#323). Nothing they schedule may reach the history then; the
+     * `finally` runs for real on the pass where the workflow actually ends.
+     */
+    public function abandon(): void
+    {
+        $this->abandoned = true;
     }
 
     public function markCancellationRaised(): void
@@ -713,7 +755,7 @@ final class ExecutionContext
             return false;
         }
 
-        $this->commandBuffer->cancelActivity($activityId, $reason);
+        $this->buffer()->cancelActivity($activityId, $reason);
         $this->rejectActivity($activityId, ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
             ? new WorkflowCancelledFailure($this->executionId, $reason)
             : new ActivitySupersededException($activityId, $reason));
@@ -737,7 +779,7 @@ final class ExecutionContext
 
         $deferred = $this->pendingNexusOperations[$operationId];
         unset($this->pendingNexusOperations[$operationId]);
-        $this->commandBuffer->cancelNexusOperation($operationId, $reason);
+        $this->buffer()->cancelNexusOperation($operationId, $reason);
 
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
             $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
@@ -761,7 +803,7 @@ final class ExecutionContext
 
         $deferred = $this->pendingTimers[$timerId];
         unset($this->pendingTimers[$timerId]);
-        $this->commandBuffer->cancelTimer($timerId, $reason);
+        $this->buffer()->cancelTimer($timerId, $reason);
 
         // A race loser is simply left unsettled; a workflow cancellation must on the contrary
         // throw, so that the workflow can compensate.
@@ -798,7 +840,7 @@ final class ExecutionContext
         if (null === $scheduled) {
             // The delay travels as it is: turning a duration into a due time requires a clock,
             // and the core has none — that is a backend decision.
-            $this->commandBuffer->startTimer($timerId, $delay, $timerSummary);
+            $this->buffer()->startTimer($timerId, $delay, $timerSummary);
         }
 
         return new TimerAwaitable($deferred->awaitable(), $timerId);
@@ -882,5 +924,14 @@ final class ExecutionContext
     private function uuid(): string
     {
         return ($this->uuidGenerator ?? new NativeUuidV7Generator())->generate();
+    }
+
+    private function buffer(): WorkflowCommandBufferInterface
+    {
+        if ($this->abandoned) {
+            throw new \LogicException(\sprintf('The pass of execution "%s" is over: a finally block cannot schedule work while its fiber is abandoned.', $this->executionId));
+        }
+
+        return $this->commandBuffer;
     }
 }
