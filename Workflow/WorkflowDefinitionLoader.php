@@ -128,6 +128,7 @@ final class WorkflowDefinitionLoader
         return $parameters;
     }
 
+    /** @param \ReflectionClass<object> $reflection */
     private function resolveWorkflowMethod(\ReflectionClass $reflection): \ReflectionMethod
     {
         $workflowMethods = [];
