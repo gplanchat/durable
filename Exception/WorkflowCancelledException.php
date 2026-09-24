@@ -10,7 +10,7 @@ namespace Gplanchat\Durable\Exception;
  * Propagated by {@see \Gplanchat\Durable\ExecutionEngine} so that the caller stops redelivering
  * the resume (cf. {@see \Gplanchat\Durable\Handler\ResumeWorkflowHandler}).
  */
-final class WorkflowCancelledException extends \RuntimeException
+final class WorkflowCancelledException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly string $executionId,

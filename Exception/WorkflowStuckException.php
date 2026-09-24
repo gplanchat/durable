@@ -9,7 +9,7 @@ namespace Gplanchat\Durable\Exception;
  *
  * Signalled rather than looped on empty: a test harness must fail, not freeze.
  */
-final class WorkflowStuckException extends \RuntimeException
+final class WorkflowStuckException extends \RuntimeException implements ExceptionInterface
 {
     private function __construct(
         public readonly string $executionId,

@@ -9,7 +9,7 @@ use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 /**
  * Activity in error whose representation could not be persisted in the event store.
  */
-final class DurableCatastrophicActivityFailureException extends \RuntimeException
+final class DurableCatastrophicActivityFailureException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         private readonly ActivityCatastrophicFailure $event,
