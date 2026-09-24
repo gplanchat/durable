@@ -8,8 +8,10 @@ namespace Gplanchat\Durable\Exception;
  * Failure of a child workflow observed by the parent (journal {@see \Gplanchat\Durable\Event\ChildWorkflowFailed}).
  *
  * The {@see $workflowFailureKind}, {@see $workflowFailureClass} and {@see $workflowFailureContext}
- * fields reflect the last child {@see \Gplanchat\Durable\Event\WorkflowExecutionFailed} when they
- * were projected onto the parent journal (async Messenger) or re-read on replay.
+ * fields reflect the last child {@see \Gplanchat\Durable\Event\WorkflowExecutionFailed}, projected
+ * onto the parent journal for an inline child and an async one alike, and read back from it on the
+ * first pass as on replay. A child that ended otherwise (cancelled) leaves them empty. On
+ * Temporal they are not filled yet.
  */
 final class DurableChildWorkflowFailedException extends \RuntimeException
 {
