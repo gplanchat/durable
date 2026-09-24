@@ -8,7 +8,7 @@ use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 
-final class DurableActivityFailedException extends \Exception
+final class DurableActivityFailedException extends \Exception implements ExceptionInterface
 {
     public function __construct(
         private readonly string $activityId,
