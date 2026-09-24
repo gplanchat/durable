@@ -68,6 +68,8 @@ final class ActivityMessageProcessor
             }
         }
 
+        $timedOut = false;
+
         try {
             if (true === $this->heartbeatSender->isCancellationRequested()) {
                 $this->appendActivityCancelled($message, 'cancellation_requested');
@@ -75,55 +77,52 @@ final class ActivityMessageProcessor
                 return;
             }
 
-            $startToClose = $options?->timeouts->startToClose;
-            if (null !== $startToClose) {
-                set_time_limit(max(1, (int) ceil($startToClose->toSeconds())));
-            }
-
-            try {
-                if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
-                    $this->eventStore,
+            if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
+                $this->eventStore,
+                $message->executionId,
+                $message->activityId,
+                $message->attempt,
+            )) {
+                $this->eventStore->append(new ActivityTaskStarted(
                     $message->executionId,
                     $message->activityId,
+                    $message->activityName,
                     $message->attempt,
-                )) {
-                    $this->eventStore->append(new ActivityTaskStarted(
-                        $message->executionId,
-                        $message->activityId,
-                        $message->activityName,
-                        $message->attempt,
-                    ));
-                }
-                $t0 = microtime(true);
-                $result = $this->activityExecutor->execute($message->activityName, $message->payload);
-                if (true === $this->heartbeatSender->isCancellationRequested()) {
-                    $duration = microtime(true) - $t0;
-                    $this->workflowExecutionObserver?->onActivityExecuted(
-                        $message->executionId,
-                        $message->activityId,
-                        $message->activityName,
-                        $duration,
-                        false,
-                        null,
-                    );
-                    $this->appendActivityCancelled($message, 'cancellation_requested');
-
-                    return;
-                }
+                ));
+            }
+            $t0 = microtime(true);
+            $result = $this->activityExecutor->execute($message->activityName, $message->payload);
+            if (true === $this->heartbeatSender->isCancellationRequested()) {
                 $duration = microtime(true) - $t0;
                 $this->workflowExecutionObserver?->onActivityExecuted(
                     $message->executionId,
                     $message->activityId,
                     $message->activityName,
                     $duration,
-                    true,
+                    false,
                     null,
                 );
-            } finally {
-                if (null !== $startToClose) {
-                    ini_restore('max_execution_time');
-                }
+                $this->appendActivityCancelled($message, 'cancellation_requested');
+
+                return;
             }
+            // Measured after the fact, not enforced with a PHP time limit: that one counts CPU
+            // time only, so a stalled call never trips it, and when it does trip it kills the
+            // worker before anything is journalled. Stopping a runaway attempt is the host's job.
+            if ($options?->timeouts->startToClose?->hasElapsedSince($t0, microtime(true))) {
+                $timedOut = true;
+
+                throw new \RuntimeException('Activity start-to-close timeout exceeded.');
+            }
+            $duration = microtime(true) - $t0;
+            $this->workflowExecutionObserver?->onActivityExecuted(
+                $message->executionId,
+                $message->activityId,
+                $message->activityName,
+                $duration,
+                true,
+                null,
+            );
             $this->eventStore->append(new ActivityTaskCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -152,7 +151,7 @@ final class ActivityMessageProcessor
             $retryLimit = (null !== $options ? $options->retryLimit : RetryLimit::unlimited())
                 ->narrowedTo(RetryLimit::ofRetries($this->maxRetries));
 
-            $nonRetryable = null !== $options && $options->isNonRetryable($e);
+            $nonRetryable = !$timedOut && null !== $options && $options->isNonRetryable($e);
             $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt + 1);
 
             // The transport does not retry on the PHP side (native Temporal worker): authority
@@ -166,6 +165,7 @@ final class ActivityMessageProcessor
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
                 // (order matters: `InProgress` wins over the local count)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
+                $timedOut => ActivityRetryState::Timeout,
                 default => ActivityRetryState::MaximumAttemptsReached,
             };
 
