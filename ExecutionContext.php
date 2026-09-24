@@ -846,14 +846,6 @@ final class ExecutionContext
         return new TimerAwaitable($deferred->awaitable(), $timerId);
     }
 
-    /**
-     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
-     */
-    public function pendingTimers(): array
-    {
-        return $this->pendingTimers;
-    }
-
     public function resolveTimer(string $timerId): void
     {
         $deferred = $this->pendingTimers[$timerId] ?? null;
@@ -866,22 +858,14 @@ final class ExecutionContext
     /**
      * The Nexus operations still in flight, by identifier.
      *
-     * Mirror of {@see pendingActivities()}: that is how the outcome of an operation, read from
-     * the history, finds again the wait it has to settle.
+     * That is how the outcome of an operation, read from the history, finds again the wait it
+     * has to settle.
      *
      * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
      */
     public function pendingNexusOperations(): array
     {
         return $this->pendingNexusOperations;
-    }
-
-    /**
-     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
-     */
-    public function pendingActivities(): array
-    {
-        return $this->pendingActivities;
     }
 
     public function resolveActivity(string $activityId, mixed $result): void

@@ -39,20 +39,6 @@ final readonly class ActivityMessage
         public ?Duration $retryDelay = null,
     ) {}
 
-    public function withAttempt(int $attempt): self
-    {
-        return new self(
-            $this->executionId,
-            $this->activityId,
-            $this->activityName,
-            $this->payload,
-            $this->options,
-            $attempt,
-            $this->firstQueuedAt,
-            $this->retryDelay,
-        );
-    }
-
     /**
      * Next attempt, to be retried after the given delay.
      */

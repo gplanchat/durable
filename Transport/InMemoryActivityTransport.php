@@ -94,32 +94,4 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
         return $removed;
     }
 
-    /**
-     * Number of messages still queued (all delays taken together).
-     */
-    public function pendingCount(): int
-    {
-        return \count($this->pending);
-    }
-
-    /**
-     * Non-destructive read of the messages whose due time has been reached.
-     *
-     * @return list<array{name: string, payload: array<string, mixed>}>
-     */
-    public function inspectPendingActivities(): array
-    {
-        $now = microtime(true);
-        $snapshot = [];
-        foreach ($this->pending as $row) {
-            if ($row['at'] <= $now) {
-                $snapshot[] = [
-                    'name' => $row['message']->activityName,
-                    'payload' => $row['message']->payload,
-                ];
-            }
-        }
-
-        return $snapshot;
-    }
 }
