@@ -182,26 +182,42 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
         $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
 
-        self::assertNotNull($fromSubject->findScheduledActivityId(0));
+        // Identifiers are drawn per execution: what must agree is whether each lookup finds one.
+        foreach ([$fromReference, $fromSubject] as $history) {
+            self::assertNotNull($history->findScheduledActivityId(0));
+            self::assertNull($history->findScheduledActivityId(1));
+        }
         self::assertSame($fromReference->activityPayloadForSlot(0), $fromSubject->activityPayloadForSlot(0));
 
+        $referenceTimer = (string) $fromReference->findScheduledTimerId(0);
         $timerId = $fromSubject->findScheduledTimerId(0);
         self::assertNotNull($timerId);
-        self::assertNotNull($fromSubject->findTimerSlotResult(0), 'the timer fired');
+        foreach ([$fromReference, $fromSubject] as $history) {
+            $fired = $history->findTimerSlotResult(0);
+            self::assertNotNull($fired, 'the timer fired, on both sides');
+            self::assertNull($fired['failed']);
+        }
         self::assertSame(
-            $fromReference->timerCompletionPosition((string) $fromReference->findScheduledTimerId(0)),
+            $fromReference->timerCompletionPosition($referenceTimer),
             $fromSubject->timerCompletionPosition($timerId),
             'the firing sits at the same rank of both journals',
         );
 
-        self::assertTrue($fromSubject->hasSideEffectForSlot(1));
+        foreach ([0, 1, 2] as $slot) {
+            self::assertSame($fromReference->hasSideEffectForSlot($slot), $fromSubject->hasSideEffectForSlot($slot), "side-effect slot {$slot}");
+        }
         self::assertFalse($fromSubject->hasSideEffectForSlot(2), 'two side effects, no third');
 
+        $referenceChild = (string) $fromReference->findScheduledChildExecutionId(0);
         $childId = $fromSubject->findScheduledChildExecutionId(0);
         self::assertNotNull($childId);
         self::assertSame($fromReference->childWorkflowInputForSlot(0), $fromSubject->childWorkflowInputForSlot(0));
         self::assertSame($fromReference->findChildWorkflowForSlot(0)['result'] ?? null, $fromSubject->findChildWorkflowForSlot(0)['result'] ?? null);
-        self::assertTrue($fromSubject->hasChildExecutionId($childId));
+        self::assertSame($fromReference->hasChildExecutionId($referenceChild), $fromSubject->hasChildExecutionId($childId));
+        self::assertSame(
+            $fromReference->hasChildExecutionCompletedSuccessfully($referenceChild),
+            $fromSubject->hasChildExecutionCompletedSuccessfully($childId),
+        );
         self::assertTrue($fromSubject->hasChildExecutionCompletedSuccessfully($childId));
 
         self::assertSame($fromReference->messageAt(0), $fromSubject->messageAt(0));
