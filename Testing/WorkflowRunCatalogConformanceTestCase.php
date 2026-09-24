@@ -59,6 +59,15 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     protected function pickUp(string $executionId): void {}
 
+    /**
+     * Makes a running execution exist that no worker has picked up yet: dispatched, not consumed.
+     * By default the same as {@see startRun()}, for a catalog that cannot tell the difference.
+     */
+    protected function dispatchRun(string $executionId, string $workflowType): void
+    {
+        $this->startRun($executionId, $workflowType);
+    }
+
     // -----------------------------------------------------------------------------------------
 
     public function testAnEmptyCatalogListsNothing(): void
@@ -84,8 +93,8 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
     public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
     {
-        $this->startRun('waiting', 'App\\OrderWorkflow');
-        $this->startRun('picked', 'App\\OrderWorkflow');
+        $this->dispatchRun('waiting', 'App\\OrderWorkflow');
+        $this->dispatchRun('picked', 'App\\OrderWorkflow');
         $this->startRun('ended', 'App\\OrderWorkflow');
         if ($this->canTellAPickup()) {
             $this->pickUp('picked');
