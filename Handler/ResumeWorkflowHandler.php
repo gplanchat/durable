@@ -12,6 +12,7 @@ use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
+use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
@@ -75,6 +76,10 @@ final class ResumeWorkflowHandler
 
             $result = $this->engine->resume($executionId, $handler, $workflowTypeForJournal, $pendingUpdates);
         } catch (WorkflowSuspendedException $e) {
+            // The catalog that records pickups usually records waits too (#324): one projection, two facts.
+            if (null !== $e->waitingOn() && $this->pickups instanceof WorkflowRunWaitProjectionInterface) {
+                $this->pickups->recordWait($executionId, $e->waitingOn());
+            }
             if ($e->shouldDispatchResume()) {
                 if (!$e->waitingOnTimer()) {
                     $this->resumeDispatcher->dispatchResume($executionId);
