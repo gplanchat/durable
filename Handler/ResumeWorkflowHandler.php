@@ -10,6 +10,7 @@ use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
@@ -40,6 +41,7 @@ final class ResumeWorkflowHandler
         private readonly ChildWorkflowParentLinkStoreInterface $childWorkflowParentLinkStore,
         private readonly WorkflowTimerDispatcher $timerDispatcher,
         private readonly WorkflowDefinitionLoader $workflowDefinitionLoader,
+        private readonly ?WorkflowRunPickupProjectionInterface $pickups = null,
     ) {}
 
     public function __invoke(ResumeWorkflowMessage $message): void
@@ -53,6 +55,10 @@ final class ResumeWorkflowHandler
         if (($metadata['completed'] ?? false) === true) {
             return;
         }
+
+        // A worker has the run now (#447). Recorded here rather than on ExecutionStarted: resume()
+        // never appends it, and a run that waits on a signal appends nothing at all.
+        $this->pickups?->recordPickup($executionId);
 
         $lookupKey = $metadata['workflowType'];
         $payload = $metadata['payload'];

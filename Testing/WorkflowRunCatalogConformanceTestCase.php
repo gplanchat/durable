@@ -55,7 +55,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
-     * Records that a worker picked the execution up. Called only when {@see canTellAPickup()} is true.
+     * Records that a worker picked the execution up, as your worker does when it consumes the resume
+     * (the core's `ResumeWorkflowHandler` calls `recordPickup()`). Called only when
+     * {@see canTellAPickup()} is true. Note that {@see startRun()} may or may not count as a pickup
+     * depending on the backend; the suite only relies on {@see dispatchRun()} for a run not picked up.
      */
     protected function pickUp(string $executionId): void {}
 
