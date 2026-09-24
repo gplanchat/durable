@@ -29,8 +29,13 @@ final class RunDashboard
 {
     public const PAGE_SIZE = 20;
 
+    /**
+     * @param (\Closure(): \DateTimeImmutable)|null $now the clock the waiting times are measured
+     *                                                 against; UTC now by default
+     */
     public function __construct(
         private readonly ?WorkflowRunCatalogInterface $catalog,
+        private readonly ?\Closure $now = null,
     ) {}
 
     /**
@@ -38,6 +43,7 @@ final class RunDashboard
      *   backend: array<string, mixed>,
      *   runs: list<array<string, mixed>>,
      *   kpis: array<string, int>,
+     *   waitingForWorker?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
      *   status: string,
      *   selectedRun: array<string, mixed>|null
@@ -97,15 +103,17 @@ final class RunDashboard
                 'name' => $health->backend,
                 'checkedAt' => $health->checkedAt,
             ],
-            'runs' => array_map(self::describe(...), $page->runs),
+            'runs' => array_map($this->describe(...), $page->runs),
             'kpis' => self::outcomeCounters($page->runs),
+            // Not an outcome bucket: a subset of the running ones, over the same page (#447).
+            'waitingForWorker' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
             'pagination' => [
                 'cursor' => $cursor,
                 'nextCursor' => $page->nextCursor,
                 'hasNext' => null !== $page->nextCursor,
             ],
             'status' => $status,
-            'selectedRun' => null === $selected ? null : self::describe($selected) + [
+            'selectedRun' => null === $selected ? null : $this->describe($selected) + [
                 // The frieze is computed in the core, next to the facts it projects: grouping
                 // into actions, placing in time and telling the queue apart from the work are not
                 // the host's business, otherwise the same run reads differently from one surface
@@ -118,7 +126,7 @@ final class RunDashboard
     /**
      * @return array<string, mixed>
      */
-    private static function describe(WorkflowRunDescription $run): array
+    private function describe(WorkflowRunDescription $run): array
     {
         $described = [
             'runId' => $run->runId,
@@ -136,8 +144,29 @@ final class RunDashboard
         if (null !== $run->groupId) {
             $described['groupId'] = $run->groupId;
         }
+        if (null !== $run->waitingForWorkerSince) {
+            // Dispatched, and no worker has taken it yet (#447). The wording is decided here, once,
+            // for every surface (DUR049).
+            $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
+            $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->now ?? static fn(): \DateTimeImmutable => new \DateTimeImmutable('now', new \DateTimeZone('UTC')))());
+        }
 
         return $described;
+    }
+
+    /**
+     * The largest whole unit: 42 s, 5 min, 2 h, 3 d.
+     */
+    private static function elapsed(\DateTimeImmutable $since, \DateTimeImmutable $now): string
+    {
+        $seconds = max(0, $now->getTimestamp() - $since->getTimestamp());
+
+        return match (true) {
+            $seconds < 60 => $seconds . ' s',
+            $seconds < 3600 => intdiv($seconds, 60) . ' min',
+            $seconds < 86400 => intdiv($seconds, 3600) . ' h',
+            default => intdiv($seconds, 86400) . ' d',
+        };
     }
 
     /**
