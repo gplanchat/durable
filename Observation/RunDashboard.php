@@ -43,7 +43,7 @@ final class RunDashboard
      *   backend: array<string, mixed>,
      *   runs: list<array<string, mixed>>,
      *   kpis: array<string, int>,
-     *   waitingForWorker?: int,
+     *   waitingForWorkerOnThisPage?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
      *   status: string,
      *   selectedRun: array<string, mixed>|null
@@ -114,7 +114,7 @@ final class RunDashboard
         ] + ($page->tellsWaitingForWorker ? [
             // Not an outcome bucket: a subset of the running ones, over the same page (#447). Left
             // out when the backend cannot tell, since zero would claim that none waits.
-            'waitingForWorker' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
+            'waitingForWorkerOnThisPage' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
         ] : []) + [
             'selectedRun' => null === $selected ? null : $this->describe($selected) + [
                 // The frieze is computed in the core, next to the facts it projects: grouping
