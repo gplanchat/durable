@@ -7,7 +7,7 @@ namespace Gplanchat\Durable\Exception;
 /**
  * The activity was cancelled because another concurrent branch (e.g. any/race) won.
  */
-final class ActivitySupersededException extends \RuntimeException
+final class ActivitySupersededException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         private readonly string $activityId,

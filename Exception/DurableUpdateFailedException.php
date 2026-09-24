@@ -10,7 +10,7 @@ namespace Gplanchat\Durable\Exception;
  * That is the whole difference between an update and a signal — an update answers, and its
  * answer may be a failure without the workflow being affected by it (ADR DUR035).
  */
-final class DurableUpdateFailedException extends \RuntimeException
+final class DurableUpdateFailedException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         private readonly string $updateName,

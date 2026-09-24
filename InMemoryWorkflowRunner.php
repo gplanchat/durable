@@ -47,7 +47,7 @@ final class InMemoryWorkflowRunner
      *
      * @return mixed the handler's result
      */
-    public function run(string $executionId, callable $handler): mixed
+    public function run(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
         // Virtual clock: an inline harness has nobody to deliver a timer wake-up, and waiting
         // out a due time for real would make every workflow that sleeps untestable. It only
@@ -87,10 +87,8 @@ final class InMemoryWorkflowRunner
 
         // What the last suspension was waiting on, when that has a name: it is all that
         // separates "stuck" from "stuck on that particular condition" in the diagnosis.
-        $waitingOn = null;
-
         try {
-            return $engine->start($executionId, $handler);
+            return $engine->start($executionId, $handler, $workflowType);
         } catch (WorkflowSuspendedException $e) {
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
             $waitingOn = $e->waitingOn();

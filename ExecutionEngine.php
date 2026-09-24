@@ -31,7 +31,8 @@ final class ExecutionEngine
     ) {}
 
     /**
-     * @param array<string, mixed> $executionStartedPayloadExtras Merged into the {@see ExecutionStarted} payload (e.g. Temporal interpreter bootstrap).
+     * @param array<string, mixed>                          $executionStartedPayloadExtras Merged into the {@see ExecutionStarted} payload (e.g. Temporal interpreter bootstrap).
+     * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
     public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
@@ -70,6 +71,8 @@ final class ExecutionEngine
     /**
      * Resumes a suspended execution. Does not append ExecutionStarted.
      * Used after WorkflowSuspendedException once the activities have run.
+     *
+     * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
     public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
@@ -79,7 +80,9 @@ final class JournalRunHistoryReader
             $recordedAt = $entry['recordedAt'] ?? null;
 
             if ($event instanceof ActivityScheduled) {
-                $activityNames[$event->activityId()] = $event->activityName();
+                // The summary first, as for timers (#260): the activity name is the method, not the step.
+                $summary = ActivityOptions::fromMetadata($event->metadata())?->summary;
+                $activityNames[$event->activityId()] = null !== $summary && '' !== $summary ? $summary : $event->activityName();
             }
 
             if ($event instanceof ChildWorkflowScheduled) {
@@ -115,6 +118,8 @@ final class JournalRunHistoryReader
                 // execution, so no interval precedes it.
                 $event instanceof ActivityTaskStarted || $event instanceof ExecutionStarted,
                 self::isFailure($event),
+                self::phaseOf($event),
+                $event instanceof ActivityTaskStarted || $event instanceof ActivityTaskFailed ? $event->attempt() : null,
             );
         }
 
@@ -214,6 +219,32 @@ final class JournalRunHistoryReader
         $scheduledEventId = self::nexusScheduledEventIdOf($event);
 
         return null === $scheduledEventId ? null : 'nexus:' . $scheduledEventId;
+    }
+
+    private static function phaseOf(Event $event): ?WorkflowRunEventPhase
+    {
+        return match (true) {
+            self::isFailure($event) => WorkflowRunEventPhase::Failed,
+            $event instanceof ActivityTaskStarted,
+            $event instanceof ExecutionStarted => WorkflowRunEventPhase::Started,
+            $event instanceof ActivityScheduled,
+            $event instanceof TimerScheduled,
+            $event instanceof ChildWorkflowScheduled,
+            $event instanceof NexusOperationScheduled,
+            $event instanceof WorkflowCancellationRequested => WorkflowRunEventPhase::Requested,
+            $event instanceof ActivityCompleted,
+            $event instanceof ActivityTaskCompleted,
+            $event instanceof ActivityCancelled,
+            $event instanceof TimerCompleted,
+            $event instanceof TimerCancelled,
+            $event instanceof ChildWorkflowCompleted,
+            $event instanceof NexusOperationCompleted,
+            $event instanceof NexusOperationCancelled,
+            $event instanceof ExecutionCompleted,
+            $event instanceof WorkflowExecutionCancelled,
+            $event instanceof WorkflowContinuedAsNew => WorkflowRunEventPhase::Settled,
+            default => null,
+        };
     }
 
     private static function kindOf(Event $event): WorkflowRunEventKind

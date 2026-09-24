@@ -13,7 +13,7 @@ namespace Gplanchat\Durable\Exception;
  * first pass as on replay. A child that ended otherwise (cancelled) leaves them empty. On
  * Temporal they are not filled yet.
  */
-final class DurableChildWorkflowFailedException extends \RuntimeException
+final class DurableChildWorkflowFailedException extends \RuntimeException implements ExceptionInterface
 {
     /**
      * @param array<string, mixed> $workflowFailureContext

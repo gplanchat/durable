@@ -8,7 +8,7 @@ namespace Gplanchat\Durable\Exception;
  * Represents a previous cause serialised from the activity failure history
  * (the original class is kept as text for logs / traces).
  */
-final class ActivityFailureCauseException extends \RuntimeException
+final class ActivityFailureCauseException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         private readonly string $originalClass,

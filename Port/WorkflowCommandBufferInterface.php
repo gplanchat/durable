@@ -105,9 +105,6 @@ interface WorkflowCommandBufferInterface
     public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
 
     /**
-     * Records workflow failure (COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION for Temporal).
-     */
-    /**
      * Records the version an execution resolved for a declared change point.
      *
      * Written once, the first time the execution reaches the point. Everything after that reads it
@@ -115,11 +112,11 @@ interface WorkflowCommandBufferInterface
      */
     public function recordVersion(string $changeId, int $version): void;
 
+    /**
+     * Records workflow failure (COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION for Temporal).
+     */
     public function failWorkflow(\Throwable $reason): void;
 
-    /**
-     * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
-     */
     /**
      * Schedules a Nexus operation: a call served by an outside endpoint.
      *
@@ -144,6 +141,9 @@ interface WorkflowCommandBufferInterface
      */
     public function cancelNexusOperation(string $operationId, string $reason): void;
 
+    /**
+     * Records an activity cancellation request (COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK for Temporal).
+     */
     public function cancelActivity(string $activityId, string $reason): void;
 
     /**
