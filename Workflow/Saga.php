@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
  * Records one compensation per completed step and runs them in reverse order.
  *
- * A compensation is a closure. When it returns an `Awaitable`, a stub call such as
- * `fn () => $payments->refund($charge)`, the saga awaits it before the next one. Anything else
- * runs inline. The closures live in workflow memory: on replay the workflow rebuilds the saga as
- * it goes, and the journal answers the compensations that already ran.
+ * A compensation is a closure that does its own waiting, such as
+ * `fn () => $env->await($payments->refund($charge))`: `await()` stays the only call that waits.
+ * One that returns an `Awaitable` instead forgot its `await()` and is refused. The closures live in
+ * workflow memory: on replay the workflow rebuilds the saga as it goes, and the journal answers the
+ * compensations that already ran.
  *
  * The first compensation that throws stops the run, and its exception replaces the one being
  * compensated. The compensations still pending stay recorded, so calling `compensate()` again
@@ -27,10 +27,6 @@ final class Saga
     /** @var list<\Closure(): mixed> */
     private array $compensations = [];
 
-    public function __construct(
-        private readonly WorkflowEnvironment $environment,
-    ) {}
-
     /**
      * @param \Closure(): mixed $compensation
      */
@@ -42,10 +38,8 @@ final class Saga
     public function compensate(): void
     {
         while (null !== $compensation = array_pop($this->compensations)) {
-            $result = $compensation();
-
-            if ($result instanceof Awaitable) {
-                $this->environment->await($result);
+            if ($compensation() instanceof Awaitable) {
+                throw new \LogicException('A compensation returned an Awaitable: wrap the call in $env->await().');
             }
         }
     }
