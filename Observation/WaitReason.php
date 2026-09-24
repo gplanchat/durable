@@ -76,6 +76,10 @@ final class WaitReason
      */
     private static function firstLeaf(Awaitable $awaitable): TimerAwaitable|ActivityAwaitable|null
     {
+        // A member already done is not what the run waits on: in all([a, b]) with a done, it is b.
+        if ($awaitable->isSettled()) {
+            return null;
+        }
         if ($awaitable instanceof TimerAwaitable || $awaitable instanceof ActivityAwaitable) {
             return $awaitable;
         }
