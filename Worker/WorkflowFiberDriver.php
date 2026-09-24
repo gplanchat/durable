@@ -65,6 +65,7 @@ final class WorkflowFiberDriver
                 // Falling out of the loop here used to return null with no lifecycle call, and the
                 // caller took that null for a result: the run was marked completed with no
                 // ExecutionCompleted in the journal (#315). It is a failure, and it is written down.
+                self::abandon($context, $fiber);
                 $this->lifecycle->onFailed($executionId, new \LogicException(\sprintf(
                     'The workflow suspended with a value of type %s; only an Awaitable can be awaited. Use $env->await(), never Fiber::suspend() directly.',
                     get_debug_type($suspended),
@@ -103,6 +104,7 @@ final class WorkflowFiberDriver
                 }
 
                 // New command: already stacked in the WorkflowCommandBufferInterface.
+                self::abandon($context, $fiber);
                 $this->lifecycle->onSuspended($executionId, $suspended);
 
                 return null;
@@ -144,6 +146,37 @@ final class WorkflowFiberDriver
         }
 
         $this->lifecycle->onFailed($executionId, $e);
+    }
+
+    /**
+     * Destroys the suspended fiber here, rather than wherever the lifecycle's exception unwinds
+     * it. PHP runs the workflow's `finally` blocks on destruction, on every pass that suspends,
+     * as a Temporal eviction does. What they throw then (an await in a force-closed fiber, work
+     * the abandoned context refuses) belongs to a pass that is already over: it is dropped, not
+     * reported as the outcome of the run.
+     */
+    /**
+     * @param-out null $fiber
+     */
+    private static function abandon(ExecutionContext $context, ?\Fiber &$fiber): void
+    {
+        $context->abandon();
+
+        try {
+            self::destroy($fiber);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Drops the last reference, which destroys the fiber and runs its `finally` blocks: whatever
+     * they throw comes out of here, which a bare assignment would hide from static analysis.
+     *
+     * @param-out null $fiber
+     */
+    private static function destroy(?\Fiber &$fiber): void
+    {
+        $fiber = null;
     }
 
     /**
