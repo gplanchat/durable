@@ -275,8 +275,12 @@ final class WorkflowEnvironment
             // Control flow, not a branch failure: swallowing it would turn a suspension into a hard
             // failure, a long way from its cause.
             throw $e;
-        } catch (\Throwable) {
-            // A branch failing decides nothing: the branches are read back below.
+        } catch (\Throwable $e) {
+            // A branch failing decides nothing: the branches are read back below. Anything else —
+            // the journal refusing the losers' cancellation — is no verdict, and must not vanish.
+            if (!self::isTheFailureOf($e, $awaitable) && !self::isTheFailureOf($e, $timer)) {
+                throw $e;
+            }
         }
 
         $failure = null;
@@ -304,6 +308,24 @@ final class WorkflowEnvironment
         }
 
         throw new \LogicException('Deadline race settled without a settled branch.');
+    }
+
+    /**
+     * @param Awaitable<mixed> $branch
+     */
+    private static function isTheFailureOf(\Throwable $e, Awaitable $branch): bool
+    {
+        if (!$branch->isSettled()) {
+            return false;
+        }
+
+        try {
+            $branch->getResult();
+
+            return false;
+        } catch (\Throwable $failure) {
+            return $failure === $e;
+        }
     }
 
     /**
@@ -433,13 +455,6 @@ final class WorkflowEnvironment
     }
 
     /**
-     * @template T
-     *
-     * @param \Closure(): T $closure
-     *
-     * @return T
-     */
-    /**
      * Declares that this workflow's behaviour changed here, and returns the one that applies to the
      * execution in progress.
      *
@@ -467,6 +482,13 @@ final class WorkflowEnvironment
         return $this->context->version($changeId, $minSupported, $maxSupported);
     }
 
+    /**
+     * @template T
+     *
+     * @param \Closure(): T $closure
+     *
+     * @return T
+     */
     public function sideEffect(\Closure $closure): mixed
     {
         return $this->await($this->context->sideEffect($closure));

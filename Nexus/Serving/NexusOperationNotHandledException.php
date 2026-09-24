@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Nexus\Serving;
 
+use Gplanchat\Durable\Exception\ExceptionInterface;
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusService;
 
@@ -15,7 +16,7 @@ use Gplanchat\Durable\Nexus\NexusService;
  * for the whole budget of the operation (probe 1.7), for an answer that will not change — the
  * handler will not appear between two attempts.
  */
-final class NexusOperationNotHandledException extends \RuntimeException
+final class NexusOperationNotHandledException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly NexusService $service,

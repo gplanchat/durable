@@ -864,9 +864,6 @@ final class ExecutionContext
     }
 
     /**
-     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
-     */
-    /**
      * The Nexus operations still in flight, by identifier.
      *
      * Mirror of {@see pendingActivities()}: that is how the outcome of an operation, read from
@@ -879,6 +876,9 @@ final class ExecutionContext
         return $this->pendingNexusOperations;
     }
 
+    /**
+     * @return array<string, \Gplanchat\Durable\Awaitable\Deferred>
+     */
     public function pendingActivities(): array
     {
         return $this->pendingActivities;

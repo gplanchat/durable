@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Nexus;
 
+use Gplanchat\Durable\Exception\ExceptionInterface;
+
 /**
  * The execution backend in use cannot serve a Nexus operation.
  *
@@ -14,7 +16,7 @@ namespace Gplanchat\Durable\Nexus;
  *
  * Hence this refusal, immediate and named, rather than a command accepted and then lost.
  */
-final class NexusUnsupportedByBackendException extends \RuntimeException
+final class NexusUnsupportedByBackendException extends \RuntimeException implements ExceptionInterface
 {
     /**
      * The refusal **at registration**, and it does not say the same thing as the one at the call.

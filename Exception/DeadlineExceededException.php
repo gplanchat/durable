@@ -17,7 +17,7 @@ use Gplanchat\Durable\Duration;
  * Not to be confused with {@see \Gplanchat\Durable\Activity\ActivityTimeouts}, which bounds an
  * activity attempt on the server side. This one bounds *this* wait, in *this* execution.
  */
-final class DeadlineExceededException extends \RuntimeException
+final class DeadlineExceededException extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         private readonly Duration $deadline,

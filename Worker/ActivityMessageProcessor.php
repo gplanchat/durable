@@ -9,7 +9,6 @@ use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCompleted;
-use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
@@ -40,7 +39,12 @@ final class ActivityMessageProcessor
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
     ) {}
 
-    public function process(ActivityMessage $message): void
+    /**
+     * @return \Throwable|null the failure that ended the activity because it is declared
+     *                         non-retryable, for a host whose queue must not retry it either (#341);
+     *                         null otherwise — it is already journalled either way
+     */
+    public function process(ActivityMessage $message): ?\Throwable
     {
         // A redelivery of an attempt that already ran is answered by the journal, not run again:
         // re-running a failed attempt would also queue its retry a second time (#319).
@@ -55,7 +59,7 @@ final class ActivityMessageProcessor
             $message->activityId,
             $message->attempt,
         )) {
-            return;
+            return null;
         }
 
         $options = $message->options;
@@ -67,12 +71,12 @@ final class ActivityMessageProcessor
             if ($timeouts->scheduleToClose?->hasElapsedSince($firstQueued, $now)) {
                 $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-close timeout exceeded.'), ActivityRetryState::Timeout);
 
-                return;
+                return null;
             }
             if ($message->attempt <= 1 && $timeouts->scheduleToStart?->hasElapsedSince($firstQueued, $now)) {
                 $this->appendActivityFailure($message, new \RuntimeException('Activity schedule-to-start timeout exceeded.'), ActivityRetryState::Timeout);
 
-                return;
+                return null;
             }
         }
 
@@ -82,7 +86,7 @@ final class ActivityMessageProcessor
             if (true === $this->heartbeatSender->isCancellationRequested()) {
                 $this->appendActivityCancelled($message, 'cancellation_requested');
 
-                return;
+                return null;
             }
 
             if (!ActivityEventJournal::hasActivityTaskStartedForAttempt(
@@ -112,7 +116,7 @@ final class ActivityMessageProcessor
                 );
                 $this->appendActivityCancelled($message, 'cancellation_requested');
 
-                return;
+                return null;
             }
             // Measured after the fact, not enforced with a PHP time limit: that one counts CPU
             // time only, so a stalled call never trips it, and when it does trip it kills the
@@ -131,11 +135,9 @@ final class ActivityMessageProcessor
                 true,
                 null,
             );
-            $this->eventStore->append(new ActivityTaskCompleted(
-                $message->executionId,
-                $message->activityId,
-                $result,
-            ));
+            // One event on success (#262): the attempt's result is the settled result, and a second
+            // `ActivityTaskCompleted` with the same body only doubled the timeline row. Failures keep
+            // the split, one `ActivityTaskFailed` per attempt for one outcome.
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -189,7 +191,7 @@ final class ActivityMessageProcessor
             if ($delegatedToTransport) {
                 $this->appendActivityFailure($message, $e, ActivityRetryState::InProgress);
 
-                return;
+                return null;
             }
 
             if ($shouldRetry) {
@@ -199,8 +201,12 @@ final class ActivityMessageProcessor
                 );
             } else {
                 $this->appendActivityFailure($message, $e, $retryState);
+
+                return $nonRetryable ? $e : null;
             }
         }
+
+        return null;
     }
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void

@@ -26,4 +26,4 @@ namespace Gplanchat\Durable\Exception;
  * Only the Temporal backend has the notion of a *task*. Elsewhere, this exception behaves like
  * any other — see the note in the change.
  */
-final class WorkflowTaskFailure extends \RuntimeException {}
+final class WorkflowTaskFailure extends \RuntimeException implements ExceptionInterface {}

@@ -40,12 +40,6 @@ interface WorkflowLifecycleInterface
     public function isCancellationPending(string $executionId): bool;
 
     /**
-     * The cancellation went through the handler without being swallowed: the execution ends
-     * cancelled.
-     *
-     * @throws \Throwable to propagate the ending to the caller
-     */
-    /**
      * The cancellation has just been raised inside the fiber; `$cancelledOperationIds` lists the
      * operations withdrawn on that occasion.
      *
@@ -57,6 +51,12 @@ interface WorkflowLifecycleInterface
      */
     public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void;
 
+    /**
+     * The cancellation went through the handler without being swallowed: the execution ends
+     * cancelled.
+     *
+     * @throws \Throwable to propagate the ending to the caller
+     */
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void;
 
     /**

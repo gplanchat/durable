@@ -18,7 +18,7 @@ use Gplanchat\Durable\Nexus\NexusOperationFailureKind;
  * The retry behaviour only travels on {@see NexusOperationFailureKind::HandlerError}: it is the
  * server that states it, and only when the handler did not run.
  */
-final class DurableNexusOperationFailedException extends \Exception
+final class DurableNexusOperationFailedException extends \Exception implements ExceptionInterface
 {
     public function __construct(
         private readonly string $endpoint,

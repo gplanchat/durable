@@ -6,7 +6,6 @@ namespace Gplanchat\Durable;
 
 use Gplanchat\Durable\Activity\NullActivityHeartbeatSender;
 use Gplanchat\Durable\Awaitable\Awaitable;
-use Gplanchat\Durable\Awaitable\AwaitableInspector;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
@@ -18,7 +17,6 @@ use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
-use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -71,8 +69,9 @@ final class ExecutionRuntime
                 return $awaitable->getResult();
             }
 
-            // Called outside of a fiber (backward-compatibility path for non-fiber callers)
-            throw new WorkflowSuspendedException(\sprintf('Workflow %s suspended (distributed mode)', $context->executionId()), 0, null, $this->awaitableShouldDispatchResume($awaitable), AwaitableInspector::waitsOnTimer($awaitable));
+            // Every engine pass runs the workflow in a fiber: an await outside one would pass for a
+            // suspension that nothing ever resumes (#329).
+            throw new \LogicException(\sprintf('Workflow %s awaited outside a fiber in distributed mode: run it through ExecutionEngine.', $context->executionId()));
         }
 
         // Synchronous in-memory drain (distributed=false)
@@ -219,18 +218,5 @@ final class ExecutionRuntime
     public function getActivityTransport(): ActivityTransportInterface
     {
         return $this->activityTransport;
-    }
-
-    /**
-     * Timer: {@see ResumeWorkflowHandler} sends {@see \Gplanchat\Durable\Transport\FireWorkflowTimersMessage} (not a direct resume).
-     * Activity: false — {@see ActivityMessageProcessor} calls {@see \Gplanchat\Durable\Port\WorkflowResumeDispatcher::dispatchResume}
-     * at the end of the activity; a {@code dispatchResume} from the workflow handler with a **sync/in-memory** transport would loop forever.
-     * Signal / update: only {@see DeliverWorkflowSignalHandler} and friends must trigger a resume.
-     *
-     * @param Awaitable<mixed> $awaitable
-     */
-    private function awaitableShouldDispatchResume(Awaitable $awaitable): bool
-    {
-        return AwaitableInspector::waitsOnTimer($awaitable);
     }
 }

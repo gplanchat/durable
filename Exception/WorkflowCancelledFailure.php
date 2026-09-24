@@ -17,7 +17,7 @@ namespace Gplanchat\Durable\Exception;
  * as the trace of delivery and as the source of the rejection on replay — the workflow therefore
  * throws the same exception at the same place, with no extra marker on the in-memory side.
  */
-final class WorkflowCancelledFailure extends \RuntimeException
+final class WorkflowCancelledFailure extends \RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly string $executionId,
