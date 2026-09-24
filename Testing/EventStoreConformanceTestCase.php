@@ -286,7 +286,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             new ActivityTaskFailed($executionId, 'act-1', 'quote', 1, \RuntimeException::class, 'transient', ActivityRetryState::InProgress),
             new ActivityTaskCompleted($executionId, 'act-1', $nested),
             new ActivityCompleted($executionId, 'act-1', $nested),
-            new VersionMarked($executionId, 'ajout-remise', 1),
+            new VersionMarked($executionId, 'add-discount', 1),
             new ActivityFailed(
                 $executionId,
                 'act-2',
