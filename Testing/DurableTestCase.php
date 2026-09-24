@@ -6,7 +6,6 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
-use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
@@ -95,19 +94,7 @@ abstract class DurableTestCase extends TestCase
      */
     protected function assertWorkflowFailed(string $executionId, string $expectedFailureClass = ''): void
     {
-        $failed = $this->findEvent($executionId, WorkflowExecutionFailed::class);
-        Assert::assertNotNull(
-            $failed,
-            \sprintf('The workflow "%s" did not fail (no WorkflowExecutionFailed event found).', $executionId),
-        );
-
-        if ('' !== $expectedFailureClass) {
-            Assert::assertSame(
-                $expectedFailureClass,
-                $failed->failureClass(),
-                \sprintf('The workflow "%s" failed with another class than the expected one.', $executionId),
-            );
-        }
+        JournalAssertions::assertWorkflowFailed($this->requireCurrentEnvironment()->getEventStore(), $executionId, $expectedFailureClass);
     }
 
     /**
