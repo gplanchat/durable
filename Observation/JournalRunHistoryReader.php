@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
@@ -79,7 +80,9 @@ final class JournalRunHistoryReader
             $recordedAt = $entry['recordedAt'] ?? null;
 
             if ($event instanceof ActivityScheduled) {
-                $activityNames[$event->activityId()] = $event->activityName();
+                // The summary first, as for timers (#260): the activity name is the method, not the step.
+                $summary = ActivityOptions::fromMetadata($event->metadata())?->summary;
+                $activityNames[$event->activityId()] = null !== $summary && '' !== $summary ? $summary : $event->activityName();
             }
 
             if ($event instanceof ChildWorkflowScheduled) {
