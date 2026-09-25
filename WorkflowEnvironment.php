@@ -154,7 +154,8 @@ final class WorkflowEnvironment
         // wait there is, and the awaitable contract is already exactly a predicate.
         if ($awaitable instanceof \Closure) {
             $awaitable = new ConditionAwaitable($awaitable, $label);
-        } elseif (null !== $label) {
+        } elseif (null !== $label && '' !== $label) {
+            // '' is no label, as on a condition: one rule for it, not a refusal on one path only.
             throw new \InvalidArgumentException(\sprintf('A label names a condition; this %s already names itself in the run list.', (new \ReflectionClass($awaitable))->getShortName()));
         }
 
