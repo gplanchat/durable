@@ -139,16 +139,23 @@ final class WorkflowEnvironment
      * {@see sideEffect()}. Beware that `fn()` captures by value: a condition on a local variable is
      * written `function () use (&$…)`.
      *
+     * A condition can carry a `$label`, what it waits for in words (`'signal approve'`): the run list
+     * then shows it instead of where the closure is written. It is display only and never enters the
+     * journal. A timer or an activity already names itself, so a label on one is refused (#324).
+     *
      * @param Awaitable<mixed>|\Closure(): bool $awaitable
      *
      * @throws DeadlineExceededException if the deadline elapses before the wait settles
+     * @throws \InvalidArgumentException  if a label is given with anything but a condition
      */
-    public function await(Awaitable|\Closure $awaitable, Duration|\DateInterval|\DateTimeInterface|int|float|null $deadline = null): mixed
+    public function await(Awaitable|\Closure $awaitable, Duration|\DateInterval|\DateTimeInterface|int|float|null $deadline = null, ?string $label = null): mixed
     {
         // A condition comes in through the same door as everything else: `await()` is the only
         // wait there is, and the awaitable contract is already exactly a predicate.
         if ($awaitable instanceof \Closure) {
-            $awaitable = new ConditionAwaitable($awaitable);
+            $awaitable = new ConditionAwaitable($awaitable, $label);
+        } elseif (null !== $label) {
+            throw new \InvalidArgumentException(\sprintf('A label names a condition; this %s already names itself in the run list.', (new \ReflectionClass($awaitable))->getShortName()));
         }
 
         $deadline = null === $deadline ? Duration::infinity() : self::delayOf($deadline);

@@ -22,9 +22,11 @@ final class ConditionAwaitable implements Awaitable
 {
     /**
      * @param \Closure(): bool $predicate
+     * @param string|null       $label     what the condition waits for, in words, for the run list
      */
     public function __construct(
         private readonly \Closure $predicate,
+        private readonly ?string $label = null,
     ) {}
 
     public function isSettled(): bool
@@ -41,11 +43,15 @@ final class ConditionAwaitable implements Awaitable
     }
 
     /**
-     * Where the condition is written — enough to name it in a diagnostic without adding to it a
-     * description parameter that every caller would then have to fill in.
+     * The label the workflow gave the condition, or else where the condition is written: enough to
+     * name it in a diagnostic without every caller having to fill a description in (#324).
      */
     public function describe(): string
     {
+        if (null !== $this->label && '' !== $this->label) {
+            return $this->label;
+        }
+
         $reflection = new \ReflectionFunction($this->predicate);
         $file = $reflection->getFileName();
 
