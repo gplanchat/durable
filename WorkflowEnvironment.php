@@ -140,8 +140,9 @@ final class WorkflowEnvironment
      * written `function () use (&$…)`.
      *
      * A condition can carry a `$label`, what it waits for in words (`'signal approve'`): the run list
-     * then shows it instead of where the closure is written. It is display only and never enters the
-     * journal. A timer or an activity already names itself, so a label on one is refused (#324).
+     * then shows it instead of where the closure is written. It is display text: nothing records it while
+     * the run waits, an uncaught deadline puts it in the failure message, and replay never compares
+     * it. A timer or an activity already names itself, so a label on one is refused (#324).
      *
      * @param Awaitable<mixed>|\Closure(): bool $awaitable
      *
