@@ -83,16 +83,16 @@ final class RunDashboard
     }
 
     /**
-     * One run, by its id, with its timeline (#264). `run` is null only when the backend answers
+     * One run, by the id the application started it with (#514), with its timeline (#264). `run` is null only when the backend answers
      * and does not know the id: a backend that does not answer says so in `backend`, and a page
      * must not present it as a run that does not exist.
      *
      * @return array{backend: array<string, mixed>, run: array<string, mixed>|null}
      */
-    public function run(string $runId): array
+    public function run(string $executionId): array
     {
         [$backend, $catalog] = $this->backend();
-        $run = $catalog?->findRun($runId);
+        $run = $catalog?->findRun($executionId);
 
         return [
             'backend' => $backend,
@@ -188,6 +188,9 @@ final class RunDashboard
     {
         $described = [
             'runId' => $run->runId,
+            // What a surface links and selects by: the id the application started the run with,
+            // which on Temporal is not the run id (#514).
+            'executionId' => $run->executionId,
             'workflowName' => $run->workflowName,
             'status' => $run->status->value,
         ];
@@ -237,7 +240,7 @@ final class RunDashboard
     private static function pick(array $runs, ?string $selectedRunId): ?WorkflowRunDescription
     {
         foreach ($runs as $run) {
-            if ($run->runId === $selectedRunId) {
+            if ($run->executionId === $selectedRunId) {
                 return $run;
             }
         }
