@@ -377,6 +377,26 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     /**
      * #557: a SQL LIKE reads `%` and `_` as wildcards, and a prefix is not a pattern.
      */
+    /**
+     * #557: runs that differ from the prefix only by case sit between those that match. A store
+     * that matches without case hands them over, and the catalog drops them: the page must still
+     * fill up, and paging must lose and repeat nothing.
+     */
+    public function testAPrefixedListingFillsItsPagesAndPagesLikeAnyOther(): void
+    {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
+        foreach (['ord-1', 'ORD-2', 'ord-3', 'ORD-4', 'ord-5'] as $executionId) {
+            $this->startRun($executionId, 'App\\OrderWorkflow');
+        }
+        $filter = new WorkflowRunFilter(executionIdPrefix: 'ord');
+
+        self::assertCount(2, $this->catalogUnderTest()->listRuns(limit: 2, filter: $filter)->runs, 'a page is full while runs match');
+        self::assertSame(['ord-1', 'ord-3', 'ord-5'], self::sorted($this->collectEveryPage(null, 1, $filter)));
+    }
+
     public function testAPrefixTakesEveryCharacterLiterally(): void
     {
         if ($this->refusesFilters()) {
@@ -493,14 +513,14 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     /**
      * @return list<string>
      */
-    private function collectEveryPage(?WorkflowRunStatus $status, int $limit): array
+    private function collectEveryPage(?WorkflowRunStatus $status, int $limit, ?WorkflowRunFilter $filter = null): array
     {
         $seen = [];
         $cursor = null;
         $guard = 0;
 
         do {
-            $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit);
+            $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit, $filter);
             foreach ($this->idsOf($page->runs) as $id) {
                 self::assertNotContains($id, $seen, \sprintf('%s showed up twice while paging', $id));
                 $seen[] = $id;

@@ -27,6 +27,11 @@ interface WorkflowRunCatalogInterface
     /**
      * A page of executions, from the most recently started to the oldest.
      *
+     * A filtered page holds `$limit` runs while enough match, but may come back shorter, even
+     * empty, with a `nextCursor` all the same: Temporal on a visibility store that ignores case
+     * returns runs the prefix does not match, and the catalog drops them after a few extra trips.
+     * Only a `null` cursor means there is nothing after.
+     *
      * @param WorkflowRunStatus|null $status `null` for every outcome
      * @param string|null            $cursor       `nextCursor` of a previous page, obtained from
      *                                             the same catalog and with the same filters;
