@@ -42,6 +42,9 @@ final class RunDashboard
     ) {}
 
     /**
+     * The list and one run, the run picked in the page or its first one: a single page that shows
+     * both. A host that renders them apart calls {@see listing()} and {@see run()}.
+     *
      * @return array{
      *   backend: array<string, mixed>,
      *   runs: list<array<string, mixed>>,
@@ -54,58 +57,62 @@ final class RunDashboard
      */
     public function build(string $status = 'all', ?string $cursor = null, ?string $selectedRunId = null): array
     {
-        if (null === $this->catalog) {
-            return [
-                'backend' => [
-                    'available' => false,
-                    'message' => 'No readable durable backend is configured for this application.',
-                ],
-                'runs' => [],
-                'kpis' => self::outcomeCounters([]),
-                'pagination' => ['cursor' => $cursor, 'nextCursor' => null, 'hasNext' => false],
-                'status' => $status,
-                'selectedRun' => null,
-            ];
-        }
-
-        // "A catalog is registered" and "the backend answers" are two distinct questions. Without
-        // this second one, a downed database would give an empty, serene page — the worse of the
-        // two possible errors, since the operator concludes there is nothing to see.
-        $health = $this->catalog->checkHealth();
-        if (!$health->reachable) {
-            return [
-                'backend' => [
-                    'available' => false,
-                    'message' => $health->message,
-                    'name' => $health->backend,
-                    'checkedAt' => $health->checkedAt,
-                ],
-                'runs' => [],
-                'kpis' => self::outcomeCounters([]),
-                'pagination' => ['cursor' => $cursor, 'nextCursor' => null, 'hasNext' => false],
-                'status' => $status,
-                'selectedRun' => null,
-            ];
-        }
-
-        // A filter coming from a URL is an arbitrary string: ignoring it is worth more than
-        // refusing a page to someone who mistyped a link.
-        $filter = WorkflowRunStatus::tryFrom($status);
-        $page = $this->catalog->listRuns($filter, $cursor, self::PAGE_SIZE);
-
+        [$model, $page, $catalog] = $this->page($status, $cursor);
         $selected = self::pick($page->runs, $selectedRunId);
 
+        return $model + [
+            'selectedRun' => null === $selected || null === $catalog ? null : $this->detail($catalog, $selected),
+        ];
+    }
+
+    /**
+     * The list alone: it reads no history (#264).
+     *
+     * @return array{
+     *   backend: array<string, mixed>,
+     *   runs: list<array<string, mixed>>,
+     *   kpis: array<string, int>,
+     *   waitingForWorkerOnThisPage?: int,
+     *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
+     *   status: string
+     * }
+     */
+    public function listing(string $status = 'all', ?string $cursor = null): array
+    {
+        return $this->page($status, $cursor)[0];
+    }
+
+    /**
+     * One run, by its id, with its timeline (#264). `run` is null only when the backend answers
+     * and does not know the id: a backend that does not answer says so in `backend`, and a page
+     * must not present it as a run that does not exist.
+     *
+     * @return array{backend: array<string, mixed>, run: array<string, mixed>|null}
+     */
+    public function run(string $runId): array
+    {
+        [$backend, $catalog] = $this->backend();
+        $run = $catalog?->findRun($runId);
+
         return [
-            'backend' => [
-                'available' => true,
-                // The third state: it answers, and its answer is empty by construction because
-                // its journal does not survive the process. Empty is then the right answer, not a
-                // breakdown — and a surface needs to **read** it in order to say so.
-                'ephemeral' => $health->ephemeral,
-                'message' => $health->message,
-                'name' => $health->backend,
-                'checkedAt' => $health->checkedAt,
-            ],
+            'backend' => $backend,
+            'run' => null === $run ? null : $this->detail($catalog, $run),
+        ];
+    }
+
+    /**
+     * @return array{0: array{backend: array<string, mixed>, runs: list<array<string, mixed>>, kpis: array<string, int>, waitingForWorkerOnThisPage?: int, pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool}, status: string}, 1: WorkflowRunPage, 2: WorkflowRunCatalogInterface|null}
+     */
+    private function page(string $status, ?string $cursor): array
+    {
+        [$backend, $catalog] = $this->backend();
+        // A filter coming from a URL is an arbitrary string: ignoring it is worth more than
+        // refusing a page to someone who mistyped a link. A backend that does not answer is not
+        // asked for a page at all.
+        $page = $catalog?->listRuns(WorkflowRunStatus::tryFrom($status), $cursor, self::PAGE_SIZE) ?? new WorkflowRunPage([]);
+
+        return [[
+            'backend' => $backend,
             'runs' => array_map($this->describe(...), $page->runs),
             'kpis' => self::outcomeCounters($page->runs),
             'pagination' => [
@@ -118,14 +125,59 @@ final class RunDashboard
             // Not an outcome bucket: a subset of the running ones, over the same page (#447). Left
             // out when the backend cannot tell, since zero would claim that none waits.
             'waitingForWorkerOnThisPage' => \count(array_filter($page->runs, static fn(WorkflowRunDescription $run): bool => null !== $run->waitingForWorkerSince)),
-        ] : []) + [
-            'selectedRun' => null === $selected ? null : $this->describe($selected) + [
-                // The frieze is computed in the core, next to the facts it projects: grouping
-                // into actions, placing in time and telling the queue apart from the work are not
-                // the host's business, otherwise the same run reads differently from one surface
-                // to the next.
-                'timeline' => RunTimeline::of($this->catalog->readHistory($selected), $this->redactor),
-            ],
+        ] : []), $page, $catalog];
+    }
+
+    /**
+     * What the page says of the backend, and the catalog to read when, and only when, it answers.
+     *
+     * @return array{0: array<string, mixed>, 1: WorkflowRunCatalogInterface|null}
+     */
+    private function backend(): array
+    {
+        if (null === $this->catalog) {
+            return [[
+                'available' => false,
+                'message' => 'No readable durable backend is configured for this application.',
+            ], null];
+        }
+
+        // "A catalog is registered" and "the backend answers" are two distinct questions. Without
+        // this second one, a downed database would give an empty, serene page — the worse of the
+        // two possible errors, since the operator concludes there is nothing to see.
+        $health = $this->catalog->checkHealth();
+        if (!$health->reachable) {
+            return [[
+                'available' => false,
+                'message' => $health->message,
+                'name' => $health->backend,
+                'checkedAt' => $health->checkedAt,
+            ], null];
+        }
+
+        return [[
+            'available' => true,
+            // The third state: it answers, and its answer is empty by construction because its
+            // journal does not survive the process. Empty is then the right answer, not a
+            // breakdown — and a surface needs to **read** it in order to say so.
+            'ephemeral' => $health->ephemeral,
+            'message' => $health->message,
+            'name' => $health->backend,
+            'checkedAt' => $health->checkedAt,
+        ], $this->catalog];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function detail(WorkflowRunCatalogInterface $catalog, WorkflowRunDescription $run): array
+    {
+        return $this->describe($run) + [
+            // The frieze is computed in the core, next to the facts it projects: grouping into
+            // actions, placing in time and telling the queue apart from the work are not the
+            // host's business, otherwise the same run reads differently from one surface to the
+            // next.
+            'timeline' => RunTimeline::of($catalog->readHistory($run), $this->redactor),
         ];
     }
 
