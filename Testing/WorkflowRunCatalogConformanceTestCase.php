@@ -282,6 +282,15 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
+     * #558: a catalog under this suite filters, so it must say so. A surface reads this before
+     * offering the filter controls.
+     */
+    public function testACatalogThatFiltersSaysSo(): void
+    {
+        self::assertTrue($this->catalogUnderTest()->canFilterRuns());
+    }
+
+    /**
      * #264, #558: the runs of one workflow without paging until they show up. The whole name,
      * backslashes and case included: a FQCN is what most applications name a type.
      */

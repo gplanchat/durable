@@ -38,6 +38,14 @@ interface WorkflowRunCatalogInterface
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20, ?WorkflowRunFilter $filter = null): WorkflowRunPage;
 
     /**
+     * Whether {@see listRuns()} honours a {@see WorkflowRunFilter}. When it does not, a filter
+     * makes it throw {@see \Gplanchat\Durable\Exception\RunFilterUnavailableException}: a surface
+     * reads this first, and offers no filter controls. Temporal filters only once Durable writes
+     * its search attributes (#558).
+     */
+    public function canFilterRuns(): bool;
+
+    /**
      * One execution, by the id the application started it with, the `executionId` a description
      * carries (#514); `null` when the catalog has no such execution. On a backend that chains runs
      * under one execution (Temporal's continue-as-new), the current run of the chain.
