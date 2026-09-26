@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
+use Gplanchat\Durable\Observation\WorkflowRunFilter;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -278,6 +279,48 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame(['exec-done'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed)->runs));
         self::assertSame(['exec-failed'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Failed)->runs));
         self::assertSame([], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Cancelled)->runs));
+    }
+
+    /**
+     * #264, #558: the runs of one workflow without paging until they show up. The whole name,
+     * backslashes and case included: a FQCN is what most applications name a type.
+     */
+    public function testFilteringByWorkflowNameReturnsOnlyThatWorkflow(): void
+    {
+        $this->startRun('exec-order', 'App\\OrderWorkflow');
+        $this->startRun('exec-report', 'App\\ReportWorkflow');
+        $this->endRun('exec-report', WorkflowRunStatus::Completed);
+
+        $catalog = $this->catalogUnderTest();
+        $named = static fn(string $name): WorkflowRunFilter => new WorkflowRunFilter(workflowName: $name);
+
+        self::assertSame(['exec-order'], $this->idsOf($catalog->listRuns(filter: $named('App\\OrderWorkflow'))->runs));
+        self::assertSame(['exec-report'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $named('App\\ReportWorkflow'))->runs));
+        self::assertSame([], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $named('App\\OrderWorkflow'))->runs), 'both filters apply');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('App\\Order'))->runs), 'the whole name, not a part of it');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('app\\orderworkflow'))->runs), 'case counts');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('App\\"OrderWorkflow'))->runs), 'a quote is a character like any other');
+    }
+
+    /**
+     * #557: the runs whose execution id starts with what an operator typed, case included.
+     */
+    public function testFilteringByExecutionIdPrefixReturnsOnlyThoseRuns(): void
+    {
+        $this->startRun('ord-1', 'App\\OrderWorkflow');
+        $this->startRun('ord-2', 'App\\OrderWorkflow');
+        $this->startRun('rep-1', 'App\\ReportWorkflow');
+        $this->endRun('ord-2', WorkflowRunStatus::Completed);
+
+        $catalog = $this->catalogUnderTest();
+        $starting = static fn(string $prefix): WorkflowRunFilter => new WorkflowRunFilter(executionIdPrefix: $prefix);
+
+        self::assertSame(['ord-1', 'ord-2'], self::sorted($this->idsOf($catalog->listRuns(filter: $starting('ord-'))->runs)));
+        self::assertSame(['ord-2'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $starting('ord'))->runs), 'with the status');
+        self::assertSame(['rep-1'], $this->idsOf($catalog->listRuns(filter: new WorkflowRunFilter('App\\ReportWorkflow', 'r'))->runs), 'with the name');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $starting('ORD'))->runs), 'case counts');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $starting('rd-'))->runs), 'the start, not any part');
+        self::assertCount(3, $catalog->listRuns(filter: $starting(''))->runs, 'an empty prefix filters nothing');
     }
 
     public function testNoFilterListsEveryOutcomeTogether(): void

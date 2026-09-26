@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
+use Gplanchat\Durable\Observation\WorkflowRunFilter;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 
@@ -27,11 +28,14 @@ interface WorkflowRunCatalogInterface
      * A page of executions, from the most recently started to the oldest.
      *
      * @param WorkflowRunStatus|null $status `null` for every outcome
-     * @param string|null            $cursor `nextCursor` of a previous page, obtained from the
-     *                                       same catalog and with the same filter; `null` for the
-     *                                       first page
+     * @param string|null            $cursor       `nextCursor` of a previous page, obtained from
+     *                                             the same catalog and with the same filters;
+     *                                             `null` for the first page
+     * @param WorkflowRunFilter|null $filter       the workflow name and the execution-id prefix,
+     *                                             compared as the application wrote them, case
+     *                                             included (#558, #557); `null` for every run
      */
-    public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
+    public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20, ?WorkflowRunFilter $filter = null): WorkflowRunPage;
 
     /**
      * One execution, by the id the application started it with, the `executionId` a description

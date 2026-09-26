@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Store;
 use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\JournalRunHistoryReader;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
+use Gplanchat\Durable\Observation\WorkflowRunFilter;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
@@ -98,7 +99,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         $this->runs[$executionId]['endedAt'] = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
-    public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage
+    public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20, ?WorkflowRunFilter $filter = null): WorkflowRunPage
     {
         $ordered = array_reverse(array_keys($this->runs));
 
@@ -106,6 +107,16 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             $ordered = array_values(array_filter(
                 $ordered,
                 fn(string $runId): bool => $this->runs[$runId]['status'] === $status,
+            ));
+        }
+
+        $name = $filter?->workflowName;
+        $prefix = $filter?->executionIdPrefix;
+        if (null !== $name || null !== $prefix) {
+            $ordered = array_values(array_filter(
+                $ordered,
+                fn(string $runId): bool => (null === $name || $this->runs[$runId]['workflowType'] === $name)
+                    && (null === $prefix || str_starts_with($runId, $prefix)),
             ));
         }
 
