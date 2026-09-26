@@ -120,17 +120,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         $hasMore = \count($window) > $limit;
         $window = \array_slice($window, 0, $limit);
 
-        $runs = array_map(fn(string $runId): WorkflowRunDescription => new WorkflowRunDescription(
-            $runId,
-            $this->runs[$runId]['workflowType'],
-            $this->runs[$runId]['status'],
-            $this->runs[$runId]['startedAt'],
-            $this->runs[$runId]['endedAt'],
-            waitingForWorkerSince: WorkflowRunStatus::Running === $this->runs[$runId]['status'] && !$this->runs[$runId]['pickedUp']
-                ? $this->runs[$runId]['startedAt']
-                : null,
-            waitingOn: WorkflowRunStatus::Running === $this->runs[$runId]['status'] ? $this->runs[$runId]['waitingOn'] ?? null : null,
-        ), $window);
+        $runs = array_map($this->describe(...), $window);
 
         return new WorkflowRunPage($runs, $hasMore ? end($window) : null, tellsWaitingForWorker: true);
     }
@@ -154,6 +144,21 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             // to read that to decide what to display; saying it in the message was not enough,
             // and that is why two hosts out of three did not say it.
             ephemeral: true,
+        );
+    }
+
+    private function describe(string $runId): WorkflowRunDescription
+    {
+        return new WorkflowRunDescription(
+            $runId,
+            $this->runs[$runId]['workflowType'],
+            $this->runs[$runId]['status'],
+            $this->runs[$runId]['startedAt'],
+            $this->runs[$runId]['endedAt'],
+            waitingForWorkerSince: WorkflowRunStatus::Running === $this->runs[$runId]['status'] && !$this->runs[$runId]['pickedUp']
+                ? $this->runs[$runId]['startedAt']
+                : null,
+            waitingOn: WorkflowRunStatus::Running === $this->runs[$runId]['status'] ? $this->runs[$runId]['waitingOn'] ?? null : null,
         );
     }
 }
