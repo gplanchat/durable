@@ -43,7 +43,7 @@ final class RunDashboard
 
     /**
      * The list and one run, the run picked in the page or its first one: a single page that shows
-     * both.
+     * both. A host that renders them apart calls {@see listing()} and {@see run()}.
      *
      * @return array{
      *   backend: array<string, mixed>,
@@ -62,6 +62,41 @@ final class RunDashboard
 
         return $model + [
             'selectedRun' => null === $selected || null === $catalog ? null : $this->detail($catalog, $selected),
+        ];
+    }
+
+    /**
+     * The list alone: it reads no history (#264).
+     *
+     * @return array{
+     *   backend: array<string, mixed>,
+     *   runs: list<array<string, mixed>>,
+     *   kpis: array<string, int>,
+     *   waitingForWorkerOnThisPage?: int,
+     *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
+     *   status: string
+     * }
+     */
+    public function listing(string $status = 'all', ?string $cursor = null): array
+    {
+        return $this->page($status, $cursor)[0];
+    }
+
+    /**
+     * One run, by its id, with its timeline (#264). `run` is null only when the backend answers
+     * and does not know the id: a backend that does not answer says so in `backend`, and a page
+     * must not present it as a run that does not exist.
+     *
+     * @return array{backend: array<string, mixed>, run: array<string, mixed>|null}
+     */
+    public function run(string $runId): array
+    {
+        [$backend, $catalog] = $this->backend();
+        $run = $catalog?->findRun($runId);
+
+        return [
+            'backend' => $backend,
+            'run' => null === $run ? null : $this->detail($catalog, $run),
         ];
     }
 
