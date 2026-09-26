@@ -260,6 +260,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         foreach ($others as $successor) {
             self::assertNotSame($ended[0]->runId, $successor->runId, 'the successor is another run');
             self::assertSame($ended[0]->groupId, $successor->groupId, 'the successor belongs to the same group');
+            self::assertSame($ended[0]->executionId, $successor->executionId, 'one execution, two runs: the application\'s id carries over (#514)');
         }
     }
 
