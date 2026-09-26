@@ -323,6 +323,22 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertCount(3, $catalog->listRuns(filter: $starting(''))->runs, 'an empty prefix filters nothing');
     }
 
+    /**
+     * #557: a SQL LIKE reads `%` and `_` as wildcards, and a prefix is not a pattern.
+     */
+    public function testAPrefixTakesEveryCharacterLiterally(): void
+    {
+        foreach (['p%1', 'p_1', 'pq1', 'e!1', 'eq1'] as $executionId) {
+            $this->startRun($executionId, 'App\\OrderWorkflow');
+        }
+
+        $catalog = $this->catalogUnderTest();
+
+        foreach (['p%' => ['p%1'], 'p_' => ['p_1'], 'e!' => ['e!1']] as $prefix => $expected) {
+            self::assertSame($expected, $this->idsOf($catalog->listRuns(filter: new WorkflowRunFilter(executionIdPrefix: $prefix))->runs), $prefix);
+        }
+    }
+
     public function testNoFilterListsEveryOutcomeTogether(): void
     {
         $this->startRun('exec-running', 'App\\OrderWorkflow');
