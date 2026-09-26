@@ -283,6 +283,24 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
+     * Whether the catalog under test must filter runs. True by default: a catalog that cannot, as
+     * Temporal without its search attributes (#558), overrides this to say so.
+     */
+    protected function expectsToFilterRuns(): bool
+    {
+        return true;
+    }
+
+    /**
+     * A surface reads the capability before offering filter controls: a catalog that filters and
+     * says it cannot hides them for nothing, and one that says it can but cannot breaks them.
+     */
+    public function testACatalogSaysWhetherItFilters(): void
+    {
+        self::assertSame($this->expectsToFilterRuns(), $this->catalogUnderTest()->canFilterRuns());
+    }
+
+    /**
      * #558: a catalog that says it cannot filter refuses a filter, before any backend call, rather
      * than answering an unfiltered page or an empty one. The filter cases below go through here:
      * they check the results where the catalog filters, and the refusal where it does not.
