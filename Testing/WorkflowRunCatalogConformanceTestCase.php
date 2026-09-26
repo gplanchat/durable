@@ -121,6 +121,35 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame(WorkflowRunStatus::Running, $runs[0]->status);
     }
 
+    /**
+     * A run has an address (#264): the id the list gave it finds it again, with the facts the list
+     * gave, and without paging until it shows up.
+     */
+    public function testARunTheListShowsIsFoundByTheIdTheListGaveIt(): void
+    {
+        $this->dispatchRun('exec-1', 'App\\OrderWorkflow');
+        $this->startRun('exec-2', 'App\\OrderWorkflow');
+        if ($this->canTellAWait()) {
+            $this->recordWait('exec-2', 'activity charge attempt 1 in flight');
+        }
+        $this->startRun('exec-3', 'App\\OrderWorkflow');
+        $this->endRun('exec-3', WorkflowRunStatus::Completed);
+
+        $listed = $this->catalogUnderTest()->listRuns()->runs;
+
+        self::assertCount(3, $listed);
+        foreach ($listed as $run) {
+            self::assertEquals($run, $this->catalogUnderTest()->findRun($run->runId), $this->executionIdOf($run) . ' is found as it is listed');
+        }
+    }
+
+    public function testAnUnknownRunIsNotFound(): void
+    {
+        $this->startRun('exec-1', 'App\\OrderWorkflow');
+
+        self::assertNull($this->catalogUnderTest()->findRun('exec-nobody'));
+    }
+
     public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
     {
         $this->dispatchRun('waiting', 'App\\OrderWorkflow');

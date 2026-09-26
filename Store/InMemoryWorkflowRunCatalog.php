@@ -125,6 +125,11 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         return new WorkflowRunPage($runs, $hasMore ? end($window) : null, tellsWaitingForWorker: true);
     }
 
+    public function findRun(string $runId): ?WorkflowRunDescription
+    {
+        return isset($this->runs[$runId]) ? $this->describe($runId) : null;
+    }
+
     public function readHistory(WorkflowRunDescription $run): array
     {
         return (new JournalRunHistoryReader($this->events))->read($run->runId, $run->workflowName);
