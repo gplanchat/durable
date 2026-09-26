@@ -34,12 +34,9 @@ interface WorkflowRunCatalogInterface
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20): WorkflowRunPage;
 
     /**
-     * One execution, by the id a description of it carries in `runId`; `null` when the catalog has
-     * no such execution.
-     *
-     * On every catalog but Temporal's, that id is the execution id the application started the run
-     * with. On Temporal it is still the server's run id until #514 settles which id names a run.
-     * The parameter is already named for where it is going.
+     * One execution, by the id the application started it with, the `executionId` a description
+     * carries (#514); `null` when the catalog has no such execution. On a backend that chains runs
+     * under one execution (Temporal's continue-as-new), the current run of the chain.
      *
      * A run page links to a run by this id alone (#264): no cursor, no filter, no page. Paging
      * {@see listRuns()} until the id shows up would make an old run unreachable.

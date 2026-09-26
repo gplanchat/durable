@@ -136,7 +136,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertCount(3, $listed);
         foreach ($listed as $run) {
-            self::assertEquals($run, $this->catalogUnderTest()->findRun($run->runId), $this->executionIdOf($run) . ' is found as it is listed');
+            self::assertEquals($run, $this->catalogUnderTest()->findRun($run->executionId), $this->executionIdOf($run) . ' is found as it is listed');
         }
     }
 
