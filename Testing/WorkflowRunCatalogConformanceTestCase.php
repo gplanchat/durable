@@ -148,6 +148,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         $this->startRun('exec-1', 'App\\OrderWorkflow');
 
         self::assertNull($this->catalogUnderTest()->findRun('exec-nobody'));
+        self::assertNull($this->catalogUnderTest()->findRun('0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b'), 'an id shaped like a run id, known to nobody');
     }
 
     public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
