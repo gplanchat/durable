@@ -21,9 +21,16 @@ namespace Gplanchat\Durable\Observation;
  *
  * `waitingOn` is what a running execution last suspended on: a condition, a timer and its deadline,
  * an activity and its attempt (#324). Absent on an ended run and on a backend that cannot tell.
+ *
+ * `executionId` is the id the application started the execution with, the one a log line, an
+ * exception or `durable:execution:diagnose` names (#514). `runId` stays the backend's own: the same
+ * on a backend where one execution is one run, a UUID per run on Temporal, whose workflow id is a
+ * sanitised form of the execution id that cannot be read back. It defaults to `runId`.
  */
 final readonly class WorkflowRunDescription
 {
+    public string $executionId;
+
     public function __construct(
         public string $runId,
         public string $workflowName,
@@ -33,5 +40,8 @@ final readonly class WorkflowRunDescription
         public ?string $groupId = null,
         public ?\DateTimeImmutable $waitingForWorkerSince = null,
         public ?string $waitingOn = null,
-    ) {}
+        ?string $executionId = null,
+    ) {
+        $this->executionId = $executionId ?? $runId;
+    }
 }

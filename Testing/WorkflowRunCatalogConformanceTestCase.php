@@ -87,15 +87,12 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     protected function recordWait(string $executionId, ?string $waitingOn): void {}
 
     /**
-     * The execution id a description reports, the one {@see startRun()} was given. By default the
-     * run id, as on a backend where one execution is one run. A backend that gives each run an id of
-     * its own and keeps the execution id as the grouping (Temporal, DUR037) returns `groupId`.
-     *
-     * @see DUR037
+     * The execution id a description reports, the one {@see startRun()} was given: `executionId`,
+     * on every backend since #514. Kept for the subclasses that override it.
      */
     protected function executionIdOf(WorkflowRunDescription $run): string
     {
-        return $run->runId;
+        return $run->executionId;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -149,6 +146,17 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertNull($this->catalogUnderTest()->findRun('exec-nobody'));
         self::assertNull($this->catalogUnderTest()->findRun('0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b'), 'an id shaped like a run id, known to nobody');
+    }
+
+    /**
+     * #514: every catalog reports the id the application started the run with, whatever id the
+     * backend gives the run itself. That is the id a log line, an exception or `diagnose` names.
+     */
+    public function testARunCarriesTheIdTheApplicationStartedItWith(): void
+    {
+        $this->startRun('exec-1', 'App\\OrderWorkflow');
+
+        self::assertSame(['exec-1'], array_map(static fn(WorkflowRunDescription $run): string => $run->executionId, $this->catalogUnderTest()->listRuns()->runs));
     }
 
     public function testARunNobodyPickedUpSaysSinceWhenAndNoOtherRunDoes(): void
