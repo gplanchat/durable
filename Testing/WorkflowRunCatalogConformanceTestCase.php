@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Exception\RunFilterUnavailableException;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
 use Gplanchat\Durable\Observation\WorkflowRunFilter;
@@ -282,12 +283,27 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
-     * #558: a catalog under this suite filters, so it must say so. A surface reads this before
-     * offering the filter controls.
+     * #558: a catalog that says it cannot filter refuses a filter, before any backend call, rather
+     * than answering an unfiltered page or an empty one. The filter cases below go through here:
+     * they check the results where the catalog filters, and the refusal where it does not.
      */
-    public function testACatalogThatFiltersSaysSo(): void
+    private function refusesFilters(): bool
     {
-        self::assertTrue($this->catalogUnderTest()->canFilterRuns());
+        $catalog = $this->catalogUnderTest();
+        if ($catalog->canFilterRuns()) {
+            return false;
+        }
+
+        foreach ([new WorkflowRunFilter(workflowName: 'App\\OrderWorkflow'), new WorkflowRunFilter(executionIdPrefix: 'ord')] as $filter) {
+            try {
+                $catalog->listRuns(filter: $filter);
+                self::fail('a catalog that cannot filter must refuse a filter');
+            } catch (RunFilterUnavailableException) {
+            }
+        }
+        self::assertCount(0, $catalog->listRuns(filter: new WorkflowRunFilter('', ''))->runs, 'an empty filter is no filter');
+
+        return true;
     }
 
     /**
@@ -296,6 +312,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testFilteringByWorkflowNameReturnsOnlyThatWorkflow(): void
     {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
         $this->startRun('exec-order', 'App\\OrderWorkflow');
         $this->startRun('exec-report', 'App\\ReportWorkflow');
         $this->endRun('exec-report', WorkflowRunStatus::Completed);
@@ -316,6 +336,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testFilteringByExecutionIdPrefixReturnsOnlyThoseRuns(): void
     {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
         $this->startRun('ord-1', 'App\\OrderWorkflow');
         $this->startRun('ord-2', 'App\\OrderWorkflow');
         $this->startRun('rep-1', 'App\\ReportWorkflow');
@@ -337,6 +361,10 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testAPrefixTakesEveryCharacterLiterally(): void
     {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
         foreach (['p%1', 'p_1', 'pq1', 'e!1', 'eq1'] as $executionId) {
             $this->startRun($executionId, 'App\\OrderWorkflow');
         }
