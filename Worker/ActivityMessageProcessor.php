@@ -12,6 +12,7 @@ use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
+use Gplanchat\Durable\Exception\ActivityAttemptDeferred;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\ActivityAttemptClaimInterface;
@@ -50,10 +51,11 @@ final class ActivityMessageProcessor
      */
     public function process(ActivityMessage $message): ?\Throwable
     {
-        // A copy of an attempt another worker is running: that worker journals it (#590).
+        // A copy of an attempt another worker holds: not now, and not never, since a holder that
+        // died keeps its claim until the lock TTL. The host delivers it again later (#590).
         $release = $this->attemptClaim->claim($message->executionId, $message->activityId, $message->attempt);
         if (null === $release) {
-            return null;
+            throw new ActivityAttemptDeferred($message->executionId, $message->activityId, $message->attempt);
         }
 
         try {
