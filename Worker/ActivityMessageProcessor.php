@@ -47,13 +47,20 @@ final class ActivityMessageProcessor
     public function process(ActivityMessage $message): ?\Throwable
     {
         // A redelivery of an attempt that already ran is answered by the journal, not run again:
-        // re-running a failed attempt would also queue its retry a second time (#319).
+        // re-running a failed attempt would also queue its retry a second time (#319). An outcome
+        // was followed by a resume, which may be the very send that failed and caused this
+        // redelivery: it goes again, resumes being at-least-once (#328).
         if (null !== ActivityEventJournal::settledOutcomeForDelivery(
             $this->eventStore,
             $message->executionId,
             $message->activityId,
             $message->attempt,
-        ) || ActivityEventJournal::hasActivityTaskFailedForAttempt(
+        )) {
+            $this->resumeDispatcher->dispatchResume($message->executionId);
+
+            return null;
+        }
+        if (ActivityEventJournal::hasActivityTaskFailedForAttempt(
             $this->eventStore,
             $message->executionId,
             $message->activityId,
@@ -81,9 +88,14 @@ final class ActivityMessageProcessor
         }
 
         $timedOut = false;
+        // Once the attempt has its outcome, what follows (journalling it, sending the resume) is not
+        // the activity's doing: an error there fails the message, which is redelivered, rather than
+        // the attempt, which succeeded (#328).
+        $settled = false;
 
         try {
             if (true === $this->heartbeatSender->isCancellationRequested()) {
+                $settled = true;
                 $this->appendActivityCancelled($message, 'cancellation_requested');
 
                 return null;
@@ -114,6 +126,7 @@ final class ActivityMessageProcessor
                     false,
                     null,
                 );
+                $settled = true;
                 $this->appendActivityCancelled($message, 'cancellation_requested');
 
                 return null;
@@ -138,6 +151,7 @@ final class ActivityMessageProcessor
             // One event on success (#262): the attempt's result is the settled result, and a second
             // `ActivityTaskCompleted` with the same body only doubled the timeline row. Failures keep
             // the split, one `ActivityTaskFailed` per attempt for one outcome.
+            $settled = true;
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -145,6 +159,9 @@ final class ActivityMessageProcessor
             ));
             $this->resumeDispatcher->dispatchResume($message->executionId);
         } catch (\Throwable $e) {
+            if ($settled) {
+                throw $e;
+            }
             if (isset($t0)) {
                 $duration = microtime(true) - $t0;
                 $this->workflowExecutionObserver?->onActivityExecuted(
