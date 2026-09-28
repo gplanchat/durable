@@ -100,18 +100,18 @@ interface WorkflowHistorySourceInterface
      *
      * The same separation already exists on this port for timers, where
      * {@see findScheduledTimerId()} answers the state and {@see findTimerSlotResult()} the value,
-     * and for activities, child workflows and Nexus operations, whose three sibling methods wrap
-     * their result in an `array{result: mixed, ...}` for exactly this reason.
+     * and for activities, child workflows and Nexus operations, whose sibling methods wrap their
+     * result in a value object for exactly this reason.
      */
     public function hasSideEffectForSlot(int $slot): bool;
 
     /**
-     * Returns the recorded side effect result at slot N.
+     * Returns the recorded side effect at slot N, or null if nothing was recorded there.
      *
-     * Returns `null` both for a slot that recorded `null` and for a slot that recorded nothing;
-     * callers deciding whether to run a closure MUST ask {@see hasSideEffectForSlot()} first.
+     * A recorded `null` comes back as a {@see History\SideEffectOutcome} whose `result` is null:
+     * the wrapper is what tells it apart from an empty slot, as for its siblings.
      */
-    public function findSideEffectForSlot(int $slot): mixed;
+    public function findSideEffectForSlot(int $slot): ?History\SideEffectOutcome;
 
     /**
      * Returns the recorded result for child workflow slot N, or null if not yet completed.

@@ -30,6 +30,7 @@ use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
+use Gplanchat\Durable\Port\History\SideEffectOutcome;
 use Gplanchat\Durable\Port\History\SlotOutcome;
 use Gplanchat\Durable\Port\History\TimerOutcome;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
@@ -311,13 +312,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return false;
     }
 
-    public function findSideEffectForSlot(int $slot): mixed
+    public function findSideEffectForSlot(int $slot): ?SideEffectOutcome
     {
         $index = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof SideEffectRecorded) {
                 if ($index === $slot) {
-                    return $event->result();
+                    return new SideEffectOutcome($event->result());
                 }
                 ++$index;
             }

@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Testing;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
+use Gplanchat\Durable\Port\History\SideEffectOutcome;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -75,8 +76,9 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
 
         // Side effects carry a `mixed`: that is where a JSON round trip distorts.
-        self::assertSame($fromReference->findSideEffectForSlot(0), $fromSubject->findSideEffectForSlot(0));
-        self::assertSame($fromReference->findSideEffectForSlot(1), $fromSubject->findSideEffectForSlot(1));
+        self::assertInstanceOf(SideEffectOutcome::class, $fromSubject->findSideEffectForSlot(0));
+        self::assertSame($fromReference->findSideEffectForSlot(0)?->result, $fromSubject->findSideEffectForSlot(0)->result);
+        self::assertSame($fromReference->findSideEffectForSlot(1)?->result, $fromSubject->findSideEffectForSlot(1)?->result);
 
         self::assertNotNull($fromSubject->findScheduledTimerId(0), 'the timer must be read back from the store');
     }

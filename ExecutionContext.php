@@ -528,8 +528,9 @@ final class ExecutionContext
 
         // The slot's presence, never the value it carries: a closure returning `null` did run, and
         // reading it back is exactly what `sideEffect()` promises.
-        if ($this->historySource->hasSideEffectForSlot($slotIndex)) {
-            $deferred->resolve($this->historySource->findSideEffectForSlot($slotIndex));
+        $recorded = $this->historySource->findSideEffectForSlot($slotIndex);
+        if (null !== $recorded) {
+            $deferred->resolve($recorded->result);
 
             return $deferred->awaitable();
         }
