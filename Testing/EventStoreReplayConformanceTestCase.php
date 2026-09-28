@@ -27,9 +27,9 @@ use Gplanchat\Durable\WorkflowRegistry;
  *
  * Temporal is such a server. Its history source, {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory},
  * replays this tier in the root integration suite: `TemporalHistoryReplayConformanceTest` runs
- * {@see ConformanceWorkflow} on a server and on the reference, and compares every lookup of the
+ * {@see ConformanceWorkflow} on a server and on the reference, and compares the lookups of the
  * history port (#326). {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore}
- * still runs no tier (#331, #333).
+ * still runs no tier (#326).
  *
  * The reference, for its part, does not extend this class: a store is not diffed against itself.
  *
