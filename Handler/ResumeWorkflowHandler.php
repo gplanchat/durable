@@ -16,7 +16,6 @@ use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
-use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
@@ -60,11 +59,10 @@ final class ResumeWorkflowHandler
             return;
         }
 
-        // Sent before the outcome it announces (DUR050): until that outcome is journalled, this
+        // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this
         // resume concludes nothing, and the transport's retry is the wait.
-        if (null !== $message->awaitedActivityId
-            && !ActivityEventJournal::hasTerminalOutcomeForActivity($this->eventStore, $executionId, $message->awaitedActivityId)) {
-            throw new ResumeArrivedBeforeItsOutcome($executionId, $message->awaitedActivityId);
+        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $executionId)) {
+            throw new ResumeArrivedBeforeItsOutcome($executionId, $message->awaited);
         }
 
         // A worker has the run now (#447). Recorded here rather than on ExecutionStarted: resume()
