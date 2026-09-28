@@ -190,10 +190,8 @@ interface WorkflowHistorySourceInterface
      * Where the workflow's cancellation was raised inside the workflow, or null while it has not
      * been. `targets` are the operations withdrawn there, empty when the workflow was waiting on
      * a condition. `position` is comparable with {@see messageAt()} positions.
-     *
-     * @return array{position: int, targets: list<string>}|null
      */
-    public function cancellationDelivery(): ?array;
+    public function cancellationDelivery(): ?History\CancellationDelivery;
 
     /**
      * Returns whether the given child execution ID has already been scheduled (for reuse policy checks).

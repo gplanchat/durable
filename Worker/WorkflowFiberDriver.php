@@ -83,7 +83,7 @@ final class WorkflowFiberDriver
                 // A delivery recorded on a condition withdrew nothing the journal could reject: it is
                 // raised again here, where the replay reaches the same await, and not recorded twice.
                 $recorded = $cancellationDelivered ? null : $context->cancellationDelivery();
-                $replayedOnCondition = null !== $recorded && [] === $recorded['targets'];
+                $replayedOnCondition = null !== $recorded && [] === $recorded->targets;
                 if (!$cancellationDelivered && ($replayedOnCondition || $this->lifecycle->isCancellationPending($executionId))) {
                     $cancellationDelivered = true;
                     $context->markCancellationRaised();

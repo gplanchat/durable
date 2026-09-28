@@ -23,6 +23,7 @@ use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
+use Gplanchat\Durable\Port\History\CancellationDelivery;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
@@ -716,10 +717,7 @@ final class ExecutionContext
         return $this->historySource->timerCompletionPosition($timerId);
     }
 
-    /**
-     * @return array{position: int, targets: list<string>}|null
-     */
-    public function cancellationDelivery(): ?array
+    public function cancellationDelivery(): ?CancellationDelivery
     {
         return $this->historySource->cancellationDelivery();
     }
@@ -749,7 +747,7 @@ final class ExecutionContext
     {
         $delivery = $this->cancellationRaised ? null : $this->historySource->cancellationDelivery();
 
-        return null !== $delivery && [] === $delivery['targets'] ? $delivery['position'] : null;
+        return null !== $delivery && [] === $delivery->targets ? $delivery->position : null;
     }
 
     /**

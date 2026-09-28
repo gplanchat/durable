@@ -29,6 +29,7 @@ use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Port\History\CancellationDelivery;
 use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
 use Gplanchat\Durable\Port\History\RecordedMessage;
 use Gplanchat\Durable\Port\History\SideEffectOutcome;
@@ -415,12 +416,12 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function cancellationDelivery(): ?array
+    public function cancellationDelivery(): ?CancellationDelivery
     {
         $position = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof WorkflowCancellationDelivered) {
-                return ['position' => $position, 'targets' => $event->targets()];
+                return new CancellationDelivery($position, $event->targets());
             }
             ++$position;
         }
