@@ -52,6 +52,7 @@ final class RunDashboard
      *   waitingForWorkerOnThisPage?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
      *   status: string,
+     *   filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null},
      *   selectedRun: array<string, mixed>|null
      * }
      */
@@ -66,7 +67,8 @@ final class RunDashboard
     }
 
     /**
-     * The list alone: it reads no history (#264).
+     * The list alone: it reads no history (#264). The filter applies only where the catalog can
+     * apply it (#558); `filters.available` says whether it could.
      *
      * @return array{
      *   backend: array<string, mixed>,
@@ -74,12 +76,13 @@ final class RunDashboard
      *   kpis: array<string, int>,
      *   waitingForWorkerOnThisPage?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
-     *   status: string
+     *   status: string,
+     *   filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null}
      * }
      */
-    public function listing(string $status = 'all', ?string $cursor = null): array
+    public function listing(string $status = 'all', ?string $cursor = null, ?WorkflowRunFilter $filter = null): array
     {
-        return $this->page($status, $cursor)[0];
+        return $this->page($status, $cursor, $filter)[0];
     }
 
     /**
@@ -101,15 +104,19 @@ final class RunDashboard
     }
 
     /**
-     * @return array{0: array{backend: array<string, mixed>, runs: list<array<string, mixed>>, kpis: array<string, int>, waitingForWorkerOnThisPage?: int, pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool}, status: string}, 1: WorkflowRunPage, 2: WorkflowRunCatalogInterface|null}
+     * @return array{0: array{backend: array<string, mixed>, runs: list<array<string, mixed>>, kpis: array<string, int>, waitingForWorkerOnThisPage?: int, pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool}, status: string, filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null}}, 1: WorkflowRunPage, 2: WorkflowRunCatalogInterface|null}
      */
-    private function page(string $status, ?string $cursor): array
+    private function page(string $status, ?string $cursor, ?WorkflowRunFilter $filter = null): array
     {
         [$backend, $catalog] = $this->backend();
+        // A catalog that cannot filter would refuse the filter (#558): it lists every run instead,
+        // and the page says the filters are unavailable rather than failing.
+        $filterable = null !== $catalog && $catalog->canFilterRuns();
+        $filter = $filterable ? $filter : null;
         // A filter coming from a URL is an arbitrary string: ignoring it is worth more than
         // refusing a page to someone who mistyped a link. A backend that does not answer is not
         // asked for a page at all.
-        $page = $catalog?->listRuns(WorkflowRunStatus::tryFrom($status), $cursor, self::PAGE_SIZE) ?? new WorkflowRunPage([]);
+        $page = $catalog?->listRuns(WorkflowRunStatus::tryFrom($status), $cursor, self::PAGE_SIZE, $filter) ?? new WorkflowRunPage([]);
 
         return [[
             'backend' => $backend,
@@ -121,6 +128,11 @@ final class RunDashboard
                 'hasNext' => null !== $page->nextCursor,
             ],
             'status' => $status,
+            'filters' => [
+                'available' => $filterable,
+                'workflowName' => $filter?->workflowName,
+                'executionIdPrefix' => $filter?->executionIdPrefix,
+            ],
         ] + ($page->tellsWaitingForWorker ? [
             // Not an outcome bucket: a subset of the running ones, over the same page (#447). Left
             // out when the backend cannot tell, since zero would claim that none waits.
