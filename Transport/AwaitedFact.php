@@ -21,12 +21,22 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 final readonly class AwaitedFact
 {
     /**
-     * @param non-empty-list<string> $ids
+     * Public so that a denormalizer can rebuild the fact: a transport configured with the Symfony
+     * Serializer carries the message as JSON (#627). In code, prefer the named factories below.
+     *
+     * @param non-empty-list<string> $ids one id for an activity, a child or a signal; one per
+     *        timer for timers
+     *
+     * @throws \InvalidArgumentException when a kind other than timers is given more than one id
      */
-    private function __construct(
+    public function __construct(
         public AwaitedFactKind $kind,
         public array $ids,
-    ) {}
+    ) {
+        if (AwaitedFactKind::Timer !== $kind && 1 !== \count($ids)) {
+            throw new \InvalidArgumentException(\sprintf('An awaited %s has exactly one id, got %d.', $kind->value, \count($ids)));
+        }
+    }
 
     public static function activity(string $activityId): self
     {
