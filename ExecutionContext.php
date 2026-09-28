@@ -589,10 +589,10 @@ final class ExecutionContext
         $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replay) {
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
 
             return $deferred->awaitable();
@@ -631,7 +631,7 @@ final class ExecutionContext
             $this->buffer()->failChildWorkflow($childExecutionId, $e);
             // Read back from the journal when it holds the failure already, so the pass rejects
             // with the exception the replay will build: same kind, class, and no previous (#318).
-            $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)['failed'] ?? new DurableChildWorkflowFailedException(
+            $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)->failed ?? new DurableChildWorkflowFailedException(
                 $childExecutionId,
                 $e->getMessage(),
                 (int) $e->getCode(),

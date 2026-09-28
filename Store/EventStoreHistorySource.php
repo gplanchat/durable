@@ -29,6 +29,7 @@ use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
 use Gplanchat\Durable\Port\History\SlotOutcome;
 use Gplanchat\Durable\Port\History\TimerOutcome;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
@@ -325,7 +326,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findChildWorkflowForSlot(int $slot): ?array
+    public function findChildWorkflowForSlot(int $slot): ?ChildWorkflowOutcome
     {
         $scheduledIds = [];
         foreach ($this->events() as $event) {
@@ -341,22 +342,18 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
 
         foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId() === $childId) {
-                return ['childExecutionId' => $childId, 'result' => $event->result(), 'failed' => null];
+                return new ChildWorkflowOutcome($childId, $event->result());
             }
             if ($event instanceof ChildWorkflowFailed && $event->childExecutionId() === $childId) {
-                return [
-                    'childExecutionId' => $childId,
-                    'result' => null,
-                    'failed' => new DurableChildWorkflowFailedException(
-                        $childId,
-                        $event->failureMessage(),
-                        $event->failureCode(),
-                        null,
-                        $event->workflowFailureKind(),
-                        $event->workflowFailureClass(),
-                        $event->workflowFailureContext(),
-                    ),
-                ];
+                return new ChildWorkflowOutcome($childId, null, new DurableChildWorkflowFailedException(
+                    $childId,
+                    $event->failureMessage(),
+                    $event->failureCode(),
+                    null,
+                    $event->workflowFailureKind(),
+                    $event->workflowFailureClass(),
+                    $event->workflowFailureContext(),
+                ));
             }
         }
 

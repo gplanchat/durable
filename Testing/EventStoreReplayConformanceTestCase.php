@@ -211,7 +211,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $childId = $fromSubject->findScheduledChildExecutionId(0);
         self::assertNotNull($childId);
         self::assertSame($fromReference->childWorkflowInputForSlot(0), $fromSubject->childWorkflowInputForSlot(0));
-        self::assertSame($fromReference->findChildWorkflowForSlot(0)['result'] ?? null, $fromSubject->findChildWorkflowForSlot(0)['result'] ?? null);
+        self::assertSame($fromReference->findChildWorkflowForSlot(0)?->result, $fromSubject->findChildWorkflowForSlot(0)?->result);
         self::assertSame($fromReference->hasChildExecutionId($referenceChild), $fromSubject->hasChildExecutionId($childId));
         self::assertSame(
             $fromReference->hasChildExecutionCompletedSuccessfully($referenceChild),

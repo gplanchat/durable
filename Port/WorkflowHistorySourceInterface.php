@@ -115,10 +115,8 @@ interface WorkflowHistorySourceInterface
 
     /**
      * Returns the recorded result for child workflow slot N, or null if not yet completed.
-     *
-     * @return array{childExecutionId: string, result: mixed, failed: \Throwable|null}|null
      */
-    public function findChildWorkflowForSlot(int $slot): ?array;
+    public function findChildWorkflowForSlot(int $slot): ?History\ChildWorkflowOutcome;
 
     /**
      * Returns the child execution ID scheduled at slot N, or null.
