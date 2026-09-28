@@ -21,10 +21,12 @@ use Gplanchat\Durable\Port\NoActivityAttemptClaim;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\SystemClock;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\NoopActivityTransport;
+use Psr\Clock\ClockInterface;
 
 /**
  * Processes an {@see ActivityMessage}: timeouts, execution, journal, workflow resume, retry.
@@ -34,6 +36,8 @@ use Gplanchat\Durable\Transport\NoopActivityTransport;
  */
 final class ActivityMessageProcessor
 {
+    private readonly ClockInterface $clock;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -43,7 +47,10 @@ final class ActivityMessageProcessor
         private readonly int $maxRetries = 0,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
         private readonly ActivityAttemptClaimInterface $attemptClaim = new NoActivityAttemptClaim(),
-    ) {}
+        ?ClockInterface $clock = null,
+    ) {
+        $this->clock = $clock ?? new SystemClock();
+    }
 
     /**
      * @return \Throwable|null the failure that ended the activity because it is declared
@@ -100,7 +107,7 @@ final class ActivityMessageProcessor
         }
 
         $options = $message->options;
-        $now = microtime(true);
+        $now = (float) $this->clock->now()->format('U.u');
         $firstQueued = $message->firstQueuedAt;
 
         if (null !== $options && null !== $firstQueued) {
@@ -144,10 +151,12 @@ final class ActivityMessageProcessor
                     $message->attempt,
                 ));
             }
-            $t0 = microtime(true);
+            // A length, not an instant: measured on the monotonic timer, which a clock handed by a
+            // harness (frozen, or skipping to the next timer) would stop or jump.
+            $t0 = hrtime(true);
             $result = $this->activityExecutor->execute($message->activityName, $message->payload);
             if (true === $this->heartbeatSender->isCancellationRequested()) {
-                $duration = microtime(true) - $t0;
+                $duration = self::secondsSince($t0);
                 $this->workflowExecutionObserver?->onActivityExecuted(
                     $message->executionId,
                     $message->activityId,
@@ -164,12 +173,12 @@ final class ActivityMessageProcessor
             // Measured after the fact, not enforced with a PHP time limit: that one counts CPU
             // time only, so a stalled call never trips it, and when it does trip it kills the
             // worker before anything is journalled. Stopping a runaway attempt is the host's job.
-            if ($options?->timeouts->startToClose?->hasElapsedSince($t0, microtime(true))) {
+            if ($options?->timeouts->startToClose?->hasElapsedSince(0.0, self::secondsSince($t0))) {
                 $timedOut = true;
 
                 throw new \RuntimeException('Activity start-to-close timeout exceeded.');
             }
-            $duration = microtime(true) - $t0;
+            $duration = self::secondsSince($t0);
             $this->workflowExecutionObserver?->onActivityExecuted(
                 $message->executionId,
                 $message->activityId,
@@ -196,7 +205,7 @@ final class ActivityMessageProcessor
                 throw $e;
             }
             if (isset($t0)) {
-                $duration = microtime(true) - $t0;
+                $duration = self::secondsSince($t0);
                 $this->workflowExecutionObserver?->onActivityExecuted(
                     $message->executionId,
                     $message->activityId,
@@ -288,5 +297,10 @@ final class ActivityMessageProcessor
             $reason,
         ));
         $this->resumeDispatcher->dispatchResume($message->executionId);
+    }
+
+    private static function secondsSince(int|float $t0): float
+    {
+        return (hrtime(true) - $t0) / 1e9;
     }
 }
