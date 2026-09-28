@@ -29,7 +29,7 @@ use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */
-final class ProjectingEventStore implements EventStoreInterface
+final class ProjectingEventStore implements FencedEventStoreInterface
 {
     public function __construct(
         private readonly EventStoreInterface $inner,
@@ -39,7 +39,30 @@ final class ProjectingEventStore implements EventStoreInterface
     public function append(Event $event): void
     {
         $this->inner->append($event);
+        $this->project($event);
+    }
 
+    /** Forwarded to a store that fences; over one that cannot, a fence that fences nothing (DUR053). */
+    public function claimPass(string $executionId): PassFence
+    {
+        return $this->inner instanceof FencedEventStoreInterface
+            ? $this->inner->claimPass($executionId)
+            : PassFence::none($executionId);
+    }
+
+    public function appendFenced(Event $event, PassFence $fence): void
+    {
+        // A refused append throws before anything is projected.
+        if ($this->inner instanceof FencedEventStoreInterface) {
+            $this->inner->appendFenced($event, $fence);
+        } else {
+            $this->inner->append($event);
+        }
+        $this->project($event);
+    }
+
+    private function project(Event $event): void
+    {
         // A worker appends ExecutionStarted when it picks the run up. Except for a continued run: the
         // worker that ended its predecessor writes its start, and its pickup is recorded when a worker
         // takes its message (#322, #447).
