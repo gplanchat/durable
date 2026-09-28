@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Exception\RunFilterUnavailableException;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
+use Gplanchat\Durable\Observation\WorkflowRunFilter;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -280,6 +282,138 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertSame([], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Cancelled)->runs));
     }
 
+    /**
+     * Whether the catalog under test must filter runs. True by default: a catalog that cannot, as
+     * Temporal without its search attributes (#558), overrides this to say so.
+     */
+    protected function expectsToFilterRuns(): bool
+    {
+        return true;
+    }
+
+    /**
+     * A surface reads the capability before offering filter controls: a catalog that filters and
+     * says it cannot hides them for nothing, and one that says it can but cannot breaks them.
+     */
+    public function testACatalogSaysWhetherItFilters(): void
+    {
+        self::assertSame($this->expectsToFilterRuns(), $this->catalogUnderTest()->canFilterRuns());
+    }
+
+    /**
+     * #558: a catalog that says it cannot filter refuses a filter, before any backend call, rather
+     * than answering an unfiltered page or an empty one. The filter cases below go through here:
+     * they check the results where the catalog filters, and the refusal where it does not.
+     */
+    private function refusesFilters(): bool
+    {
+        $catalog = $this->catalogUnderTest();
+        if ($catalog->canFilterRuns()) {
+            return false;
+        }
+
+        foreach ([new WorkflowRunFilter(workflowName: 'App\\OrderWorkflow'), new WorkflowRunFilter(executionIdPrefix: 'ord')] as $filter) {
+            try {
+                $catalog->listRuns(filter: $filter);
+                self::fail('a catalog that cannot filter must refuse a filter');
+            } catch (RunFilterUnavailableException) {
+            }
+        }
+        self::assertCount(0, $catalog->listRuns(filter: new WorkflowRunFilter('', ''))->runs, 'an empty filter is no filter');
+
+        return true;
+    }
+
+    /**
+     * #264, #558: the runs of one workflow without paging until they show up. The whole name,
+     * backslashes and case included: a FQCN is what most applications name a type.
+     */
+    public function testFilteringByWorkflowNameReturnsOnlyThatWorkflow(): void
+    {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
+        $this->startRun('exec-order', 'App\\OrderWorkflow');
+        $this->startRun('exec-report', 'App\\ReportWorkflow');
+        $this->endRun('exec-report', WorkflowRunStatus::Completed);
+
+        $catalog = $this->catalogUnderTest();
+        $named = static fn(string $name): WorkflowRunFilter => new WorkflowRunFilter(workflowName: $name);
+
+        self::assertSame(['exec-order'], $this->idsOf($catalog->listRuns(filter: $named('App\\OrderWorkflow'))->runs));
+        self::assertSame(['exec-report'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $named('App\\ReportWorkflow'))->runs));
+        self::assertSame([], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $named('App\\OrderWorkflow'))->runs), 'both filters apply');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('App\\Order'))->runs), 'the whole name, not a part of it');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('app\\orderworkflow'))->runs), 'case counts');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $named('App\\"OrderWorkflow'))->runs), 'a quote is a character like any other');
+    }
+
+    /**
+     * #557: the runs whose execution id starts with what an operator typed, case included.
+     */
+    public function testFilteringByExecutionIdPrefixReturnsOnlyThoseRuns(): void
+    {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
+        $this->startRun('ord-1', 'App\\OrderWorkflow');
+        $this->startRun('ord-2', 'App\\OrderWorkflow');
+        $this->startRun('rep-1', 'App\\ReportWorkflow');
+        $this->endRun('ord-2', WorkflowRunStatus::Completed);
+
+        $catalog = $this->catalogUnderTest();
+        $starting = static fn(string $prefix): WorkflowRunFilter => new WorkflowRunFilter(executionIdPrefix: $prefix);
+
+        self::assertSame(['ord-1', 'ord-2'], self::sorted($this->idsOf($catalog->listRuns(filter: $starting('ord-'))->runs)));
+        self::assertSame(['ord-2'], $this->idsOf($catalog->listRuns(WorkflowRunStatus::Completed, filter: $starting('ord'))->runs), 'with the status');
+        self::assertSame(['rep-1'], $this->idsOf($catalog->listRuns(filter: new WorkflowRunFilter('App\\ReportWorkflow', 'r'))->runs), 'with the name');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $starting('ORD'))->runs), 'case counts');
+        self::assertSame([], $this->idsOf($catalog->listRuns(filter: $starting('rd-'))->runs), 'the start, not any part');
+        self::assertCount(3, $catalog->listRuns(filter: $starting(''))->runs, 'an empty prefix filters nothing');
+    }
+
+    /**
+     * #557: a SQL LIKE reads `%` and `_` as wildcards, and a prefix is not a pattern.
+     */
+    /**
+     * #557: runs that differ from the prefix only by case sit between those that match. A store
+     * that matches without case hands them over, and the catalog drops them: the page must still
+     * fill up, and paging must lose and repeat nothing.
+     */
+    public function testAPrefixedListingFillsItsPagesAndPagesLikeAnyOther(): void
+    {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
+        foreach (['ord-1', 'ORD-2', 'ord-3', 'ORD-4', 'ord-5'] as $executionId) {
+            $this->startRun($executionId, 'App\\OrderWorkflow');
+        }
+        $filter = new WorkflowRunFilter(executionIdPrefix: 'ord');
+
+        self::assertCount(2, $this->catalogUnderTest()->listRuns(limit: 2, filter: $filter)->runs, 'a page is full while runs match');
+        self::assertSame(['ord-1', 'ord-3', 'ord-5'], self::sorted($this->collectEveryPage(null, 1, $filter)));
+    }
+
+    public function testAPrefixTakesEveryCharacterLiterally(): void
+    {
+        if ($this->refusesFilters()) {
+            return;
+        }
+
+        foreach (['p%1', 'p_1', 'pq1', 'e!1', 'eq1'] as $executionId) {
+            $this->startRun($executionId, 'App\\OrderWorkflow');
+        }
+
+        $catalog = $this->catalogUnderTest();
+
+        foreach (['p%' => ['p%1'], 'p_' => ['p_1'], 'e!' => ['e!1']] as $prefix => $expected) {
+            self::assertSame($expected, $this->idsOf($catalog->listRuns(filter: new WorkflowRunFilter(executionIdPrefix: $prefix))->runs), $prefix);
+        }
+    }
+
     public function testNoFilterListsEveryOutcomeTogether(): void
     {
         $this->startRun('exec-running', 'App\\OrderWorkflow');
@@ -379,14 +513,14 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     /**
      * @return list<string>
      */
-    private function collectEveryPage(?WorkflowRunStatus $status, int $limit): array
+    private function collectEveryPage(?WorkflowRunStatus $status, int $limit, ?WorkflowRunFilter $filter = null): array
     {
         $seen = [];
         $cursor = null;
         $guard = 0;
 
         do {
-            $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit);
+            $page = $this->catalogUnderTest()->listRuns($status, $cursor, $limit, $filter);
             foreach ($this->idsOf($page->runs) as $id) {
                 self::assertNotContains($id, $seen, \sprintf('%s showed up twice while paging', $id));
                 $seen[] = $id;
