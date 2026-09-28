@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
@@ -99,6 +100,11 @@ final class EventDataMapper
                 (string) $payload['activityId'],
                 (string) $payload['activityName'],
                 (int) ($payload['attempt'] ?? 1),
+            ),
+            ActivityRetryQueued::class => new ActivityRetryQueued(
+                $executionId,
+                (string) $payload['activityId'],
+                (int) $payload['attempt'],
             ),
             ActivityTaskCompleted::class => new ActivityTaskCompleted(
                 $executionId,
