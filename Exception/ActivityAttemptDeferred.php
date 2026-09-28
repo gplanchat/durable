@@ -8,7 +8,8 @@ namespace Gplanchat\Durable\Exception;
  * Another worker holds this attempt: run it later, not now and not never.
  *
  * The claim that refused it survives a worker that died holding it until the lock TTL, so the copy
- * is handed back to its host to be delivered again after {@see self::RETRY_AFTER_SECONDS}. By then
+ * is handed back to its host to be delivered again later ({@see self::RETRY_AFTER_SECONDS} where
+ * the host picks the delay, the transport's retry strategy on Messenger). By then
  * the holder has journalled the attempt, and the guards answer the copy; or it died, and its claim
  * expires in the end (#590).
  */
