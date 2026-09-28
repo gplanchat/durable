@@ -23,6 +23,7 @@ use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
+use Gplanchat\Durable\Port\History\CancellationDelivery;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 use Gplanchat\Durable\Uuid\NativeUuidV7Generator;
@@ -123,10 +124,10 @@ final class ExecutionContext
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
             $replayActivityId = $this->historySource->findScheduledActivityId($slotIndex) ?? '';
 
@@ -192,10 +193,10 @@ final class ExecutionContext
         $replay = $this->historySource->findNexusOperationSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
 
             return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
@@ -528,8 +529,9 @@ final class ExecutionContext
 
         // The slot's presence, never the value it carries: a closure returning `null` did run, and
         // reading it back is exactly what `sideEffect()` promises.
-        if ($this->historySource->hasSideEffectForSlot($slotIndex)) {
-            $deferred->resolve($this->historySource->findSideEffectForSlot($slotIndex));
+        $recorded = $this->historySource->findSideEffectForSlot($slotIndex);
+        if (null !== $recorded) {
+            $deferred->resolve($recorded->result);
 
             return $deferred->awaitable();
         }
@@ -589,10 +591,10 @@ final class ExecutionContext
         $replay = $this->historySource->findChildWorkflowForSlot($slotIndex);
         $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
         if (null !== $replay) {
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
 
             return $deferred->awaitable();
@@ -631,7 +633,7 @@ final class ExecutionContext
             $this->buffer()->failChildWorkflow($childExecutionId, $e);
             // Read back from the journal when it holds the failure already, so the pass rejects
             // with the exception the replay will build: same kind, class, and no previous (#318).
-            $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)['failed'] ?? new DurableChildWorkflowFailedException(
+            $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)->failed ?? new DurableChildWorkflowFailedException(
                 $childExecutionId,
                 $e->getMessage(),
                 (int) $e->getCode(),
@@ -660,16 +662,16 @@ final class ExecutionContext
     {
         $message = $this->historySource->messageAt($this->messageCursor);
         if (null !== $message) {
-            if (null !== $beforePosition && $message['position'] > $beforePosition) {
+            if (null !== $beforePosition && $message->position > $beforePosition) {
                 return null;
             }
 
             ++$this->messageCursor;
 
             return [
-                'kind' => $message['kind'],
-                'name' => $message['name'],
-                'payload' => $message['payload'],
+                'kind' => $message->kind,
+                'name' => $message->name,
+                'payload' => $message->payload,
                 'pending' => null,
             ];
         }
@@ -715,10 +717,7 @@ final class ExecutionContext
         return $this->historySource->timerCompletionPosition($timerId);
     }
 
-    /**
-     * @return array{position: int, targets: list<string>}|null
-     */
-    public function cancellationDelivery(): ?array
+    public function cancellationDelivery(): ?CancellationDelivery
     {
         return $this->historySource->cancellationDelivery();
     }
@@ -748,7 +747,7 @@ final class ExecutionContext
     {
         $delivery = $this->cancellationRaised ? null : $this->historySource->cancellationDelivery();
 
-        return null !== $delivery && [] === $delivery['targets'] ? $delivery['position'] : null;
+        return null !== $delivery && [] === $delivery->targets ? $delivery->position : null;
     }
 
     /**
@@ -828,13 +827,13 @@ final class ExecutionContext
         $replay = $this->historySource->findTimerSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== ($replay['failed'] ?? null)) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
                 $deferred->resolve(null);
             }
 
-            return new TimerAwaitable($deferred->awaitable(), $replay['id']);
+            return new TimerAwaitable($deferred->awaitable(), $replay->timerId);
         }
 
         $scheduled = $this->historySource->findScheduledTimerId($slotIndex);

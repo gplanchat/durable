@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Handler;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
+use Gplanchat\Durable\Exception\ResumeArrivedBeforeItsOutcome;
 use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
@@ -20,6 +21,7 @@ use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
 use Gplanchat\Durable\Workflow\PendingUpdate;
@@ -57,6 +59,12 @@ final class ResumeWorkflowHandler
         }
         if (($metadata['completed'] ?? false) === true) {
             return;
+        }
+
+        // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this
+        // resume concludes nothing, and the transport's retry is the wait.
+        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $executionId)) {
+            throw new ResumeArrivedBeforeItsOutcome($executionId, $message->awaited);
         }
 
         // A worker has the run now (#447). Recorded here rather than on ExecutionStarted: resume()
@@ -146,18 +154,18 @@ final class ResumeWorkflowHandler
             return;
         }
 
-        if (null !== $failure) {
-            $this->eventStore->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
-                $this->eventStore,
-                $parentId,
-                $childExecutionId,
-                $failure,
-            ));
-        } else {
-            $this->eventStore->append(new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
+        // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
+        // redelivered after a crash still finds the link, and resumes the parent without a second
+        // outcome.
+        $child = AwaitedFact::child($childExecutionId);
+        if (!$child->isJournalledIn($this->eventStore, $parentId)) {
+            $this->resumeDispatcher->dispatchResumeAwaiting($parentId, $child);
+            $this->eventStore->append(null !== $failure
+                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
+                : new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
         }
 
-        $this->childWorkflowParentLinkStore->unlink($childExecutionId);
         $this->resumeDispatcher->dispatchResume($parentId);
+        $this->childWorkflowParentLinkStore->unlink($childExecutionId);
     }
 }

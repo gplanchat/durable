@@ -11,15 +11,14 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
-use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
-use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Timer\PendingTimers;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
 
@@ -90,31 +89,9 @@ final class ExecutionRuntime
     public function checkTimers(ExecutionContext $context, ?EventStoreInterface $journal = null): void
     {
         $journal ??= $this->eventStore;
-        $now = ($this->clock)();
-        $scheduledIds = [];
-        $completedIds = [];
-        $cancelledIds = [];
-        foreach ($journal->readStream($context->executionId()) as $event) {
-            if ($event instanceof TimerScheduled) {
-                $scheduledIds[] = ['id' => $event->timerId(), 'at' => $event->scheduledAt()];
-            }
-            if ($event instanceof TimerCompleted) {
-                $completedIds[$event->timerId()] = true;
-            }
-            if ($event instanceof TimerCancelled) {
-                $cancelledIds[$event->timerId()] = true;
-            }
-        }
-
-        foreach ($scheduledIds as $info) {
-            if (isset($completedIds[$info['id']]) || isset($cancelledIds[$info['id']])) {
-                continue;
-            }
-            if ($now >= $info['at']) {
-                $journal->append(new TimerCompleted($context->executionId(), $info['id']));
-                $completedIds[$info['id']] = true;
-                $context->resolveTimer($info['id']);
-            }
+        foreach (PendingTimers::dueAt($journal, $context->executionId(), ($this->clock)()) as $timerId) {
+            $journal->append(new TimerCompleted($context->executionId(), $timerId));
+            $context->resolveTimer($timerId);
         }
     }
 

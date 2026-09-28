@@ -43,12 +43,13 @@ interface WorkflowRunCatalogInterface
     public function listRuns(?WorkflowRunStatus $status = null, ?string $cursor = null, int $limit = 20, ?WorkflowRunFilter $filter = null): WorkflowRunPage;
 
     /**
-     * Whether {@see listRuns()} honours a {@see WorkflowRunFilter}. When it does not, a filter
-     * makes it throw {@see \Gplanchat\Durable\Exception\RunFilterUnavailableException}: a surface
-     * reads this first, and offers no filter controls. Temporal filters only once Durable writes
-     * its search attributes (#558).
+     * Whether {@see listRuns()} honours this filter, or, with none, any filter at all. When it does
+     * not, the filter makes it throw {@see \Gplanchat\Durable\Exception\RunFilterUnavailableException}:
+     * a surface asks first, and offers only the controls the answer allows. Temporal filters only
+     * once Durable writes its search attributes (#558), and by execution-id prefix only from Server
+     * 1.23.0, the first that accepts STARTS_WITH (#523).
      */
-    public function canFilterRuns(): bool;
+    public function canFilterRuns(?WorkflowRunFilter $filter = null): bool;
 
     /**
      * One execution, by the id the application started it with, the `executionId` a description

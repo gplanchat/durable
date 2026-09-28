@@ -19,10 +19,8 @@ interface WorkflowHistorySourceInterface
 {
     /**
      * Returns the recorded result for activity slot N, or null if not yet recorded.
-     *
-     * @return array{result: mixed, failed: \Throwable|null}|null
      */
-    public function findActivitySlotResult(int $slot): ?array;
+    public function findActivitySlotResult(int $slot): ?History\SlotOutcome;
 
     /**
      * Returns the activity ID that was scheduled at slot N (first-occurrence order), or null.
@@ -70,10 +68,8 @@ interface WorkflowHistorySourceInterface
 
     /**
      * Returns the recorded result for Nexus operation slot N, or null if not yet recorded.
-     *
-     * @return array{result: mixed, failed: \Throwable|null}|null
      */
-    public function findNexusOperationSlotResult(int $slot): ?array;
+    public function findNexusOperationSlotResult(int $slot): ?History\SlotOutcome;
 
     /**
      * Returns the operation id scheduled at Nexus slot N (first-occurrence order), or null.
@@ -86,10 +82,8 @@ interface WorkflowHistorySourceInterface
      * `failed` carries the timer's cancellation ({@see \Gplanchat\Durable\Event\TimerCancelled}):
      * without that channel, a timer cancelled by the workflow's cancellation could not raise the
      * same exception on replay.
-     *
-     * @return array{id: string, scheduledAt: float, failed: \Throwable|null}|null
      */
-    public function findTimerSlotResult(int $slot): ?array;
+    public function findTimerSlotResult(int $slot): ?History\TimerOutcome;
 
     /**
      * Returns the timer ID that was scheduled at slot N, or null.
@@ -106,25 +100,23 @@ interface WorkflowHistorySourceInterface
      *
      * The same separation already exists on this port for timers, where
      * {@see findScheduledTimerId()} answers the state and {@see findTimerSlotResult()} the value,
-     * and for activities, child workflows and Nexus operations, whose three sibling methods wrap
-     * their result in an `array{result: mixed, ...}` for exactly this reason.
+     * and for activities, child workflows and Nexus operations, whose sibling methods wrap their
+     * result in a value object for exactly this reason.
      */
     public function hasSideEffectForSlot(int $slot): bool;
 
     /**
-     * Returns the recorded side effect result at slot N.
+     * Returns the recorded side effect at slot N, or null if nothing was recorded there.
      *
-     * Returns `null` both for a slot that recorded `null` and for a slot that recorded nothing;
-     * callers deciding whether to run a closure MUST ask {@see hasSideEffectForSlot()} first.
+     * A recorded `null` comes back as a {@see History\SideEffectOutcome} whose `result` is null:
+     * the wrapper is what tells it apart from an empty slot, as for its siblings.
      */
-    public function findSideEffectForSlot(int $slot): mixed;
+    public function findSideEffectForSlot(int $slot): ?History\SideEffectOutcome;
 
     /**
      * Returns the recorded result for child workflow slot N, or null if not yet completed.
-     *
-     * @return array{childExecutionId: string, result: mixed, failed: \Throwable|null}|null
      */
-    public function findChildWorkflowForSlot(int $slot): ?array;
+    public function findChildWorkflowForSlot(int $slot): ?History\ChildWorkflowOutcome;
 
     /**
      * Returns the child execution ID scheduled at slot N, or null.
@@ -184,10 +176,8 @@ interface WorkflowHistorySourceInterface
      * in memory, the `eventId` on Temporal. Positions are comparable **within one execution's own
      * history** and nowhere else: they are never serialized, and never compared across backends.
      * See ADR DUR035.
-     *
-     * @return array{position: int, kind: 'signal'|'update', name: string, payload: array<string, mixed>}|null
      */
-    public function messageAt(int $index): ?array;
+    public function messageAt(int $index): ?History\RecordedMessage;
 
     /**
      * Returns the position at which the given timer's completion was recorded, or null if it has
@@ -200,10 +190,8 @@ interface WorkflowHistorySourceInterface
      * Where the workflow's cancellation was raised inside the workflow, or null while it has not
      * been. `targets` are the operations withdrawn there, empty when the workflow was waiting on
      * a condition. `position` is comparable with {@see messageAt()} positions.
-     *
-     * @return array{position: int, targets: list<string>}|null
      */
-    public function cancellationDelivery(): ?array;
+    public function cancellationDelivery(): ?History\CancellationDelivery;
 
     /**
      * Returns whether the given child execution ID has already been scheduled (for reuse policy checks).

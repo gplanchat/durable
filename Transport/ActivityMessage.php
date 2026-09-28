@@ -57,6 +57,23 @@ final readonly class ActivityMessage
     }
 
     /**
+     * The same attempt, to be delivered again after the delay (#590).
+     */
+    public function deferredBy(Duration $delay): self
+    {
+        return new self(
+            $this->executionId,
+            $this->activityId,
+            $this->activityName,
+            $this->payload,
+            $this->options,
+            $this->attempt,
+            $this->firstQueuedAt,
+            $delay,
+        );
+    }
+
+    /**
      * The delay once the transport has taken charge of it.
      */
     public function withoutRetryDelay(): self

@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
@@ -356,6 +357,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             new ExecutionStarted($executionId, ['input' => $nested]),
             new ActivityScheduled($executionId, 'act-1', 'quote', ['lines' => ['a', 'b']], ['queue' => 'default']),
             new ActivityTaskStarted($executionId, 'act-1', 'quote', 1),
+            new ActivityRetryQueued($executionId, 'act-1', 2),
             new ActivityTaskFailed($executionId, 'act-1', 'quote', 1, \RuntimeException::class, 'transient', ActivityRetryState::InProgress),
             new ActivityTaskCompleted($executionId, 'act-1', $nested),
             new ActivityCompleted($executionId, 'act-1', $nested),
@@ -397,7 +399,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             ),
             new ChildWorkflowCompleted($executionId, 'child-1', $nested),
             new ChildWorkflowFailed($executionId, 'child-2', 'child blew up', 7, 'workflow_handler_failure', \LogicException::class, ['ctx' => $nested]),
-            new WorkflowSignalReceived($executionId, 'approve', ['by' => 'someone', 'payload' => $nested]),
+            new WorkflowSignalReceived($executionId, 'approve', ['by' => 'someone', 'payload' => $nested], 'request-1'),
             new WorkflowUpdateHandled(
                 $executionId,
                 'amend',

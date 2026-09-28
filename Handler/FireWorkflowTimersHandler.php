@@ -14,7 +14,9 @@ use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\PassEventStore;
+use Gplanchat\Durable\Timer\PendingTimers;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 
 /**
@@ -44,6 +46,12 @@ final class FireWorkflowTimersHandler
             new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $message->executionId, null, $history),
             null,
         );
+
+        // DUR052 §5: the due timers are named before they fire. None due, nothing is announced.
+        $due = PendingTimers::dueAt($this->eventStore, $message->executionId, $this->runtime->nowSeconds());
+        if ([] !== $due) {
+            $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::timers($due));
+        }
 
         $before = $this->countTimerCompleted($message->executionId);
 

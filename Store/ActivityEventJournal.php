@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityRetryState;
@@ -141,6 +142,30 @@ final class ActivityEventJournal
         }
 
         return false;
+    }
+
+    /**
+     * True when the given attempt failed with a retry to come, and the journal does not record that
+     * retry as handed to the transport ({@see ActivityRetryQueued}): its queueing is still owed
+     * (#590). An activity with a terminal outcome owes nothing.
+     */
+    public static function nextAttemptIsDue(
+        EventStoreInterface $eventStore,
+        string $executionId,
+        string $activityId,
+        int $attempt,
+    ): bool {
+        $willRetry = false;
+        foreach ($eventStore->readStream($executionId) as $event) {
+            if ($event instanceof ActivityRetryQueued && $event->activityId() === $activityId && $event->attempt() === $attempt + 1) {
+                return false;
+            }
+            if ($event instanceof ActivityTaskFailed && $event->activityId() === $activityId && $event->attempt() === $attempt) {
+                $willRetry = $event->willRetry();
+            }
+        }
+
+        return $willRetry && !self::hasTerminalOutcomeForActivity($eventStore, $executionId, $activityId);
     }
 
     /**

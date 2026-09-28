@@ -29,6 +29,12 @@ use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Port\History\CancellationDelivery;
+use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
+use Gplanchat\Durable\Port\History\RecordedMessage;
+use Gplanchat\Durable\Port\History\SideEffectOutcome;
+use Gplanchat\Durable\Port\History\SlotOutcome;
+use Gplanchat\Durable\Port\History\TimerOutcome;
 use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
 
 /**
@@ -70,7 +76,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return $this->events ??= iterator_to_array($this->eventStore->readStream($this->executionId), false);
     }
 
-    public function findActivitySlotResult(int $slot): ?array
+    public function findActivitySlotResult(int $slot): ?SlotOutcome
     {
         $scheduledIds = [];
         $completedResults = [];
@@ -106,23 +112,20 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         if (isset($catastrophicByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => $catastrophicByActivityId[$activityId]];
+            return new SlotOutcome(null, $catastrophicByActivityId[$activityId]);
         }
         if (isset($failedByActivityId[$activityId])) {
-            return ['result' => null, 'failed' => $failedByActivityId[$activityId]];
+            return new SlotOutcome(null, $failedByActivityId[$activityId]);
         }
         if (isset($cancelledReasonByActivityId[$activityId])) {
             $reason = $cancelledReasonByActivityId[$activityId];
 
-            return [
-                'result' => null,
-                'failed' => ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
-                    ? new WorkflowCancelledFailure($this->executionId, $reason)
-                    : new ActivitySupersededException($activityId, $reason),
-            ];
+            return new SlotOutcome(null, ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
+                ? new WorkflowCancelledFailure($this->executionId, $reason)
+                : new ActivitySupersededException($activityId, $reason));
         }
         if (\array_key_exists($activityId, $completedResults)) {
-            return ['result' => $completedResults[$activityId], 'failed' => null];
+            return new SlotOutcome($completedResults[$activityId]);
         }
 
         return null;
@@ -247,7 +250,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findTimerSlotResult(int $slot): ?array
+    public function findTimerSlotResult(int $slot): ?TimerOutcome
     {
         $scheduledIds = [];
         $completedIds = [];
@@ -270,11 +273,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === ($cancelledReasons[$timerId] ?? null)) {
-            return [
-                'id' => $timerId,
-                'scheduledAt' => 0.0,
-                'failed' => new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED),
-            ];
+            return new TimerOutcome($timerId, new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED));
         }
 
         // A race loser simply stays unsettled: it never had a winner to announce.
@@ -282,7 +281,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             return null;
         }
 
-        return ['id' => $timerId, 'scheduledAt' => 0.0, 'failed' => null];
+        return new TimerOutcome($timerId);
     }
 
     public function findScheduledTimerId(int $slot): ?string
@@ -315,13 +314,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return false;
     }
 
-    public function findSideEffectForSlot(int $slot): mixed
+    public function findSideEffectForSlot(int $slot): ?SideEffectOutcome
     {
         $index = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof SideEffectRecorded) {
                 if ($index === $slot) {
-                    return $event->result();
+                    return new SideEffectOutcome($event->result());
                 }
                 ++$index;
             }
@@ -330,7 +329,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findChildWorkflowForSlot(int $slot): ?array
+    public function findChildWorkflowForSlot(int $slot): ?ChildWorkflowOutcome
     {
         $scheduledIds = [];
         foreach ($this->events() as $event) {
@@ -346,22 +345,18 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
 
         foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId() === $childId) {
-                return ['childExecutionId' => $childId, 'result' => $event->result(), 'failed' => null];
+                return new ChildWorkflowOutcome($childId, $event->result());
             }
             if ($event instanceof ChildWorkflowFailed && $event->childExecutionId() === $childId) {
-                return [
-                    'childExecutionId' => $childId,
-                    'result' => null,
-                    'failed' => new DurableChildWorkflowFailedException(
-                        $childId,
-                        $event->failureMessage(),
-                        $event->failureCode(),
-                        null,
-                        $event->workflowFailureKind(),
-                        $event->workflowFailureClass(),
-                        $event->workflowFailureContext(),
-                    ),
-                ];
+                return new ChildWorkflowOutcome($childId, null, new DurableChildWorkflowFailedException(
+                    $childId,
+                    $event->failureMessage(),
+                    $event->failureCode(),
+                    null,
+                    $event->workflowFailureKind(),
+                    $event->workflowFailureClass(),
+                    $event->workflowFailureContext(),
+                ));
             }
         }
 
@@ -383,7 +378,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function messageAt(int $index): ?array
+    public function messageAt(int $index): ?RecordedMessage
     {
         $position = 0;
         $seen = 0;
@@ -392,23 +387,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             // journal, not their kind.
             if ($event instanceof WorkflowSignalReceived) {
                 if ($seen === $index) {
-                    return [
-                        'position' => $position,
-                        'kind' => 'signal',
-                        'name' => $event->signalName(),
-                        'payload' => $event->signalPayload(),
-                    ];
+                    return new RecordedMessage($position, 'signal', $event->signalName(), $event->signalPayload());
                 }
                 ++$seen;
             }
             if ($event instanceof WorkflowUpdateHandled) {
                 if ($seen === $index) {
-                    return [
-                        'position' => $position,
-                        'kind' => 'update',
-                        'name' => $event->updateName(),
-                        'payload' => $event->arguments(),
-                    ];
+                    return new RecordedMessage($position, 'update', $event->updateName(), $event->arguments());
                 }
                 ++$seen;
             }
@@ -431,12 +416,12 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function cancellationDelivery(): ?array
+    public function cancellationDelivery(): ?CancellationDelivery
     {
         $position = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof WorkflowCancellationDelivered) {
-                return ['position' => $position, 'targets' => $event->targets()];
+                return new CancellationDelivery($position, $event->targets());
             }
             ++$position;
         }
@@ -470,7 +455,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
      * its journal. This is not an implementation still pending — there is nothing to read back
      * because there was never anything to write.
      */
-    public function findNexusOperationSlotResult(int $slot): ?array
+    public function findNexusOperationSlotResult(int $slot): ?SlotOutcome
     {
         return null;
     }

@@ -7,6 +7,8 @@ namespace Gplanchat\Durable\Testing;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
+use Gplanchat\Durable\Port\History\RecordedMessage;
+use Gplanchat\Durable\Port\History\SideEffectOutcome;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -69,14 +71,15 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
 
         self::assertSame(
-            $fromReference->findActivitySlotResult(0)['result'],
-            $fromSubject->findActivitySlotResult(0)['result'],
+            $fromReference->findActivitySlotResult(0)->result,
+            $fromSubject->findActivitySlotResult(0)->result,
         );
         self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
 
         // Side effects carry a `mixed`: that is where a JSON round trip distorts.
-        self::assertSame($fromReference->findSideEffectForSlot(0), $fromSubject->findSideEffectForSlot(0));
-        self::assertSame($fromReference->findSideEffectForSlot(1), $fromSubject->findSideEffectForSlot(1));
+        self::assertInstanceOf(SideEffectOutcome::class, $fromSubject->findSideEffectForSlot(0));
+        self::assertSame($fromReference->findSideEffectForSlot(0)?->result, $fromSubject->findSideEffectForSlot(0)->result);
+        self::assertSame($fromReference->findSideEffectForSlot(1)?->result, $fromSubject->findSideEffectForSlot(1)?->result);
 
         self::assertNotNull($fromSubject->findScheduledTimerId(0), 'the timer must be read back from the store');
     }
@@ -194,7 +197,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         foreach ([$fromReference, $fromSubject] as $history) {
             $fired = $history->findTimerSlotResult(0);
             self::assertNotNull($fired, 'the timer fired, on both sides');
-            self::assertNull($fired['failed']);
+            self::assertNull($fired->failed);
         }
         self::assertSame(
             $fromReference->timerCompletionPosition($referenceTimer),
@@ -211,7 +214,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $childId = $fromSubject->findScheduledChildExecutionId(0);
         self::assertNotNull($childId);
         self::assertSame($fromReference->childWorkflowInputForSlot(0), $fromSubject->childWorkflowInputForSlot(0));
-        self::assertSame($fromReference->findChildWorkflowForSlot(0)['result'] ?? null, $fromSubject->findChildWorkflowForSlot(0)['result'] ?? null);
+        self::assertSame($fromReference->findChildWorkflowForSlot(0)?->result, $fromSubject->findChildWorkflowForSlot(0)?->result);
         self::assertSame($fromReference->hasChildExecutionId($referenceChild), $fromSubject->hasChildExecutionId($childId));
         self::assertSame(
             $fromReference->hasChildExecutionCompletedSuccessfully($referenceChild),
@@ -219,7 +222,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
         self::assertTrue($fromSubject->hasChildExecutionCompletedSuccessfully($childId));
 
-        self::assertSame($fromReference->messageAt(0), $fromSubject->messageAt(0));
+        self::assertInstanceOf(RecordedMessage::class, $fromSubject->messageAt(0));
+        self::assertEquals($fromReference->messageAt(0), $fromSubject->messageAt(0));
         self::assertNull($fromSubject->messageAt(1));
 
         foreach ([$fromReference, $fromSubject] as $history) {
