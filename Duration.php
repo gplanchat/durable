@@ -78,7 +78,7 @@ final readonly class Duration
      */
     public static function until(\DateTimeInterface $deadline, ?\DateTimeInterface $from = null): self
     {
-        $from ??= new \DateTimeImmutable();
+        $from ??= (new SystemClock())->now();
 
         return self::seconds(((float) $deadline->format('U.u')) - ((float) $from->format('U.u')));
     }
