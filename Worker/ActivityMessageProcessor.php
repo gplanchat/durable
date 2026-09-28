@@ -181,6 +181,9 @@ final class ActivityMessageProcessor
             // `ActivityTaskCompleted` with the same body only doubled the timeline row. Failures keep
             // the split, one `ActivityTaskFailed` per attempt for one outcome.
             $settled = true;
+            // Sent before the append and again after (DUR050): a worker that dies in between leaves
+            // a resume that waits for the outcome, instead of an outcome nobody resumes.
+            $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -263,6 +266,7 @@ final class ActivityMessageProcessor
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
     {
+        $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
         $this->eventStore->append(ActivityFailureEventFactory::fromActivityThrowable(
             $message->executionId,
             $message->activityId,
@@ -276,6 +280,7 @@ final class ActivityMessageProcessor
 
     private function appendActivityCancelled(ActivityMessage $message, string $reason): void
     {
+        $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
         $this->eventStore->append(new ActivityCancelled(
             $message->executionId,
             $message->activityId,
