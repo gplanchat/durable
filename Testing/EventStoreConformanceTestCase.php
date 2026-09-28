@@ -79,13 +79,14 @@ abstract class EventStoreConformanceTestCase extends TestCase
 
     public function testAStoreThatShouldFencePassesDoes(): void
     {
+        $store = $this->createEventStore();
         if (!$this->expectsFencedPasses()) {
-            $this->addToAssertionCount(1);
+            self::assertInstanceOf(EventStoreInterface::class, $store, 'a store need not fence');
 
             return;
         }
 
-        self::assertInstanceOf(FencedEventStoreInterface::class, $this->createEventStore());
+        self::assertInstanceOf(FencedEventStoreInterface::class, $store);
     }
 
     /** DUR053, #505: once a newer pass claims the execution, the older one can no longer append. */
@@ -464,7 +465,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
     {
         $store = $this->createEventStore();
         if (!$store instanceof FencedEventStoreInterface) {
-            $this->addToAssertionCount(1);
+            self::assertFalse($this->expectsFencedPasses(), 'a store that must fence implements FencedEventStoreInterface');
 
             return null;
         }
