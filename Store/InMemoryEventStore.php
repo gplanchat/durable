@@ -6,14 +6,23 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Exception\SupersededPassException;
+use Gplanchat\Durable\SystemClock;
+use Psr\Clock\ClockInterface;
 
 final class InMemoryEventStore implements FencedEventStoreInterface
 {
+    private readonly ClockInterface $clock;
+
     /** @var array<string, int> the newest epoch claimed per execution (DUR053) */
     private array $epochs = [];
 
     /** @var array<string, list<array{event: Event, recordedAt: \DateTimeImmutable}>> */
     private array $streams = [];
+
+    public function __construct(?ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new SystemClock();
+    }
 
     public function append(Event $event): void
     {
@@ -23,7 +32,7 @@ final class InMemoryEventStore implements FencedEventStoreInterface
         }
         $this->streams[$id][] = [
             'event' => $event,
-            'recordedAt' => new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            'recordedAt' => $this->clock->now()->setTimezone(new \DateTimeZone('UTC')),
         ];
     }
 
