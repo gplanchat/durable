@@ -301,23 +301,22 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     }
 
     /**
-     * #558: a catalog that says it cannot filter refuses a filter, before any backend call, rather
-     * than answering an unfiltered page or an empty one. The filter cases below go through here:
-     * they check the results where the catalog filters, and the refusal where it does not.
+     * #558, #523: a catalog that says it cannot apply a filter refuses it, before any backend call,
+     * rather than answering an unfiltered page or an empty one. Each filter case goes through here
+     * with the filter it uses: the results where the catalog applies it, the refusal where it does
+     * not (Temporal before 1.23.0 takes a name, not a prefix).
      */
-    private function refusesFilters(): bool
+    private function refusesFilters(WorkflowRunFilter $filter): bool
     {
         $catalog = $this->catalogUnderTest();
-        if ($catalog->canFilterRuns()) {
+        if ($catalog->canFilterRuns($filter)) {
             return false;
         }
 
-        foreach ([new WorkflowRunFilter(workflowName: 'App\\OrderWorkflow'), new WorkflowRunFilter(executionIdPrefix: 'ord')] as $filter) {
-            try {
-                $catalog->listRuns(filter: $filter);
-                self::fail('a catalog that cannot filter must refuse a filter');
-            } catch (RunFilterUnavailableException) {
-            }
+        try {
+            $catalog->listRuns(filter: $filter);
+            self::fail('a catalog that cannot apply a filter must refuse it');
+        } catch (RunFilterUnavailableException) {
         }
         self::assertCount(0, $catalog->listRuns(filter: new WorkflowRunFilter('', ''))->runs, 'an empty filter is no filter');
 
@@ -330,7 +329,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testFilteringByWorkflowNameReturnsOnlyThatWorkflow(): void
     {
-        if ($this->refusesFilters()) {
+        if ($this->refusesFilters(new WorkflowRunFilter(workflowName: 'App\\OrderWorkflow'))) {
             return;
         }
 
@@ -354,7 +353,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testFilteringByExecutionIdPrefixReturnsOnlyThoseRuns(): void
     {
-        if ($this->refusesFilters()) {
+        if ($this->refusesFilters(new WorkflowRunFilter(executionIdPrefix: 'ord'))) {
             return;
         }
 
@@ -384,7 +383,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
      */
     public function testAPrefixedListingFillsItsPagesAndPagesLikeAnyOther(): void
     {
-        if ($this->refusesFilters()) {
+        if ($this->refusesFilters(new WorkflowRunFilter(executionIdPrefix: 'ord'))) {
             return;
         }
 
@@ -399,7 +398,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
     public function testAPrefixTakesEveryCharacterLiterally(): void
     {
-        if ($this->refusesFilters()) {
+        if ($this->refusesFilters(new WorkflowRunFilter(executionIdPrefix: 'p%'))) {
             return;
         }
 

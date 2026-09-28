@@ -99,7 +99,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         $this->runs[$executionId]['endedAt'] = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
-    public function canFilterRuns(): bool
+    public function canFilterRuns(?WorkflowRunFilter $filter = null): bool
     {
         return true;
     }
