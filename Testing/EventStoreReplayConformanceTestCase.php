@@ -25,11 +25,11 @@ use Gplanchat\Durable\WorkflowRegistry;
  * the integration suite. The cut is in the class declaration, so that a bridge playing only one
  * half of the suite is a visible fact and not an oversight.
  *
- * This docblock claimed that the Temporal stores extended the port tier. **That is false**:
- * {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore} extends nothing at
- * all, and neither tier runs against it. A bridge playing **no** half was not foreseen by the
- * cut, and that is precisely the oversight it was meant to make visible.
- * The `backend-data-parity` change fills it in; DUR041 carries the real state.
+ * Temporal is such a server. Its history source, {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory},
+ * replays this tier in the root integration suite: `TemporalHistoryReplayConformanceTest` runs
+ * {@see ConformanceWorkflow} on a server and on the reference, and compares every lookup of the
+ * history port (#326). {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore}
+ * still runs no tier (#331, #333).
  *
  * The reference, for its part, does not extend this class: a store is not diffed against itself.
  *
