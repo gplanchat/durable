@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Timer;
 
-use Gplanchat\Durable\Event\TimerCancelled;
-use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
@@ -26,23 +24,7 @@ final class TimerWakeDelayCalculator
      */
     public static function millisecondsUntilNextTimerDue(EventStoreInterface $store, string $executionId, float $nowSeconds): ?int
     {
-        $scheduled = [];
-        $completed = [];
-        foreach ($store->readStream($executionId) as $event) {
-            if ($event instanceof TimerScheduled) {
-                $scheduled[$event->timerId()] = $event->scheduledAt();
-            }
-            if ($event instanceof TimerCompleted || $event instanceof TimerCancelled) {
-                $completed[$event->timerId()] = true;
-            }
-        }
-
-        $pending = [];
-        foreach ($scheduled as $id => $at) {
-            if (!isset($completed[$id])) {
-                $pending[] = $at;
-            }
-        }
+        $pending = PendingTimers::of($store, $executionId);
 
         if ([] === $pending) {
             return null;

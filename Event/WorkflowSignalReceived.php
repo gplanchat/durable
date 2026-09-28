@@ -17,7 +17,14 @@ final readonly class WorkflowSignalReceived implements Event
         private string $executionId,
         private string $signalName,
         private array $payload,
+        /** The delivery's request id (DUR052); null on a signal journalled before it was kept. */
+        private ?string $requestId = null,
     ) {}
+
+    public function requestId(): ?string
+    {
+        return $this->requestId;
+    }
 
     public function executionId(): string
     {
@@ -37,6 +44,7 @@ final readonly class WorkflowSignalReceived implements Event
         return [
             'signalName' => $this->signalName,
             'signalPayload' => $this->payload,
+            ...(null !== $this->requestId ? ['requestId' => $this->requestId] : []),
         ];
     }
 
