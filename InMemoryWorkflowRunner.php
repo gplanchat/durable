@@ -9,6 +9,7 @@ use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 
@@ -104,7 +105,7 @@ final class InMemoryWorkflowRunner
             $before = $this->eventStore->countEventsInStream($executionId);
             $this->runActivityWorker($executionId, $runtime, max(0.0, $deadline - microtime(true)));
             // Timers already due fire on every round; time itself does not move yet.
-            $runtime->checkTimers($this->timerContext($executionId, $runtime));
+            $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 
             try {
                 return $engine->resume($executionId, $handler);
@@ -156,7 +157,7 @@ final class InMemoryWorkflowRunner
         }
 
         $clock->now += max(0.0, (float) $dueInMs / 1000.0);
-        $runtime->checkTimers($this->timerContext($executionId, $runtime));
+        $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 
         return true;
     }

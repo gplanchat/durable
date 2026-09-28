@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Handler;
 
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -12,6 +13,7 @@ use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
 
@@ -34,15 +36,22 @@ final class FireWorkflowTimersHandler
 
     public function __invoke(FireWorkflowTimersMessage $message): void
     {
+        // Firing timers is a pass: it claims the execution, and a newer pass supersedes it (DUR053).
+        $journal = PassEventStore::open($this->eventStore, $message->executionId);
         $context = new ExecutionContext(
             $message->executionId,
-            $history = new EventStoreHistorySource($this->eventStore, $message->executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->runtime->getActivityTransport(), $message->executionId, null, $history),
+            $history = new EventStoreHistorySource($journal, $message->executionId),
+            new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $message->executionId, null, $history),
             null,
         );
 
         $before = $this->countTimerCompleted($message->executionId);
-        $this->runtime->checkTimers($context);
+
+        try {
+            $this->runtime->checkTimers($context, $journal);
+        } catch (SupersededPassException) {
+            return; // the newer pass owns the execution
+        }
         $after = $this->countTimerCompleted($message->executionId);
 
         if ($after > $before) {

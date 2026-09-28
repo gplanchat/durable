@@ -83,13 +83,18 @@ final class ExecutionRuntime
         return $awaitable->getResult();
     }
 
-    public function checkTimers(ExecutionContext $context): void
+    /**
+     * @param EventStoreInterface|null $journal the pass's journal when a pass fires the timers
+     *                                          (DUR053); the runtime's own store otherwise
+     */
+    public function checkTimers(ExecutionContext $context, ?EventStoreInterface $journal = null): void
     {
+        $journal ??= $this->eventStore;
         $now = ($this->clock)();
         $scheduledIds = [];
         $completedIds = [];
         $cancelledIds = [];
-        foreach ($this->eventStore->readStream($context->executionId()) as $event) {
+        foreach ($journal->readStream($context->executionId()) as $event) {
             if ($event instanceof TimerScheduled) {
                 $scheduledIds[] = ['id' => $event->timerId(), 'at' => $event->scheduledAt()];
             }
@@ -106,7 +111,7 @@ final class ExecutionRuntime
                 continue;
             }
             if ($now >= $info['at']) {
-                $this->eventStore->append(new TimerCompleted($context->executionId(), $info['id']));
+                $journal->append(new TimerCompleted($context->executionId(), $info['id']));
                 $completedIds[$info['id']] = true;
                 $context->resolveTimer($info['id']);
             }

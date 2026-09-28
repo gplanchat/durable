@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Handler;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
+use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
@@ -121,6 +122,9 @@ final class ResumeWorkflowHandler
             // backend that writes no `ExecutionStarted` lives nowhere else.
             $this->metadataStore->markCompleted($executionId);
 
+            return;
+        } catch (SupersededPassException) {
+            // A newer pass has claimed the execution (DUR053): it owns the run, this one only stops.
             return;
         } catch (\Throwable $e) {
             $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);

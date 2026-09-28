@@ -13,6 +13,7 @@ use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\EventStoreWorkflowLifecycle;
+use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 use Gplanchat\Durable\Worker\WorkflowFiberDriver;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
@@ -38,12 +39,14 @@ final class ExecutionEngine
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
 
-        $history = new EventStoreHistorySource($this->eventStore, $executionId);
+        // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
+        $journal = PassEventStore::open($this->eventStore, $executionId);
+        $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
             $executionId,
             $history,
             new EventStoreCommandBuffer(
-                $this->eventStore,
+                $journal,
                 $this->runtime->getActivityTransport(),
                 $executionId,
                 $this->runtime->nowSeconds(...),
@@ -54,7 +57,7 @@ final class ExecutionEngine
             $pendingUpdates,
         );
 
-        if (0 === $this->eventStore->countEventsInStream($executionId)) {
+        if (0 === $journal->countEventsInStream($executionId)) {
             $startedPayload = [];
             if (null !== $workflowType && '' !== $workflowType) {
                 $startedPayload['workflowType'] = $workflowType;
@@ -62,10 +65,10 @@ final class ExecutionEngine
             if ($executionStartedPayloadExtras !== []) {
                 $startedPayload = array_merge($startedPayload, $executionStartedPayloadExtras);
             }
-            $this->eventStore->append(new ExecutionStarted($executionId, $startedPayload));
+            $journal->append(new ExecutionStarted($executionId, $startedPayload));
         }
 
-        return $this->runHandler($context, $this->createEnvironment($context), $handler);
+        return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
     }
 
     /**
@@ -78,12 +81,14 @@ final class ExecutionEngine
     {
         $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
 
-        $history = new EventStoreHistorySource($this->eventStore, $executionId);
+        // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
+        $journal = PassEventStore::open($this->eventStore, $executionId);
+        $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
             $executionId,
             $history,
             new EventStoreCommandBuffer(
-                $this->eventStore,
+                $journal,
                 $this->runtime->getActivityTransport(),
                 $executionId,
                 $this->runtime->nowSeconds(...),
@@ -94,7 +99,7 @@ final class ExecutionEngine
             $pendingUpdates,
         );
 
-        return $this->runHandler($context, $this->createEnvironment($context), $handler);
+        return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
     }
 
     private function createEnvironment(ExecutionContext $context): WorkflowEnvironment
@@ -107,10 +112,10 @@ final class ExecutionEngine
         );
     }
 
-    private function runHandler(ExecutionContext $context, WorkflowEnvironment $environment, callable $handler): mixed
+    private function runHandler(ExecutionContext $context, WorkflowEnvironment $environment, callable $handler, EventStoreInterface $journal): mixed
     {
         $driver = new WorkflowFiberDriver(new EventStoreWorkflowLifecycle(
-            $this->eventStore,
+            $journal,
             $this->parentChildCoordinator,
         ));
 
