@@ -9,6 +9,7 @@ use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityCompleted;
+use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
@@ -66,6 +67,14 @@ final class ActivityMessageProcessor
             $message->activityId,
             $message->attempt,
         )) {
+            // Queueing the retry may be what failed and caused this redelivery: the journal says
+            // whether it went out, as Temporal's dispatch task does (#590).
+            if (!$this->activityTransport instanceof NoopActivityTransport
+                && ActivityEventJournal::nextAttemptIsDue($this->eventStore, $message->executionId, $message->activityId, $message->attempt)
+            ) {
+                $this->enqueueNextAttempt($message);
+            }
+
             return null;
         }
 
@@ -212,10 +221,7 @@ final class ActivityMessageProcessor
             }
 
             if ($shouldRetry) {
-                $delay = $options?->retryDelayBeforeAttempt($message->attempt + 1);
-                $this->activityTransport->enqueue(
-                    $message->retryingIn(null !== $delay && !$delay->isZero() ? $delay : null),
-                );
+                $this->enqueueNextAttempt($message);
             } else {
                 $this->appendActivityFailure($message, $e, $retryState);
 
@@ -224,6 +230,15 @@ final class ActivityMessageProcessor
         }
 
         return null;
+    }
+
+    private function enqueueNextAttempt(ActivityMessage $message): void
+    {
+        $delay = $message->options?->retryDelayBeforeAttempt($message->attempt + 1);
+        $this->activityTransport->enqueue(
+            $message->retryingIn(null !== $delay && !$delay->isZero() ? $delay : null),
+        );
+        $this->eventStore->append(new ActivityRetryQueued($message->executionId, $message->activityId, $message->attempt + 1));
     }
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
