@@ -52,7 +52,7 @@ final class RunDashboard
      *   waitingForWorkerOnThisPage?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
      *   status: string,
-     *   filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null},
+     *   filters: array{available: bool, workflowNameAvailable: bool, executionIdPrefixAvailable: bool, workflowName: string|null, executionIdPrefix: string|null},
      *   selectedRun: array<string, mixed>|null
      * }
      */
@@ -77,7 +77,7 @@ final class RunDashboard
      *   waitingForWorkerOnThisPage?: int,
      *   pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool},
      *   status: string,
-     *   filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null}
+     *   filters: array{available: bool, workflowNameAvailable: bool, executionIdPrefixAvailable: bool, workflowName: string|null, executionIdPrefix: string|null}
      * }
      */
     public function listing(string $status = 'all', ?string $cursor = null, ?WorkflowRunFilter $filter = null): array
@@ -104,15 +104,23 @@ final class RunDashboard
     }
 
     /**
-     * @return array{0: array{backend: array<string, mixed>, runs: list<array<string, mixed>>, kpis: array<string, int>, waitingForWorkerOnThisPage?: int, pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool}, status: string, filters: array{available: bool, workflowName: string|null, executionIdPrefix: string|null}}, 1: WorkflowRunPage, 2: WorkflowRunCatalogInterface|null}
+     * @return array{0: array{backend: array<string, mixed>, runs: list<array<string, mixed>>, kpis: array<string, int>, waitingForWorkerOnThisPage?: int, pagination: array{cursor: string|null, nextCursor: string|null, hasNext: bool}, status: string, filters: array{available: bool, workflowNameAvailable: bool, executionIdPrefixAvailable: bool, workflowName: string|null, executionIdPrefix: string|null}}, 1: WorkflowRunPage, 2: WorkflowRunCatalogInterface|null}
      */
     private function page(string $status, ?string $cursor, ?WorkflowRunFilter $filter = null): array
     {
         [$backend, $catalog] = $this->backend();
-        // A catalog that cannot filter would refuse the filter (#558): it lists every run instead,
-        // and the page says the filters are unavailable rather than failing.
+        // A catalog refuses a filter it cannot apply (#558, #523): each part goes only where it can,
+        // the rest is left out rather than failing the page, and the page says which it offers.
+        $can = static fn(WorkflowRunFilter $part): bool => null !== $catalog && $catalog->canFilterRuns($part);
         $filterable = null !== $catalog && $catalog->canFilterRuns();
-        $filter = $filterable ? $filter : null;
+        $byName = $can(new WorkflowRunFilter(workflowName: 'probe'));
+        $byPrefix = $can(new WorkflowRunFilter(executionIdPrefix: 'probe'));
+        if (null !== $filter) {
+            $filter = new WorkflowRunFilter($byName ? $filter->workflowName : null, $byPrefix ? $filter->executionIdPrefix : null);
+            if ($filter->isEmpty()) {
+                $filter = null;
+            }
+        }
         // A filter coming from a URL is an arbitrary string: ignoring it is worth more than
         // refusing a page to someone who mistyped a link. A backend that does not answer is not
         // asked for a page at all.
@@ -130,6 +138,8 @@ final class RunDashboard
             'status' => $status,
             'filters' => [
                 'available' => $filterable,
+                'workflowNameAvailable' => $byName,
+                'executionIdPrefixAvailable' => $byPrefix,
                 'workflowName' => $filter?->workflowName,
                 'executionIdPrefix' => $filter?->executionIdPrefix,
             ],
