@@ -29,7 +29,9 @@ use Gplanchat\Durable\WorkflowRegistry;
  * replays this tier in the root integration suite: `TemporalHistoryReplayConformanceTest` runs
  * {@see ConformanceWorkflow} on a server and on the reference, and compares the lookups of the
  * history port (#326). {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore}
- * still runs no tier (#326).
+ * extends the port tier in `TemporalEventStoreConformanceTest`, and the same replay test reads
+ * the server's history back through it. Both replay checks are hand-written: a case added here
+ * does not reach Temporal until it is added there too.
  *
  * The reference, for its part, does not extend this class: a store is not diffed against itself.
  *
