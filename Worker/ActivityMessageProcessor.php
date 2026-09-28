@@ -14,7 +14,9 @@ use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Failure\ActivityRetryState;
+use Gplanchat\Durable\Port\ActivityAttemptClaimInterface;
 use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
+use Gplanchat\Durable\Port\NoActivityAttemptClaim;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -38,6 +40,7 @@ final class ActivityMessageProcessor
         private readonly ActivityHeartbeatSenderInterface $heartbeatSender,
         private readonly int $maxRetries = 0,
         private readonly ?WorkflowExecutionObserverInterface $workflowExecutionObserver = null,
+        private readonly ActivityAttemptClaimInterface $attemptClaim = new NoActivityAttemptClaim(),
     ) {}
 
     /**
@@ -46,6 +49,21 @@ final class ActivityMessageProcessor
      *                         null otherwise — it is already journalled either way
      */
     public function process(ActivityMessage $message): ?\Throwable
+    {
+        // A copy of an attempt another worker is running: that worker journals it (#590).
+        $release = $this->attemptClaim->claim($message->executionId, $message->activityId, $message->attempt);
+        if (null === $release) {
+            return null;
+        }
+
+        try {
+            return $this->processClaimed($message);
+        } finally {
+            $release();
+        }
+    }
+
+    private function processClaimed(ActivityMessage $message): ?\Throwable
     {
         // A redelivery of an attempt that already ran is answered by the journal, not run again:
         // re-running a failed attempt would also queue its retry a second time (#319). An outcome
