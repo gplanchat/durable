@@ -324,7 +324,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             ),
             new ChildWorkflowCompleted($executionId, 'child-1', $nested),
             new ChildWorkflowFailed($executionId, 'child-2', 'child blew up', 7, 'workflow_handler_failure', \LogicException::class, ['ctx' => $nested]),
-            new WorkflowSignalReceived($executionId, 'approve', ['by' => 'someone', 'payload' => $nested]),
+            new WorkflowSignalReceived($executionId, 'approve', ['by' => 'someone', 'payload' => $nested], 'request-1'),
             new WorkflowUpdateHandled(
                 $executionId,
                 'amend',

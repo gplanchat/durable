@@ -8,6 +8,7 @@ use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
@@ -37,6 +38,11 @@ final readonly class AwaitedFact
         return new self(AwaitedFactKind::Child, [$childExecutionId]);
     }
 
+    public static function signal(string $requestId): self
+    {
+        return new self(AwaitedFactKind::Signal, [$requestId]);
+    }
+
     /**
      * @param non-empty-list<string> $timerIds
      */
@@ -55,6 +61,7 @@ final readonly class AwaitedFact
         foreach ($journal->readStream($executionId) as $event) {
             $id = match (true) {
                 AwaitedFactKind::Child === $this->kind && ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) => $event->childExecutionId(),
+                AwaitedFactKind::Signal === $this->kind && $event instanceof WorkflowSignalReceived => $event->requestId(),
                 // A named timer may be cancelled before it fires; that settles it too.
                 AwaitedFactKind::Timer === $this->kind && ($event instanceof TimerCompleted || $event instanceof TimerCancelled) => $event->timerId(),
                 default => null,

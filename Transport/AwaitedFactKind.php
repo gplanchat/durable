@@ -12,5 +12,6 @@ enum AwaitedFactKind: string
 {
     case Activity = 'activity';
     case Child = 'child';
+    case Signal = 'signal';
     case Timer = 'timer';
 }

@@ -152,6 +152,7 @@ final class EventDataMapper
                 $executionId,
                 (string) $payload['signalName'],
                 \is_array($payload['signalPayload'] ?? null) ? $payload['signalPayload'] : [],
+                \is_string($payload['requestId'] ?? null) ? $payload['requestId'] : null,
             ),
             WorkflowUpdateHandled::class => new WorkflowUpdateHandled(
                 $executionId,
