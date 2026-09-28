@@ -19,6 +19,7 @@ use Gplanchat\Durable\Port\NullWorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Timer\PendingTimers;
+use Gplanchat\Durable\Timer\VirtualClock;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Worker\ActivityMessageProcessor;
 use Psr\Clock\ClockInterface;
@@ -187,8 +188,11 @@ final class ExecutionRuntime
      * @param ClockInterface|null $queueClock the clock the transport stamps its due times with,
      *                                        when it is not this runtime's (a harness that skips
      *                                        time on the runtime, not on the queue)
+     * @param VirtualClock|null   $waitedOn   a harness's virtual clock, moved by the real time
+     *                                        spent here waiting out a backoff: that wait counts
+     *                                        towards the schedule-to-* bounds
      */
-    public function runUntilIdle(ExecutionContext $context, ?float $budgetSeconds = null, ?ClockInterface $queueClock = null): void
+    public function runUntilIdle(ExecutionContext $context, ?float $budgetSeconds = null, ?ClockInterface $queueClock = null, ?VirtualClock $waitedOn = null): void
     {
         $queueClock ??= $this->clock;
         // The budget is a length of real waiting (usleep below): measured on the monotonic timer.
@@ -206,7 +210,9 @@ final class ExecutionRuntime
 
             $wait = $dueAt - (float) $queueClock->now()->format('U.u');
             if ($wait > 0) {
+                $waitStartedAt = hrtime(true);
                 usleep((int) ceil($wait * 1_000_000.0));
+                $waitedOn?->advance(((float) (hrtime(true) - $waitStartedAt)) / 1e9);
             }
             if (!$this->drainActivityQueueOnce($context)) {
                 return;
