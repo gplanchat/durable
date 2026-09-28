@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Observation;
 
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\SystemClock;
+use Psr\Clock\ClockInterface;
 
 /**
  * What the page needs to know, drawn from the port and from nothing else — **for every surface**.
@@ -30,12 +32,12 @@ final class RunDashboard
     public const PAGE_SIZE = 20;
 
     /**
-     * @param (\Closure(): \DateTimeImmutable)|null $now the clock the waiting times are measured
-     *                                                 against; UTC now by default
+     * @param ClockInterface|null $clock the clock the waiting times are measured against;
+     *                                   the system's by default
      */
     public function __construct(
         private readonly ?WorkflowRunCatalogInterface $catalog,
-        private readonly ?\Closure $now = null,
+        private readonly ?ClockInterface $clock = null,
         // What masks each event's details: the application's own, as for the profiler and
         // diagnose, when the host hands it; #488's key pattern otherwise (#507).
         private readonly ?PayloadRedactorInterface $redactor = null,
@@ -231,7 +233,7 @@ final class RunDashboard
             // Dispatched, and no worker has taken it yet (#447). The wording is decided here, once,
             // for every surface (DUR049).
             $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
-            $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->now ?? static fn(): \DateTimeImmutable => new \DateTimeImmutable('now', new \DateTimeZone('UTC')))());
+            $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->clock ?? new SystemClock())->now());
         }
         if (null !== $run->waitingOn) {
             // What the run last suspended on (#324), worded once for every surface, as above.

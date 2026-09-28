@@ -11,7 +11,9 @@ use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
+use Gplanchat\Durable\Timer\VirtualClock;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Psr\Clock\ClockInterface;
 
 /**
  * Runs workflows on an in-memory stack while reproducing suspension.
@@ -24,6 +26,8 @@ use Gplanchat\Durable\Transport\ActivityTransportInterface;
 final class InMemoryWorkflowRunner
 {
     public const DEFAULT_BUDGET_SECONDS = 10.0;
+
+    private readonly ClockInterface $clock;
 
     public function __construct(
         private readonly EventStoreInterface $eventStore,
@@ -41,7 +45,15 @@ final class InMemoryWorkflowRunner
          * that keeps failing would spin this runner forever.
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
-    ) {}
+        /**
+         * Where the virtual time starts, and the clock the activity queue runs on: it must be the
+         * clock `$activityTransport` stamps its due times with. Handed a different one, the drain
+         * never sees a delayed retry fall due and the run ends as budget exhausted.
+         */
+        ?ClockInterface $clock = null,
+    ) {
+        $this->clock = $clock ?? new SystemClock();
+    }
 
     /**
      * Starts a workflow and loops suspend/resume until completion.
@@ -55,17 +67,14 @@ final class InMemoryWorkflowRunner
         // moves from one due time to the next, never on its own.
         // An object, not a variable: an arrow function captures by value, and the clock would
         // never move.
-        $clock = new class {
-            public float $now;
-        };
-        $clock->now = microtime(true);
+        $clock = new VirtualClock((float) $this->clock->now()->format('U.u'));
 
         $runtime = new ExecutionRuntime(
             $this->eventStore,
             $this->activityTransport,
             $this->activityExecutor,
             $this->maxActivityRetries,
-            static fn(): float => $clock->now,
+            $clock,
             true, // distributed = true => suspension
         );
         // The engine was built without a child runner or a parent/child coordinator:
@@ -95,15 +104,16 @@ final class InMemoryWorkflowRunner
             $waitingOn = $e->waitingOn();
         }
 
-        $deadline = microtime(true) + $this->budgetSeconds;
+        // A length of real work, not an instant: the monotonic timer, which the virtual clock is not.
+        $deadline = hrtime(true) + (int) ($this->budgetSeconds * 1e9);
 
         while (true) {
-            if (microtime(true) >= $deadline) {
+            if (hrtime(true) >= $deadline) {
                 throw WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds);
             }
 
             $before = $this->eventStore->countEventsInStream($executionId);
-            $this->runActivityWorker($executionId, $runtime, max(0.0, $deadline - microtime(true)));
+            $this->runActivityWorker($executionId, $runtime, $clock, max(0.0, ((float) ($deadline - hrtime(true))) / 1e9));
             // Timers already due fire on every round; time itself does not move yet.
             $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 
@@ -149,14 +159,14 @@ final class InMemoryWorkflowRunner
      *
      * @return bool true when time was moved forward
      */
-    private function skipToNextTimer(string $executionId, ExecutionRuntime $runtime, object $clock): bool
+    private function skipToNextTimer(string $executionId, ExecutionRuntime $runtime, VirtualClock $clock): bool
     {
-        $dueInMs = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue($this->eventStore, $executionId, $clock->now);
+        $dueInMs = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue($this->eventStore, $executionId, $clock->seconds());
         if (null === $dueInMs) {
             return false;
         }
 
-        $clock->now += max(0.0, (float) $dueInMs / 1000.0);
+        $clock->advance((float) $dueInMs / 1000.0);
         $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 
         return true;
@@ -167,18 +177,18 @@ final class InMemoryWorkflowRunner
         return new ExecutionContext(
             $executionId,
             $history = new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->clock(), $history),
         );
     }
 
-    private function runActivityWorker(string $executionId, ExecutionRuntime $runtime, float $budgetSeconds): void
+    private function runActivityWorker(string $executionId, ExecutionRuntime $runtime, VirtualClock $clock, float $budgetSeconds): void
     {
         $context = new ExecutionContext(
             $executionId,
             $history = new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->clock(), $history),
             null,
         );
-        $runtime->runUntilIdle($context, $budgetSeconds);
+        $runtime->runUntilIdle($context, $budgetSeconds, $this->clock, $clock);
     }
 }

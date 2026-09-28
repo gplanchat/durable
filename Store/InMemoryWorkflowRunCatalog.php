@@ -14,6 +14,8 @@ use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\SystemClock;
+use Psr\Clock\ClockInterface;
 
 /**
  * Execution catalog for the in-memory backend — the counterpart of
@@ -46,6 +48,8 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
  */
 final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, WorkflowRunProjectionInterface, WorkflowRunPickupProjectionInterface, WorkflowRunWaitProjectionInterface
 {
+    private readonly ClockInterface $clock;
+
     private const BACKEND = 'in-memory';
 
     /**
@@ -55,7 +59,15 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
 
     public function __construct(
         private readonly EventStoreInterface $events,
-    ) {}
+        ?ClockInterface $clock = null,
+    ) {
+        $this->clock = $clock ?? new SystemClock();
+    }
+
+    private function now(): \DateTimeImmutable
+    {
+        return $this->clock->now()->setTimezone(new \DateTimeZone('UTC'));
+    }
 
     /**
      * An execution starts, or restarts under another type after a continue-as-new.
@@ -65,7 +77,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         $this->runs[$executionId] = [
             'workflowType' => $workflowType,
             'status' => WorkflowRunStatus::Running,
-            'startedAt' => $this->runs[$executionId]['startedAt'] ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            'startedAt' => $this->runs[$executionId]['startedAt'] ?? $this->now(),
             'endedAt' => null,
             'pickedUp' => $this->runs[$executionId]['pickedUp'] ?? false,
         ];
@@ -96,7 +108,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         }
 
         $this->runs[$executionId]['status'] = $status;
-        $this->runs[$executionId]['endedAt'] = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $this->runs[$executionId]['endedAt'] = $this->now();
     }
 
     public function canFilterRuns(?WorkflowRunFilter $filter = null): bool
@@ -160,7 +172,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             . 'an empty list means nothing ran here, not that nothing ran. '
             . 'Configure a backend that records outside this process — a SQL database, '
             . 'or a Temporal cluster — to read the runs of every other one.',
-            new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            $this->now(),
             // A third state: it answers, and its answer is empty by construction. A surface needs
             // to read that to decide what to display; saying it in the message was not enough,
             // and that is why two hosts out of three did not say it.

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Transport;
 
+use Gplanchat\Durable\SystemClock;
+use Psr\Clock\ClockInterface;
+
 final class InMemoryActivityTransport implements ActivityTransportInterface
 {
     /**
@@ -11,10 +14,17 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
      */
     private array $pending = [];
 
+    private readonly ClockInterface $clock;
+
+    public function __construct(?ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new SystemClock();
+    }
+
     public function enqueue(ActivityMessage $message): void
     {
         // The transport translates the delay into its own deferral mechanism, then forgets it.
-        $at = microtime(true);
+        $at = $this->now();
         if (null !== $message->retryDelay) {
             $at += $message->retryDelay->toSeconds();
             $message = $message->withoutRetryDelay();
@@ -24,7 +34,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
 
     public function dequeue(): ?ActivityMessage
     {
-        $now = microtime(true);
+        $now = $this->now();
         $bestIdx = null;
         $bestAt = null;
         foreach ($this->pending as $i => $row) {
@@ -47,7 +57,7 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
      */
     public function peek(): ?ActivityMessage
     {
-        $now = microtime(true);
+        $now = $this->now();
         $best = null;
         $bestAt = null;
         foreach ($this->pending as $row) {
@@ -94,4 +104,8 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
         return $removed;
     }
 
+    private function now(): float
+    {
+        return (float) $this->clock->now()->format('U.u');
+    }
 }

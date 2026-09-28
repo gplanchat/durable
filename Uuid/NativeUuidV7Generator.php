@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Uuid;
 
+use Gplanchat\Durable\SystemClock;
+use Psr\Clock\ClockInterface;
+
 /**
  * Pure-PHP UUID v7 generator (RFC 9562) — no framework dependency.
  *
@@ -12,9 +15,16 @@ namespace Gplanchat\Durable\Uuid;
  */
 final class NativeUuidV7Generator implements UuidGeneratorInterface
 {
+    private readonly ClockInterface $clock;
+
+    public function __construct(?ClockInterface $clock = null)
+    {
+        $this->clock = $clock ?? new SystemClock();
+    }
+
     public function generate(): string
     {
-        $ms = (int) (microtime(true) * 1000.0);
+        $ms = (int) $this->clock->now()->format('Uv');
 
         $bytes = random_bytes(10);
 

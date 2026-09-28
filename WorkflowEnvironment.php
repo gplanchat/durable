@@ -160,7 +160,7 @@ final class WorkflowEnvironment
             throw new \InvalidArgumentException(\sprintf('A label names a condition; this %s already names itself in the run list.', (new \ReflectionClass($awaitable))->getShortName()));
         }
 
-        $deadline = null === $deadline ? Duration::infinity() : self::delayOf($deadline);
+        $deadline = null === $deadline ? Duration::infinity() : $this->delayOf($deadline);
 
         // An infinite deadline schedules no timer: the only divergence between the two paths, and
         // an irreducible one — a timer that never fires would be one more command in the history,
@@ -427,10 +427,10 @@ final class WorkflowEnvironment
      * the resume that came to collect it (#314). On a first pass, "wait until then" when "then"
      * has come is a timer with no delay.
      */
-    private static function delayOf(Duration|\DateInterval|\DateTimeInterface|int|float $value): Duration
+    private function delayOf(Duration|\DateInterval|\DateTimeInterface|int|float $value): Duration
     {
         if ($value instanceof \DateTimeInterface) {
-            return Duration::seconds(max(0.0, ((float) $value->format('U.u')) - microtime(true)));
+            return Duration::seconds(max(0.0, ((float) $value->format('U.u')) - $this->runtime->nowSeconds()));
         }
 
         return Duration::from($value);
@@ -455,7 +455,7 @@ final class WorkflowEnvironment
      */
     public function timer(Duration|\DateInterval|\DateTimeInterface|int|float $duration, string $timerSummary = ''): Awaitable
     {
-        $duration = self::delayOf($duration);
+        $duration = $this->delayOf($duration);
         if ($duration->isInfinite()) {
             throw new \InvalidArgumentException('A timer cannot be infinite: it would be a command in history for a wake-up that never comes. An unbounded wait is await() without a deadline.');
         }
