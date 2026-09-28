@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
-use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\Port\History\RecordedMessage;
@@ -14,8 +13,6 @@ use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\InMemoryEventStore;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
-use Gplanchat\Durable\Versioning\ChangePoint;
-use Gplanchat\Durable\WorkflowEnvironment;
 use Gplanchat\Durable\WorkflowRegistry;
 
 /**
@@ -28,11 +25,11 @@ use Gplanchat\Durable\WorkflowRegistry;
  * the integration suite. The cut is in the class declaration, so that a bridge playing only one
  * half of the suite is a visible fact and not an oversight.
  *
- * This docblock claimed that the Temporal stores extended the port tier. **That is false**:
- * {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore} extends nothing at
- * all, and neither tier runs against it. A bridge playing **no** half was not foreseen by the
- * cut, and that is precisely the oversight it was meant to make visible.
- * The `backend-data-parity` change fills it in; DUR041 carries the real state.
+ * Temporal is such a server. Its history source, {@see \Gplanchat\Bridge\Temporal\Worker\TemporalExecutionHistory},
+ * replays this tier in the root integration suite: `TemporalHistoryReplayConformanceTest` runs
+ * {@see ConformanceWorkflow} on a server and on the reference, and compares the lookups of the
+ * history port (#326). {@see \Gplanchat\Bridge\Temporal\Store\TemporalReadThroughEventStore}
+ * still runs no tier (#326).
  *
  * The reference, for its part, does not extend this class: a store is not diffed against itself.
  *
@@ -237,11 +234,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     private static function runConformanceWorkflow(EventStoreInterface $eventStore, string $executionId): mixed
     {
         $activityExecutor = new RegistryActivityExecutor();
-        $activityExecutor->register('durable.conformance.quote', static fn(array $payload): array => [
-            'total' => 42.5,
-            'currency' => 'EUR',
-            'lines' => $payload['lines'] ?? [],
-        ]);
+        ConformanceWorkflow::registerActivity($activityExecutor);
 
         $registry = new WorkflowRegistry();
         $registry->registerClass(ConformanceChildWorkflow::class);
@@ -253,20 +246,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
             $registry,
         );
 
-        return $runner->run($executionId, static function (WorkflowEnvironment $wf): array {
-            // A change point in the conformance workflow: this is what forces every adapter to
-            // round trip the version marker, and not just the reference. A store that lost
-            // `VersionMarked` would swing an in-flight execution back onto the other branch —
-            // silently.
-            $wf->version('conformance-change', ChangePoint::DEFAULT_VERSION, 1);
-            $nested = $wf->sideEffect(static fn(): array => ['nested' => ['deep' => true], 'ratio' => 0.1]);
-            $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
-            $wf->sleep(Duration::seconds(0.001));
-            $flag = $wf->sideEffect(static fn(): string => 'after-timer');
-            $child = $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class)->run('hello'));
-
-            return ['nested' => $nested, 'quote' => $quote, 'flag' => $flag, 'child' => $child];
-        });
+        return $runner->run($executionId, ConformanceWorkflow::run(...));
     }
 
     /**
