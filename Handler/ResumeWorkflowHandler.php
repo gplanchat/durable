@@ -20,6 +20,7 @@ use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
 use Gplanchat\Durable\Workflow\PendingUpdate;
@@ -149,18 +150,18 @@ final class ResumeWorkflowHandler
             return;
         }
 
-        if (null !== $failure) {
-            $this->eventStore->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
-                $this->eventStore,
-                $parentId,
-                $childExecutionId,
-                $failure,
-            ));
-        } else {
-            $this->eventStore->append(new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
+        // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
+        // redelivered after a crash still finds the link, and resumes the parent without a second
+        // outcome.
+        $child = AwaitedFact::child($childExecutionId);
+        if (!$child->isJournalledIn($this->eventStore, $parentId)) {
+            $this->resumeDispatcher->dispatchResumeAwaiting($parentId, $child);
+            $this->eventStore->append(null !== $failure
+                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
+                : new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
         }
 
-        $this->childWorkflowParentLinkStore->unlink($childExecutionId);
         $this->resumeDispatcher->dispatchResume($parentId);
+        $this->childWorkflowParentLinkStore->unlink($childExecutionId);
     }
 }
