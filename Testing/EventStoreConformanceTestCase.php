@@ -30,11 +30,13 @@ use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Mapping\EventDataMapper;
 use Gplanchat\Durable\ParentClosePolicy;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\FencedEventStoreInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -62,9 +64,79 @@ abstract class EventStoreConformanceTestCase extends TestCase
      */
     abstract protected function createEventStore(): EventStoreInterface;
 
+    /**
+     * DUR053: whether the store under test must fence passes. False by default, so a third-party
+     * store keeps passing; a store that should fence and does not then fails the suite.
+     */
+    protected function expectsFencedPasses(): bool
+    {
+        return false;
+    }
+
     // -----------------------------------------------------------------------------------------
     // The cases
     // -----------------------------------------------------------------------------------------
+
+    public function testAStoreThatShouldFencePassesDoes(): void
+    {
+        if (!$this->expectsFencedPasses()) {
+            $this->addToAssertionCount(1);
+
+            return;
+        }
+
+        self::assertInstanceOf(FencedEventStoreInterface::class, $this->createEventStore());
+    }
+
+    /** DUR053, #505: once a newer pass claims the execution, the older one can no longer append. */
+    public function testAnOlderPassIsRefusedOnceANewerOneClaims(): void
+    {
+        $store = $this->fencedStore();
+        if (null === $store) {
+            return;
+        }
+        $older = $store->claimPass('exec-fence');
+        $newer = $store->claimPass('exec-fence');
+
+        $store->appendFenced(new ExecutionStarted('exec-fence', ['by' => 'newer']), $newer);
+
+        try {
+            $store->appendFenced(new ExecutionStarted('exec-fence', ['by' => 'older']), $older);
+            self::fail('a superseded pass must not append');
+        } catch (SupersededPassException) {
+        }
+
+        self::assertSame(1, $store->countEventsInStream('exec-fence'));
+    }
+
+    /** DUR053: a fact from outside the pass (an activity outcome, a signal) carries no fence and invalidates nothing. */
+    public function testAnAppendFromOutsideThePassNeitherNeedsNorBreaksAFence(): void
+    {
+        $store = $this->fencedStore();
+        if (null === $store) {
+            return;
+        }
+        $pass = $store->claimPass('exec-outside');
+
+        $store->append(new WorkflowSignalReceived('exec-outside', 'approve', []));
+        $store->appendFenced(new TimerCompleted('exec-outside', 'timer-1'), $pass);
+
+        self::assertSame(2, $store->countEventsInStream('exec-outside'));
+    }
+
+    public function testEachExecutionHasItsOwnEpoch(): void
+    {
+        $store = $this->fencedStore();
+        if (null === $store) {
+            return;
+        }
+        $first = $store->claimPass('exec-a');
+        $store->claimPass('exec-b');
+
+        $store->appendFenced(new TimerCompleted('exec-a', 'timer-1'), $first);
+
+        self::assertSame(1, $store->countEventsInStream('exec-a'));
+    }
 
     public function testAStreamComesBackInInsertionOrder(): void
     {
@@ -386,5 +458,17 @@ abstract class EventStoreConformanceTestCase extends TestCase
         }
 
         return $classes;
+    }
+
+    private function fencedStore(): ?FencedEventStoreInterface
+    {
+        $store = $this->createEventStore();
+        if (!$store instanceof FencedEventStoreInterface) {
+            $this->addToAssertionCount(1);
+
+            return null;
+        }
+
+        return $store;
     }
 }
