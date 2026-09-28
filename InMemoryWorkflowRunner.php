@@ -115,7 +115,7 @@ final class InMemoryWorkflowRunner
             }
 
             $before = $this->eventStore->countEventsInStream($executionId);
-            $this->runActivityWorker($executionId, $runtime, max(0.0, ($deadline - hrtime(true)) / 1e9));
+            $this->runActivityWorker($executionId, $runtime, max(0.0, ((float) ($deadline - hrtime(true))) / 1e9));
             // Timers already due fire on every round; time itself does not move yet.
             $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 

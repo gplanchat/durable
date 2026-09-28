@@ -299,8 +299,8 @@ final class ActivityMessageProcessor
         $this->resumeDispatcher->dispatchResume($message->executionId);
     }
 
-    private static function secondsSince(int|float $t0): float
+    private static function secondsSince(int $t0): float
     {
-        return (hrtime(true) - $t0) / 1e9;
+        return ((float) (hrtime(true) - $t0)) / 1e9;
     }
 }
