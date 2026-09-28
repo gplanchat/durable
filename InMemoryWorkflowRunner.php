@@ -12,6 +12,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Psr\Clock\ClockInterface;
 
 /**
  * Runs workflows on an in-memory stack while reproducing suspension.
@@ -41,6 +42,8 @@ final class InMemoryWorkflowRunner
          * that keeps failing would spin this runner forever.
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
+        /** Where the virtual time starts, and the clock the activity queue runs on. */
+        private readonly ClockInterface $clock = new SystemClock(),
     ) {}
 
     /**
@@ -55,17 +58,25 @@ final class InMemoryWorkflowRunner
         // moves from one due time to the next, never on its own.
         // An object, not a variable: an arrow function captures by value, and the clock would
         // never move.
-        $clock = new class {
-            public float $now;
+        $clock = new class implements ClockInterface {
+            public float $now = 0.0;
+
+            public function now(): \DateTimeImmutable
+            {
+                $now = \DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', $this->now), new \DateTimeZone('UTC'));
+                \assert(false !== $now);
+
+                return $now;
+            }
         };
-        $clock->now = microtime(true);
+        $clock->now = (float) $this->clock->now()->format('U.u');
 
         $runtime = new ExecutionRuntime(
             $this->eventStore,
             $this->activityTransport,
             $this->activityExecutor,
             $this->maxActivityRetries,
-            static fn(): float => $clock->now,
+            $clock,
             true, // distributed = true => suspension
         );
         // The engine was built without a child runner or a parent/child coordinator:
@@ -95,15 +106,16 @@ final class InMemoryWorkflowRunner
             $waitingOn = $e->waitingOn();
         }
 
-        $deadline = microtime(true) + $this->budgetSeconds;
+        // A length of real work, not an instant: the monotonic timer, which the virtual clock is not.
+        $deadline = hrtime(true) + (int) ($this->budgetSeconds * 1e9);
 
         while (true) {
-            if (microtime(true) >= $deadline) {
+            if (hrtime(true) >= $deadline) {
                 throw WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds);
             }
 
             $before = $this->eventStore->countEventsInStream($executionId);
-            $this->runActivityWorker($executionId, $runtime, max(0.0, $deadline - microtime(true)));
+            $this->runActivityWorker($executionId, $runtime, max(0.0, ($deadline - hrtime(true)) / 1e9));
             // Timers already due fire on every round; time itself does not move yet.
             $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
 
@@ -167,7 +179,7 @@ final class InMemoryWorkflowRunner
         return new ExecutionContext(
             $executionId,
             $history = new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->clock(), $history),
         );
     }
 
@@ -176,9 +188,9 @@ final class InMemoryWorkflowRunner
         $context = new ExecutionContext(
             $executionId,
             $history = new EventStoreHistorySource($this->eventStore, $executionId),
-            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->nowSeconds(...), $history),
+            new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $executionId, $runtime->clock(), $history),
             null,
         );
-        $runtime->runUntilIdle($context, $budgetSeconds);
+        $runtime->runUntilIdle($context, $budgetSeconds, $this->clock);
     }
 }

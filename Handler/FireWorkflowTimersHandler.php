@@ -43,7 +43,7 @@ final class FireWorkflowTimersHandler
         $context = new ExecutionContext(
             $message->executionId,
             $history = new EventStoreHistorySource($journal, $message->executionId),
-            new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $message->executionId, null, $history),
+            new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $message->executionId, $this->runtime->clock(), $history),
             null,
         );
 

@@ -27,9 +27,11 @@ use Gplanchat\Durable\Nexus\NexusOperationTimeouts;
 use Gplanchat\Durable\Nexus\NexusService;
 use Gplanchat\Durable\Nexus\NexusUnsupportedByBackendException;
 use Gplanchat\Durable\Port\WorkflowCommandBufferInterface;
+use Gplanchat\Durable\SystemClock;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
 use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
+use Psr\Clock\ClockInterface;
 
 /**
  * Implements WorkflowCommandBufferInterface by appending domain events to EventStoreInterface
@@ -39,28 +41,27 @@ use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
  */
 final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 {
-    /** @var callable(): float */
-    private $clock;
+    private readonly ClockInterface $clock;
 
     /**
-     * @param (callable(): float)|null $clock the backend's clock; injectable for the harnesses
-     *                                        that advance a virtual time
+     * @param ClockInterface|null $clock the backend's clock; injectable for the harnesses that
+     *                                   advance a virtual time
      */
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
         private readonly string $executionId,
-        ?callable $clock = null,
+        ?ClockInterface $clock = null,
         private readonly ?EventStoreHistorySource $history = null,
     ) {
-        $this->clock = $clock ?? static fn(): float => microtime(true);
+        $this->clock = $clock ?? new SystemClock();
     }
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
     {
         // It is here, in the adapter, that the options take their wire form — and that the
         // enqueuing is timestamped, with this backend's clock.
-        $queuedAt = ($this->clock)();
+        $queuedAt = $this->nowSeconds();
         $metadata = ($options?->toMetadata() ?? []) + [
             'queued_at' => $queuedAt,
             'first_queued_at' => $queuedAt,
@@ -89,7 +90,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         $this->append(new TimerScheduled(
             $this->executionId,
             $timerId,
-            ($this->clock)() + $delay->toSeconds(),
+            $this->nowSeconds() + $delay->toSeconds(),
             $summary,
         ));
     }
@@ -222,5 +223,10 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     {
         $this->eventStore->append($event);
         $this->history?->recorded($event);
+    }
+
+    private function nowSeconds(): float
+    {
+        return (float) $this->clock->now()->format('U.u');
     }
 }
