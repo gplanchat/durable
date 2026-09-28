@@ -26,6 +26,8 @@ final class InMemoryWorkflowRunner
 {
     public const DEFAULT_BUDGET_SECONDS = 10.0;
 
+    private readonly ClockInterface $clock;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
@@ -43,8 +45,10 @@ final class InMemoryWorkflowRunner
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
         /** Where the virtual time starts, and the clock the activity queue runs on. */
-        private readonly ClockInterface $clock = new SystemClock(),
-    ) {}
+        ?ClockInterface $clock = null,
+    ) {
+        $this->clock = $clock ?? new SystemClock();
+    }
 
     /**
      * Starts a workflow and loops suspend/resume until completion.
