@@ -661,16 +661,16 @@ final class ExecutionContext
     {
         $message = $this->historySource->messageAt($this->messageCursor);
         if (null !== $message) {
-            if (null !== $beforePosition && $message['position'] > $beforePosition) {
+            if (null !== $beforePosition && $message->position > $beforePosition) {
                 return null;
             }
 
             ++$this->messageCursor;
 
             return [
-                'kind' => $message['kind'],
-                'name' => $message['name'],
-                'payload' => $message['payload'],
+                'kind' => $message->kind,
+                'name' => $message->name,
+                'payload' => $message->payload,
                 'pending' => null,
             ];
         }

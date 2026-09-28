@@ -176,10 +176,8 @@ interface WorkflowHistorySourceInterface
      * in memory, the `eventId` on Temporal. Positions are comparable **within one execution's own
      * history** and nowhere else: they are never serialized, and never compared across backends.
      * See ADR DUR035.
-     *
-     * @return array{position: int, kind: 'signal'|'update', name: string, payload: array<string, mixed>}|null
      */
-    public function messageAt(int $index): ?array;
+    public function messageAt(int $index): ?History\RecordedMessage;
 
     /**
      * Returns the position at which the given timer's completion was recorded, or null if it has

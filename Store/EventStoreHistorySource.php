@@ -30,6 +30,7 @@ use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
+use Gplanchat\Durable\Port\History\RecordedMessage;
 use Gplanchat\Durable\Port\History\SideEffectOutcome;
 use Gplanchat\Durable\Port\History\SlotOutcome;
 use Gplanchat\Durable\Port\History\TimerOutcome;
@@ -376,7 +377,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function messageAt(int $index): ?array
+    public function messageAt(int $index): ?RecordedMessage
     {
         $position = 0;
         $seen = 0;
@@ -385,23 +386,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             // journal, not their kind.
             if ($event instanceof WorkflowSignalReceived) {
                 if ($seen === $index) {
-                    return [
-                        'position' => $position,
-                        'kind' => 'signal',
-                        'name' => $event->signalName(),
-                        'payload' => $event->signalPayload(),
-                    ];
+                    return new RecordedMessage($position, 'signal', $event->signalName(), $event->signalPayload());
                 }
                 ++$seen;
             }
             if ($event instanceof WorkflowUpdateHandled) {
                 if ($seen === $index) {
-                    return [
-                        'position' => $position,
-                        'kind' => 'update',
-                        'name' => $event->updateName(),
-                        'payload' => $event->arguments(),
-                    ];
+                    return new RecordedMessage($position, 'update', $event->updateName(), $event->arguments());
                 }
                 ++$seen;
             }

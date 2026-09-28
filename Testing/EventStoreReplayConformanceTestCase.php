@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Testing;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
+use Gplanchat\Durable\Port\History\RecordedMessage;
 use Gplanchat\Durable\Port\History\SideEffectOutcome;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
@@ -221,7 +222,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         );
         self::assertTrue($fromSubject->hasChildExecutionCompletedSuccessfully($childId));
 
-        self::assertSame($fromReference->messageAt(0), $fromSubject->messageAt(0));
+        self::assertInstanceOf(RecordedMessage::class, $fromSubject->messageAt(0));
+        self::assertEquals($fromReference->messageAt(0), $fromSubject->messageAt(0));
         self::assertNull($fromSubject->messageAt(1));
 
         foreach ([$fromReference, $fromSubject] as $history) {
