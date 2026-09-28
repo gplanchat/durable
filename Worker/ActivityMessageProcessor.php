@@ -47,13 +47,20 @@ final class ActivityMessageProcessor
     public function process(ActivityMessage $message): ?\Throwable
     {
         // A redelivery of an attempt that already ran is answered by the journal, not run again:
-        // re-running a failed attempt would also queue its retry a second time (#319).
+        // re-running a failed attempt would also queue its retry a second time (#319). An outcome
+        // was followed by a resume, which may be the very send that failed and caused this
+        // redelivery: it goes again, resumes being at-least-once (#328).
         if (null !== ActivityEventJournal::settledOutcomeForDelivery(
             $this->eventStore,
             $message->executionId,
             $message->activityId,
             $message->attempt,
-        ) || ActivityEventJournal::hasActivityTaskFailedForAttempt(
+        )) {
+            $this->resumeDispatcher->dispatchResume($message->executionId);
+
+            return null;
+        }
+        if (ActivityEventJournal::hasActivityTaskFailedForAttempt(
             $this->eventStore,
             $message->executionId,
             $message->activityId,
