@@ -66,9 +66,14 @@ interface WorkflowCommandBufferInterface
      * workflow does in response — the same order Temporal produces, where the acceptance command
      * precedes the workflow's commands and the server writes the events.
      *
-     * On the Temporal backend this is deliberately a no-op: there, the **server** writes
-     * `WORKFLOW_EXECUTION_UPDATE_ACCEPTED` and `..._UPDATE_COMPLETED` from the protocol messages
-     * the worker sends back, and a worker that also journalled them would double-record.
+     * - Journal: honoured, as an event in the execution's log.
+     * - Temporal: **delegated to the server** (DUR051), which writes
+     *   `WORKFLOW_EXECUTION_UPDATE_ACCEPTED` and `..._UPDATE_COMPLETED` from the protocol messages
+     *   the worker hands back. The method records nothing there, since a worker that also
+     *   journalled them would double-record. `WorkflowUpdateTest` shows the server's record.
+     *
+     * Not a refusal: every update calls it, on every backend. A backend whose server records
+     * updates itself does nothing here, and says so in its own docblock.
      *
      * @param array<string, mixed> $arguments
      */
@@ -95,12 +100,19 @@ interface WorkflowCommandBufferInterface
      * Records the outcome of a child workflow executed **inline** (in-memory backend with no
      * Messenger deferred start), in the parent's journal.
      *
-     * With no Temporal equivalent: there the server writes CHILD_WORKFLOW_EXECUTION_COMPLETED.
+     * - Journal: honoured.
+     * - Temporal: refused with {@see \Gplanchat\Durable\Exception\UnsupportedByBackendException}
+     *   (DUR051). The server writes CHILD_WORKFLOW_EXECUTION_COMPLETED, and a child there is never
+     *   run inline.
+     *
+     * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
     public function completeChildWorkflow(string $childExecutionId, mixed $result): void;
 
     /**
-     * The failure counterpart of {@see completeChildWorkflow()}.
+     * The failure counterpart of {@see completeChildWorkflow()}, honoured and refused alike.
+     *
+     * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
     public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
 
