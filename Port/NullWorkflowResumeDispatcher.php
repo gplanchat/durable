@@ -14,6 +14,11 @@ final class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
         // No-op
     }
 
+    public function dispatchResumeAnnouncing(string $executionId, string $activityId): void
+    {
+        // No-op
+    }
+
     public function dispatchNewWorkflowRun(string $executionId, string $workflowType, array $payload): void
     {
         // No-op
