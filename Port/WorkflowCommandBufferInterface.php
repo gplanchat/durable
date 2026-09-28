@@ -95,12 +95,19 @@ interface WorkflowCommandBufferInterface
      * Records the outcome of a child workflow executed **inline** (in-memory backend with no
      * Messenger deferred start), in the parent's journal.
      *
-     * With no Temporal equivalent: there the server writes CHILD_WORKFLOW_EXECUTION_COMPLETED.
+     * - Journal: honoured.
+     * - Temporal: refused with {@see \Gplanchat\Durable\Exception\UnsupportedByBackendException}
+     *   (DUR051). The server writes CHILD_WORKFLOW_EXECUTION_COMPLETED, and a child there is never
+     *   run inline.
+     *
+     * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
     public function completeChildWorkflow(string $childExecutionId, mixed $result): void;
 
     /**
-     * The failure counterpart of {@see completeChildWorkflow()}.
+     * The failure counterpart of {@see completeChildWorkflow()}, honoured and refused alike.
+     *
+     * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
     public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
 

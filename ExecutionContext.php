@@ -13,6 +13,7 @@ use Gplanchat\Durable\Exception\ActivitySupersededException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowTaskFailure;
 use Gplanchat\Durable\Failure\FailureEnvelope;
@@ -622,6 +623,10 @@ final class ExecutionContext
             $deferred->resolve($result);
         } catch (ChildWorkflowStartDeferred) {
             return $deferred->awaitable();
+        } catch (UnsupportedByBackendException $refusal) {
+            // The backend refused to record the outcome (DUR051): not the child's failure, and
+            // not to be reported as one.
+            throw $refusal;
         } catch (\Throwable $e) {
             $this->buffer()->failChildWorkflow($childExecutionId, $e);
             // Read back from the journal when it holds the failure already, so the pass rejects
