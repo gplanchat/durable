@@ -19,6 +19,7 @@ use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\NoopActivityTransport;
 
 /**
@@ -154,7 +155,7 @@ final class ActivityMessageProcessor
             $settled = true;
             // Sent before the append and again after (DUR050): a worker that dies in between leaves
             // a resume that waits for the outcome, instead of an outcome nobody resumes.
-            $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
+            $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
@@ -231,7 +232,7 @@ final class ActivityMessageProcessor
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
     {
-        $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
+        $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
         $this->eventStore->append(ActivityFailureEventFactory::fromActivityThrowable(
             $message->executionId,
             $message->activityId,
@@ -245,7 +246,7 @@ final class ActivityMessageProcessor
 
     private function appendActivityCancelled(ActivityMessage $message, string $reason): void
     {
-        $this->resumeDispatcher->dispatchResumeAnnouncing($message->executionId, $message->activityId);
+        $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
         $this->eventStore->append(new ActivityCancelled(
             $message->executionId,
             $message->activityId,
