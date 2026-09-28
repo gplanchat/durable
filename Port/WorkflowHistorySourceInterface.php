@@ -19,10 +19,8 @@ interface WorkflowHistorySourceInterface
 {
     /**
      * Returns the recorded result for activity slot N, or null if not yet recorded.
-     *
-     * @return array{result: mixed, failed: \Throwable|null}|null
      */
-    public function findActivitySlotResult(int $slot): ?array;
+    public function findActivitySlotResult(int $slot): ?History\SlotOutcome;
 
     /**
      * Returns the activity ID that was scheduled at slot N (first-occurrence order), or null.
@@ -70,10 +68,8 @@ interface WorkflowHistorySourceInterface
 
     /**
      * Returns the recorded result for Nexus operation slot N, or null if not yet recorded.
-     *
-     * @return array{result: mixed, failed: \Throwable|null}|null
      */
-    public function findNexusOperationSlotResult(int $slot): ?array;
+    public function findNexusOperationSlotResult(int $slot): ?History\SlotOutcome;
 
     /**
      * Returns the operation id scheduled at Nexus slot N (first-occurrence order), or null.

@@ -69,8 +69,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');
 
         self::assertSame(
-            $fromReference->findActivitySlotResult(0)['result'],
-            $fromSubject->findActivitySlotResult(0)['result'],
+            $fromReference->findActivitySlotResult(0)->result,
+            $fromSubject->findActivitySlotResult(0)->result,
         );
         self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
 

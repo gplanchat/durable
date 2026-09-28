@@ -123,10 +123,10 @@ final class ExecutionContext
         $replay = $this->historySource->findActivitySlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
             $replayActivityId = $this->historySource->findScheduledActivityId($slotIndex) ?? '';
 
@@ -192,10 +192,10 @@ final class ExecutionContext
         $replay = $this->historySource->findNexusOperationSlotResult($slotIndex);
         if (null !== $replay) {
             $deferred = new \Gplanchat\Durable\Awaitable\Deferred();
-            if (null !== $replay['failed']) {
-                $deferred->reject($replay['failed']);
+            if (null !== $replay->failed) {
+                $deferred->reject($replay->failed);
             } else {
-                $deferred->resolve($replay['result']);
+                $deferred->resolve($replay->result);
             }
 
             return new NexusOperationAwaitable($deferred->awaitable(), $operationId);
