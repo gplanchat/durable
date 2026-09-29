@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ParentClosePolicy;
 
 /**
@@ -16,7 +17,7 @@ final readonly class ChildWorkflowScheduled implements Event
      * @param array<string, mixed> $schedulingMetadata Temporal-aligned options (namespace, task_queue, timeouts, …)
      */
     public function __construct(
-        private string $parentExecutionId,
+        private ExecutionId|string $parentExecutionId,
         private string $childExecutionId,
         private string $childWorkflowType,
         private array $input,
@@ -27,7 +28,7 @@ final readonly class ChildWorkflowScheduled implements Event
 
     public function executionId(): string
     {
-        return $this->parentExecutionId;
+        return (string) $this->parentExecutionId;
     }
 
     public function childExecutionId(): string

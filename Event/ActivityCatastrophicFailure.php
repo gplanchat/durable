@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Activity failure that cannot be journalled safely (JSON payload impossible):
  * treated as a severe failure of the activity's code / data.
@@ -11,7 +13,7 @@ namespace Gplanchat\Durable\Event;
 final readonly class ActivityCatastrophicFailure implements Event
 {
     private function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $activityId,
         private string $activityName,
         private int $attempt,
@@ -23,7 +25,7 @@ final readonly class ActivityCatastrophicFailure implements Event
     /**
      * @param array<string, mixed> $p
      */
-    public static function fromStoredPayload(string $executionId, array $p): self
+    public static function fromStoredPayload(ExecutionId|string $executionId, array $p): self
     {
         return new self(
             $executionId,
@@ -37,7 +39,7 @@ final readonly class ActivityCatastrophicFailure implements Event
     }
 
     public static function forThrowable(
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         string $activityName,
         int $attempt,
@@ -62,7 +64,7 @@ final readonly class ActivityCatastrophicFailure implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function activityId(): string

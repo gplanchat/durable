@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Worker-side marker: the next attempt of a failed activity was handed to the transport.
  *
@@ -14,14 +16,14 @@ namespace Gplanchat\Durable\Event;
 final readonly class ActivityRetryQueued implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $activityId,
         private int $attempt,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function activityId(): string

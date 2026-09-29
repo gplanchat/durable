@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Successful end of a child workflow (journal of the **parent**).
  */
 final readonly class ChildWorkflowCompleted implements Event
 {
     public function __construct(
-        private string $parentExecutionId,
+        private ExecutionId|string $parentExecutionId,
         private string $childExecutionId,
         private mixed $result,
     ) {}
 
     public function executionId(): string
     {
-        return $this->parentExecutionId;
+        return (string) $this->parentExecutionId;
     }
 
     public function childExecutionId(): string

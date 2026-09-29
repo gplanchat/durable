@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 final readonly class ActivityScheduled implements Event
 {
     /**
@@ -11,7 +13,7 @@ final readonly class ActivityScheduled implements Event
      * @param array<string, mixed> $metadata
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $activityId,
         private string $activityName,
         private array $payload,
@@ -20,7 +22,7 @@ final readonly class ActivityScheduled implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function activityId(): string

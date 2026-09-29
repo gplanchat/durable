@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
@@ -14,7 +15,7 @@ final readonly class ActivityFailed implements Event
      * @param list<array{class: string, message: string, code: int}> $failurePrevious
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $activityId,
         private string $failureClass,
         private string $failureMessage,
@@ -29,7 +30,7 @@ final readonly class ActivityFailed implements Event
     ) {}
 
     public static function fromEnvelope(
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         FailureEnvelope $envelope,
         string $activityName = '',
@@ -53,7 +54,7 @@ final readonly class ActivityFailed implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function activityId(): string
