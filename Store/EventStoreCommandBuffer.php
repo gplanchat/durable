@@ -195,6 +195,14 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     public function cancelActivity(string $activityId, string $reason): void
     {
         $this->activityTransport->removePendingFor($this->executionId, $activityId);
+        // Same guard as cancelTimer(): a race loser stays unsettled on replay, and every resume
+        // cancels it again (#678).
+        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+            if ($event instanceof ActivityCancelled && $event->activityId() === $activityId) {
+                return;
+            }
+        }
+
         $this->append(new ActivityCancelled(
             $this->executionId,
             $activityId,
