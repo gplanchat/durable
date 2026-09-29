@@ -60,7 +60,7 @@ interface WorkflowRunCatalogInterface
      * A run page links to a run by this id alone (#264): no cursor, no filter, no page. Paging
      * {@see listRuns()} until the id shows up would make an old run unreachable.
      */
-    public function findRun(ExecutionId|string $executionId): ?WorkflowRunDescription;
+    public function findRun(ExecutionId $executionId): ?WorkflowRunDescription;
 
     /**
      * The recorded history of an execution, in the order it was recorded.
