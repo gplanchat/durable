@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Exception\SupersededPassException;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\SystemClock;
 use Psr\Clock\ClockInterface;
 
@@ -52,22 +53,26 @@ final class InMemoryEventStore implements FencedEventStoreInterface
         $this->append($event);
     }
 
-    public function readStream(string $executionId): iterable
+    public function readStream(ExecutionId|string $executionId): iterable
     {
+        $executionId = (string) $executionId;
         foreach ($this->readStreamWithRecordedAt($executionId) as $entry) {
             yield $entry['event'];
         }
     }
 
-    public function readStreamWithRecordedAt(string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId|string $executionId): iterable
     {
+        $executionId = (string) $executionId;
         foreach ($this->streams[$executionId] ?? [] as $entry) {
             yield $entry;
         }
     }
 
-    public function countEventsInStream(string $executionId): int
+    public function countEventsInStream(ExecutionId|string $executionId): int
     {
+        $executionId = (string) $executionId;
+
         return \count($this->streams[$executionId] ?? []);
     }
 }

@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * The event store of a backend that keeps no local journal: every call is refused (DUR051).
@@ -26,18 +27,24 @@ final readonly class NoLocalJournalEventStore implements EventStoreInterface
         throw $this->refusal(__FUNCTION__);
     }
 
-    public function readStream(string $executionId): iterable
+    public function readStream(ExecutionId|string $executionId): iterable
     {
+        $executionId = (string) $executionId;
+
         throw $this->refusal(__FUNCTION__);
     }
 
-    public function readStreamWithRecordedAt(string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId|string $executionId): iterable
     {
+        $executionId = (string) $executionId;
+
         throw $this->refusal(__FUNCTION__);
     }
 
-    public function countEventsInStream(string $executionId): int
+    public function countEventsInStream(ExecutionId|string $executionId): int
     {
+        $executionId = (string) $executionId;
+
         throw $this->refusal(__FUNCTION__);
     }
 
