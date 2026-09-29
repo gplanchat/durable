@@ -468,7 +468,7 @@ final class WorkflowEnvironment
      * execution in progress.
      *
      * ```php
-     * if ($this->environment->version('add-discount', ChangePoint::DEFAULT_VERSION, 1) === ChangePoint::DEFAULT_VERSION) {
+     * if ($this->environment->version('add-discount', minSupported: ChangePoint::DEFAULT_VERSION, maxSupported: 1) === ChangePoint::DEFAULT_VERSION) {
      *     $total = $this->await($this->billing->totalWithoutDiscount($basket));
      * } else {
      *     $total = $this->await($this->billing->totalWithDiscount($basket));
