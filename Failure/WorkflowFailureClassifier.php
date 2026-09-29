@@ -10,6 +10,7 @@ use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableNexusOperationFailedException;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 
 /**
@@ -23,7 +24,7 @@ final class WorkflowFailureClassifier
 {
     private function __construct() {}
 
-    public static function classify(string $executionId, \Throwable $e): WorkflowExecutionFailed
+    public static function classify(ExecutionId|string $executionId, \Throwable $e): WorkflowExecutionFailed
     {
         return match (true) {
             $e instanceof DurableCatastrophicActivityFailureException => WorkflowExecutionFailed::unhandledCatastrophicActivity($executionId, $e),

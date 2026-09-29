@@ -117,7 +117,7 @@ final class ResumeWorkflowHandler
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
             $this->metadataStore->save($newId, $nextAlias, $e->payload);
             // resume() never writes a start: this one is the only place the new run names its predecessor.
-            $this->eventStore->append(new ExecutionStarted($newExecutionId, [
+            $this->eventStore->append(new ExecutionStarted(ExecutionId::fromString($newExecutionId), [
                 'workflowType' => $nextAlias,
                 'continuedFromExecutionId' => $executionId,
             ]));
@@ -168,7 +168,7 @@ final class ResumeWorkflowHandler
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
             $this->eventStore->append(null !== $failure
                 ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
-                : new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
+                : new ChildWorkflowCompleted(ExecutionId::fromString($parentId), $childExecutionId, $result));
         }
 
         $this->resumeDispatcher->dispatchResume($parent);

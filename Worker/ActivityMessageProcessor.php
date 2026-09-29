@@ -88,7 +88,7 @@ final class ActivityMessageProcessor
             $message->activityId,
             $message->attempt,
         )) {
-            $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
+            $this->resumeDispatcher->dispatchResume($id);
 
             return null;
         }
@@ -148,7 +148,7 @@ final class ActivityMessageProcessor
                 $message->attempt,
             )) {
                 $this->eventStore->append(new ActivityTaskStarted(
-                    $message->executionId,
+                    $id,
                     $message->activityId,
                     $message->activityName,
                     $message->attempt,
@@ -196,13 +196,13 @@ final class ActivityMessageProcessor
             $settled = true;
             // Sent before the append and again after (DUR050): a worker that dies in between leaves
             // a resume that waits for the outcome, instead of an outcome nobody resumes.
-            $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
+            $this->resumeDispatcher->dispatchResumeAwaiting($id, AwaitedFact::activity($message->activityId));
             $this->eventStore->append(new ActivityCompleted(
-                $message->executionId,
+                $id,
                 $message->activityId,
                 $result,
             ));
-            $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
+            $this->resumeDispatcher->dispatchResume($id);
         } catch (\Throwable $e) {
             if ($settled) {
                 throw $e;
@@ -242,7 +242,7 @@ final class ActivityMessageProcessor
             };
 
             $this->eventStore->append(ActivityTaskFailed::forThrowable(
-                $message->executionId,
+                $id,
                 $message->activityId,
                 $message->activityName,
                 $message->attempt,
@@ -274,14 +274,14 @@ final class ActivityMessageProcessor
         $this->activityTransport->enqueue(
             $message->retryingIn(null !== $delay && !$delay->isZero() ? $delay : null),
         );
-        $this->eventStore->append(new ActivityRetryQueued($message->executionId, $message->activityId, $message->attempt + 1));
+        $this->eventStore->append(new ActivityRetryQueued(ExecutionId::fromString($message->executionId), $message->activityId, $message->attempt + 1));
     }
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
     {
         $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
         $this->eventStore->append(ActivityFailureEventFactory::fromActivityThrowable(
-            $message->executionId,
+            ExecutionId::fromString($message->executionId),
             $message->activityId,
             $message->activityName,
             $message->attempt,
@@ -295,7 +295,7 @@ final class ActivityMessageProcessor
     {
         $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
         $this->eventStore->append(new ActivityCancelled(
-            $message->executionId,
+            ExecutionId::fromString($message->executionId),
             $message->activityId,
             $reason,
         ));

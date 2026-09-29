@@ -78,7 +78,7 @@ final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordin
     private function terminateChild(ExecutionId $childExecutionId, string $parentExecutionId): void
     {
         $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(
-            $childExecutionId->toString(),
+            $childExecutionId,
             $parentExecutionId,
         ));
         $this->resumeDispatcher?->dispatchResume($childExecutionId);
@@ -87,7 +87,7 @@ final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordin
     private function requestCancelChild(ExecutionId $childExecutionId, string $parentExecutionId): void
     {
         $this->eventStore->append(new WorkflowCancellationRequested(
-            $childExecutionId->toString(),
+            $childExecutionId,
             'parent_request_cancel',
             $parentExecutionId,
         ));

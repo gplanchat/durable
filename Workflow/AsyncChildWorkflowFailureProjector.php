@@ -24,7 +24,7 @@ final class AsyncChildWorkflowFailureProjector
         $wf = self::lastWorkflowExecutionFailed($store, ExecutionId::fromString($childExecutionId));
         if (null !== $wf) {
             return new ChildWorkflowFailed(
-                $parentExecutionId,
+                ExecutionId::fromString($parentExecutionId),
                 $childExecutionId,
                 $wf->failureMessage(),
                 $wf->failureCode(),
@@ -35,7 +35,7 @@ final class AsyncChildWorkflowFailureProjector
         }
 
         return new ChildWorkflowFailed(
-            $parentExecutionId,
+            ExecutionId::fromString($parentExecutionId),
             $childExecutionId,
             $failure->getMessage(),
             (int) $failure->getCode(),

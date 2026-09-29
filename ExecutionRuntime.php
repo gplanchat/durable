@@ -91,7 +91,7 @@ final class ExecutionRuntime
     {
         $journal ??= $this->eventStore;
         foreach (PendingTimers::dueAt($journal, $context->executionId(), $this->nowSeconds()) as $timerId) {
-            $journal->append(new TimerCompleted($context->executionId(), $timerId));
+            $journal->append(new TimerCompleted(ExecutionId::fromString($context->executionId()), $timerId));
             $context->resolveTimer($timerId);
         }
     }

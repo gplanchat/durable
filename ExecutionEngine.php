@@ -65,7 +65,7 @@ final class ExecutionEngine
             if ($executionStartedPayloadExtras !== []) {
                 $startedPayload = array_merge($startedPayload, $executionStartedPayloadExtras);
             }
-            $journal->append(new ExecutionStarted($executionId, $startedPayload));
+            $journal->append(new ExecutionStarted(ExecutionId::fromString($executionId), $startedPayload));
         }
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);

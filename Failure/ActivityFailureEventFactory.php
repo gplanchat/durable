@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Failure;
 
 use Gplanchat\Durable\Event\ActivityCatastrophicFailure;
 use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 
 /**
@@ -15,7 +16,7 @@ use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 final class ActivityFailureEventFactory
 {
     public static function fromActivityThrowable(
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         string $activityName,
         int $attempt,
