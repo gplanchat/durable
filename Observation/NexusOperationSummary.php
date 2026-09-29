@@ -32,7 +32,7 @@ final readonly class NexusOperationSummary
      *
      * @return list<self> in scheduling order
      */
-    public static function ofHistory(iterable $history): array
+    public static function of(iterable $history): array
     {
         /** @var array<int, NexusOperationScheduled> $scheduled */
         $scheduled = [];
