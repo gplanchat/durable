@@ -9,6 +9,7 @@ use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Psr\Clock\ClockInterface;
 
 /**
  * Runs a child workflow on its own `executionId` (a log distinct from the parent's).
@@ -31,6 +32,11 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
         bool $asyncMessengerStart = false,
         private readonly ?WorkflowResumeDispatcher $workflowResumeDispatcher = null,
         private readonly ?ChildWorkflowParentLinkStoreInterface $parentLinkStore = null,
+        /**
+         * The clock the transport stamps its due times with, when it is not the runtime's: the
+         * in-memory runner's runtime runs on a virtual clock, its queue does not.
+         */
+        private readonly ?ClockInterface $queueClock = null,
     ) {
         $this->asyncMessengerStart = $asyncMessengerStart;
         if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore)) {
@@ -70,6 +76,9 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             $this->activityExecutor,
             $this->maxActivityRetries,
             $this->workflowRegistry,
+            clock: $this->queueClock,
+            // The child's time starts at its parent's (virtual) now, not at the real now (#652).
+            virtualTimeStartsAt: $this->runtime->clock(),
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 
