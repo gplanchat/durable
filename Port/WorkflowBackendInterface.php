@@ -21,11 +21,11 @@ interface WorkflowBackendInterface
     /**
      * Starts a workflow execution.
      *
-     * @param ExecutionId|string $executionId  Unique identifier of the execution
+     * @param ExecutionId $executionId  Unique identifier of the execution
      * @param callable    $handler      Workflow handler (ExecutionContext, ExecutionRuntime) -> mixed
      * @param string|null $workflowType Registered type (toolbar / observability); optional
      *
      * @return mixed The workflow's result
      */
-    public function start(ExecutionId|string $executionId, callable $handler, ?string $workflowType = null): mixed;
+    public function start(ExecutionId $executionId, callable $handler, ?string $workflowType = null): mixed;
 }
