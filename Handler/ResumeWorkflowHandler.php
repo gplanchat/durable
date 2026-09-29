@@ -51,9 +51,11 @@ final class ResumeWorkflowHandler
 
     public function __invoke(ResumeWorkflowMessage $message): void
     {
+        // The message is wire: its id is a string. The ports take the value object (#638).
         $executionId = $message->executionId;
+        $id = ExecutionId::fromString($executionId);
 
-        $metadata = $this->metadataStore->get($executionId);
+        $metadata = $this->metadataStore->get($id);
         if (null === $metadata) {
             return;
         }
@@ -92,7 +94,7 @@ final class ResumeWorkflowHandler
             }
             if ($e->shouldDispatchResume()) {
                 if (!$e->waitingOnTimer()) {
-                    $this->resumeDispatcher->dispatchResume($executionId);
+                    $this->resumeDispatcher->dispatchResume($id);
                 } else {
                     $ms = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue(
                         $this->eventStore,
@@ -109,63 +111,67 @@ final class ResumeWorkflowHandler
             return;
         } catch (ContinueAsNewRequested $e) {
             // Superseded, not deleted (#322): the row is what the old run was started with.
-            $this->metadataStore->markCompleted($executionId);
-            $newExecutionId = $e->nextExecutionId ?? ExecutionId::generate()->toString();
+            $this->metadataStore->markCompleted($id);
+            $newId = null !== $e->nextExecutionId ? ExecutionId::fromString($e->nextExecutionId) : ExecutionId::generate();
+            $newExecutionId = $newId->toString();
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
-            $this->metadataStore->save($newExecutionId, $nextAlias, $e->payload);
+            $this->metadataStore->save($newId, $nextAlias, $e->payload);
             // resume() never writes a start: this one is the only place the new run names its predecessor.
             $this->eventStore->append(new ExecutionStarted($newExecutionId, [
                 'workflowType' => $nextAlias,
                 'continuedFromExecutionId' => $executionId,
             ]));
-            $this->resumeDispatcher->dispatchNewWorkflowRun($newExecutionId, $nextAlias, $e->payload);
+            $this->resumeDispatcher->dispatchNewWorkflowRun($newId, $nextAlias, $e->payload);
 
             return;
         } catch (WorkflowCancelledException $e) {
             // Normal termination: do not dispatch the resume again, otherwise the cancellation
             // would be redelivered indefinitely. The parent is notified as for a failure.
-            $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);
+            $this->finalizeAsyncChildOnParentIfLinked($id, null, $e);
             // Marked, not deleted — as on the success path below. A completed row is inactive, so
             // no resume picks it up; deleting it would also destroy the start payload, which on a
             // backend that writes no `ExecutionStarted` lives nowhere else.
-            $this->metadataStore->markCompleted($executionId);
+            $this->metadataStore->markCompleted($id);
 
             return;
         } catch (SupersededPassException) {
             // A newer pass has claimed the execution (DUR053): it owns the run, this one only stops.
             return;
         } catch (\Throwable $e) {
-            $this->finalizeAsyncChildOnParentIfLinked($executionId, null, $e);
+            $this->finalizeAsyncChildOnParentIfLinked($id, null, $e);
             // An execution that failed is the one an operator most wants to look at: keeping what
             // it was started with costs a row and answers "given what?".
-            $this->metadataStore->markCompleted($executionId);
+            $this->metadataStore->markCompleted($id);
 
             throw $e;
         }
 
-        $this->finalizeAsyncChildOnParentIfLinked($executionId, $result, null);
-        $this->metadataStore->markCompleted($executionId);
+        $this->finalizeAsyncChildOnParentIfLinked($id, $result, null);
+        $this->metadataStore->markCompleted($id);
     }
 
-    private function finalizeAsyncChildOnParentIfLinked(string $childExecutionId, mixed $result, ?\Throwable $failure): void
+    private function finalizeAsyncChildOnParentIfLinked(ExecutionId $childId, mixed $result, ?\Throwable $failure): void
     {
-        $parentId = $this->childWorkflowParentLinkStore->getParentExecutionId($childExecutionId);
+        $parentId = $this->childWorkflowParentLinkStore->getParentExecutionId($childId);
         if (null === $parentId) {
             return;
         }
+        // The events and the awaited fact still carry strings (#638 follow-up).
+        $childExecutionId = $childId->toString();
+        $parent = ExecutionId::fromString($parentId);
 
         // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
         // redelivered after a crash still finds the link, and resumes the parent without a second
         // outcome.
         $child = AwaitedFact::child($childExecutionId);
         if (!$child->isJournalledIn($this->eventStore, $parentId)) {
-            $this->resumeDispatcher->dispatchResumeAwaiting($parentId, $child);
+            $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
             $this->eventStore->append(null !== $failure
                 ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
                 : new ChildWorkflowCompleted($parentId, $childExecutionId, $result));
         }
 
-        $this->resumeDispatcher->dispatchResume($parentId);
-        $this->childWorkflowParentLinkStore->unlink($childExecutionId);
+        $this->resumeDispatcher->dispatchResume($parent);
+        $this->childWorkflowParentLinkStore->unlink($childId);
     }
 }
