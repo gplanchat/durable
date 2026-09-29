@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Workflow;
 
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -20,7 +21,7 @@ final class AsyncChildWorkflowFailureProjector
         string $childExecutionId,
         \Throwable $failure,
     ): ChildWorkflowFailed {
-        $wf = self::lastWorkflowExecutionFailed($store, $childExecutionId);
+        $wf = self::lastWorkflowExecutionFailed($store, ExecutionId::fromString($childExecutionId));
         if (null !== $wf) {
             return new ChildWorkflowFailed(
                 $parentExecutionId,
@@ -41,7 +42,7 @@ final class AsyncChildWorkflowFailureProjector
         );
     }
 
-    private static function lastWorkflowExecutionFailed(EventStoreInterface $store, string $executionId): ?WorkflowExecutionFailed
+    private static function lastWorkflowExecutionFailed(EventStoreInterface $store, ExecutionId $executionId): ?WorkflowExecutionFailed
     {
         $last = null;
         foreach ($store->readStream($executionId) as $event) {

@@ -63,8 +63,9 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             if (null === $parentExecutionId || '' === $parentExecutionId) {
                 throw new \InvalidArgumentException('parentExecutionId is required for async Messenger child workflow start.');
             }
-            $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
-            $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
+            $childId = ExecutionId::fromString($childExecutionId);
+            $this->parentLinkStore->link($childId, ExecutionId::fromString($parentExecutionId));
+            $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childId, $workflowType, $input);
 
             throw new ChildWorkflowStartDeferred();
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\JournalRunHistoryReader;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
@@ -153,9 +154,9 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         return new WorkflowRunPage($runs, $hasMore ? end($window) : null, tellsWaitingForWorker: true);
     }
 
-    public function findRun(string $executionId): ?WorkflowRunDescription
+    public function findRun(ExecutionId $executionId): ?WorkflowRunDescription
     {
-        return isset($this->runs[$executionId]) ? $this->describe($executionId) : null;
+        return isset($this->runs[$executionId->toString()]) ? $this->describe($executionId->toString()) : null;
     }
 
     public function readHistory(WorkflowRunDescription $run): array

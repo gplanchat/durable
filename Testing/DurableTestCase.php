@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
@@ -104,7 +105,7 @@ abstract class DurableTestCase extends TestCase
     {
         $env = $this->requireCurrentEnvironment();
         $found = false;
-        foreach ($env->getEventStore()->readStream($executionId) as $event) {
+        foreach ($env->getEventStore()->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityScheduled && $event->activityName() === $activityName) {
                 $found = true;
                 break;
@@ -125,7 +126,7 @@ abstract class DurableTestCase extends TestCase
     {
         $env = $this->requireCurrentEnvironment();
         $found = false;
-        foreach ($env->getEventStore()->readStream($executionId) as $event) {
+        foreach ($env->getEventStore()->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof $eventClass) {
                 $found = true;
                 break;
@@ -144,7 +145,7 @@ abstract class DurableTestCase extends TestCase
     {
         $env = $this->requireCurrentEnvironment();
         $count = 0;
-        foreach ($env->getEventStore()->readStream($executionId) as $event) {
+        foreach ($env->getEventStore()->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityScheduled && $event->activityName() === $activityName) {
                 ++$count;
             }
@@ -177,7 +178,7 @@ abstract class DurableTestCase extends TestCase
     private function findEvent(string $executionId, string $eventClass): ?object
     {
         $env = $this->requireCurrentEnvironment();
-        foreach ($env->getEventStore()->readStream($executionId) as $event) {
+        foreach ($env->getEventStore()->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof $eventClass) {
                 return $event;
             }

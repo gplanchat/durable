@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -23,78 +24,79 @@ abstract class ChildWorkflowParentLinkStoreConformanceTestCase extends TestCase
     public function testALinkedChildFindsItsParent(): void
     {
         $store = $this->createParentLinkStore();
-        $store->link('child-1', 'parent-1');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
 
-        self::assertSame('parent-1', $store->getParentExecutionId('child-1'));
+        self::assertSame('parent-1', $store->getParentExecutionId(ExecutionId::fromString('child-1'))?->toString());
     }
 
     public function testAnUnknownChildHasNoParentRatherThanAnError(): void
     {
         $store = $this->createParentLinkStore();
 
-        self::assertNull($store->getParentExecutionId('child-nobody'));
-        self::assertSame([], $store->getChildExecutionIdsForParent('parent-nobody'));
+        self::assertNull($store->getParentExecutionId(ExecutionId::fromString('child-nobody')));
+        self::assertSame([], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-nobody'))));
     }
 
     public function testAParentFindsEveryChildItHasAndNoOther(): void
     {
         $store = $this->createParentLinkStore();
-        $store->link('child-1', 'parent-1');
-        $store->link('child-2', 'parent-1');
-        $store->link('child-3', 'parent-2');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
+        $store->link(ExecutionId::fromString('child-2'), ExecutionId::fromString('parent-1'));
+        $store->link(ExecutionId::fromString('child-3'), ExecutionId::fromString('parent-2'));
 
-        self::assertSame(['child-1', 'child-2'], self::sorted($store->getChildExecutionIdsForParent('parent-1')));
-        self::assertSame(['child-3'], self::sorted($store->getChildExecutionIdsForParent('parent-2')));
+        self::assertSame(['child-1', 'child-2'], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-1'))));
+        self::assertSame(['child-3'], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-2'))));
     }
 
     public function testRelinkingAChildMovesItRatherThanDuplicatingIt(): void
     {
         $store = $this->createParentLinkStore();
-        $store->link('child-1', 'parent-1');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
 
-        $store->link('child-1', 'parent-2');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-2'));
 
-        self::assertSame('parent-2', $store->getParentExecutionId('child-1'));
-        self::assertSame([], $store->getChildExecutionIdsForParent('parent-1'));
-        self::assertSame(['child-1'], self::sorted($store->getChildExecutionIdsForParent('parent-2')));
+        self::assertSame('parent-2', $store->getParentExecutionId(ExecutionId::fromString('child-1'))?->toString());
+        self::assertSame([], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-1'))));
+        self::assertSame(['child-1'], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-2'))));
     }
 
     public function testUnlinkingRemovesOneChildAndLeavesItsSiblings(): void
     {
         $store = $this->createParentLinkStore();
-        $store->link('child-1', 'parent-1');
-        $store->link('child-2', 'parent-1');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
+        $store->link(ExecutionId::fromString('child-2'), ExecutionId::fromString('parent-1'));
 
-        $store->unlink('child-1');
+        $store->unlink(ExecutionId::fromString('child-1'));
 
-        self::assertNull($store->getParentExecutionId('child-1'));
-        self::assertSame(['child-2'], self::sorted($store->getChildExecutionIdsForParent('parent-1')));
+        self::assertNull($store->getParentExecutionId(ExecutionId::fromString('child-1')));
+        self::assertSame(['child-2'], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-1'))));
     }
 
     public function testUnlinkingAnUnknownChildIsNotAnError(): void
     {
         $store = $this->createParentLinkStore();
-        $store->unlink('child-nobody');
+        $store->unlink(ExecutionId::fromString('child-nobody'));
 
-        self::assertNull($store->getParentExecutionId('child-nobody'));
+        self::assertNull($store->getParentExecutionId(ExecutionId::fromString('child-nobody')));
     }
 
     public function testLinkingTheSameChildTwiceIsIdempotent(): void
     {
         $store = $this->createParentLinkStore();
-        $store->link('child-1', 'parent-1');
-        $store->link('child-1', 'parent-1');
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
+        $store->link(ExecutionId::fromString('child-1'), ExecutionId::fromString('parent-1'));
 
-        self::assertSame(['child-1'], self::sorted($store->getChildExecutionIdsForParent('parent-1')));
+        self::assertSame(['child-1'], self::sorted($store->getChildExecutionIdsForParent(ExecutionId::fromString('parent-1'))));
     }
 
     /**
-     * @param list<string> $ids
+     * @param list<ExecutionId> $ids
      *
      * @return list<string>
      */
     private static function sorted(array $ids): array
     {
+        $ids = array_map(static fn(ExecutionId $id): string => $id->toString(), $ids);
         sort($ids);
 
         return $ids;

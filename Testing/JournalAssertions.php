@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use PHPUnit\Framework\Assert;
 
@@ -20,7 +21,7 @@ final class JournalAssertions
     public static function assertWorkflowFailed(EventStoreInterface $eventStore, string $executionId, string $expectedFailureClass = ''): void
     {
         $failed = null;
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof WorkflowExecutionFailed) {
                 $failed = $event;
                 break;

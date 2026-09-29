@@ -11,6 +11,7 @@ use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WaitReason;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
@@ -83,17 +84,17 @@ final class ProjectingEventStore implements FencedEventStoreInterface
         }
     }
 
-    public function readStream(string $executionId): iterable
+    public function readStream(ExecutionId $executionId): iterable
     {
         return $this->inner->readStream($executionId);
     }
 
-    public function readStreamWithRecordedAt(string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId $executionId): iterable
     {
         return $this->inner->readStreamWithRecordedAt($executionId);
     }
 
-    public function countEventsInStream(string $executionId): int
+    public function countEventsInStream(ExecutionId $executionId): int
     {
         return $this->inner->countEventsInStream($executionId);
     }

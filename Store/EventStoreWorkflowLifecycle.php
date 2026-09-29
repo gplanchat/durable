@@ -57,7 +57,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     public function isCancellationPending(string $executionId): bool
     {
         $requested = false;
-        foreach ($this->eventStore->readStream($executionId) as $event) {
+        foreach ($this->eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
                 $requested = true;
             }
@@ -89,7 +89,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void
     {
         $source = null;
-        foreach ($this->eventStore->readStream($executionId) as $event) {
+        foreach ($this->eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
                 $source = $event->sourceParentExecutionId();
             }

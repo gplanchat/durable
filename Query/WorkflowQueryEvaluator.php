@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Query;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -23,7 +24,7 @@ final class WorkflowQueryEvaluator
     public static function lastExecutionResult(EventStoreInterface $store, string $executionId): mixed
     {
         $last = null;
-        foreach ($store->readStream($executionId) as $event) {
+        foreach ($store->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ExecutionCompleted) {
                 $last = $event->result();
             }
@@ -39,7 +40,7 @@ final class WorkflowQueryEvaluator
     public static function hasPendingTimer(EventStoreInterface $store, string $executionId): bool
     {
         $scheduled = [];
-        foreach ($store->readStream($executionId) as $event) {
+        foreach ($store->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof TimerScheduled) {
                 $scheduled[$event->timerId()] = true;
             } elseif ($event instanceof TimerCompleted) {

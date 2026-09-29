@@ -57,7 +57,7 @@ final class ExecutionEngine
             $pendingUpdates,
         );
 
-        if (0 === $journal->countEventsInStream($executionId)) {
+        if (0 === $journal->countEventsInStream(ExecutionId::fromString($executionId))) {
             $startedPayload = [];
             if (null !== $workflowType && '' !== $workflowType) {
                 $startedPayload['workflowType'] = $workflowType;

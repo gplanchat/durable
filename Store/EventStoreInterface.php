@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * Persistence port for workflow events (event sourcing).
@@ -18,17 +19,17 @@ interface EventStoreInterface
     /**
      * @return iterable<Event> events of the identified execution only, in insertion order; the DBAL store walks the result as a cursor
      */
-    public function readStream(string $executionId): iterable;
+    public function readStream(ExecutionId $executionId): iterable;
 
     /**
      * The same stream as {@see readStream} with the store-side recording instant (Temporal-style "Event time" profile).
      *
      * @return iterable<array{event: Event, recordedAt: \DateTimeImmutable|null}>
      */
-    public function readStreamWithRecordedAt(string $executionId): iterable;
+    public function readStreamWithRecordedAt(ExecutionId $executionId): iterable;
 
     /**
      * Number of events persisted for this execution (equivalent to counting the {@see readStream} stream without materialising it entirely on the DBAL side where possible).
      */
-    public function countEventsInStream(string $executionId): int;
+    public function countEventsInStream(ExecutionId $executionId): int;
 }

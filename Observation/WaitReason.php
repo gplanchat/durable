@@ -13,6 +13,7 @@ use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -44,7 +45,7 @@ final class WaitReason
         }
 
         $reason = null;
-        foreach ($events->readStream($executionId) as $event) {
+        foreach ($events->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($leaf instanceof TimerAwaitable && $event instanceof TimerScheduled && $event->timerId() === $leaf->timerId()) {
                 $reason = \sprintf(
                     'timer %sdue at %s',

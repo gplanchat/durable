@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * @internal default implementation (bundle + tests)
  */
@@ -12,30 +14,32 @@ final class InMemoryChildWorkflowParentLinkStore implements ChildWorkflowParentL
     /** @var array<string, string> childExecutionId => parentExecutionId */
     private array $childToParent = [];
 
-    public function link(string $childExecutionId, string $parentExecutionId): void
+    public function link(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void
     {
-        $this->childToParent[$childExecutionId] = $parentExecutionId;
+        $this->childToParent[$childExecutionId->toString()] = $parentExecutionId->toString();
     }
 
-    public function getParentExecutionId(string $childExecutionId): ?string
+    public function getParentExecutionId(ExecutionId $childExecutionId): ?ExecutionId
     {
-        return $this->childToParent[$childExecutionId] ?? null;
+        $parent = $this->childToParent[$childExecutionId->toString()] ?? null;
+
+        return null === $parent ? null : ExecutionId::fromString($parent);
     }
 
-    public function getChildExecutionIdsForParent(string $parentExecutionId): array
+    public function getChildExecutionIdsForParent(ExecutionId $parentExecutionId): array
     {
         $children = [];
-        foreach ($this->childToParent as $childExecutionId => $p) {
-            if ($p === $parentExecutionId) {
-                $children[] = $childExecutionId;
+        foreach ($this->childToParent as $child => $parent) {
+            if ($parent === $parentExecutionId->toString()) {
+                $children[] = ExecutionId::fromString((string) $child);
             }
         }
 
         return $children;
     }
 
-    public function unlink(string $childExecutionId): void
+    public function unlink(ExecutionId $childExecutionId): void
     {
-        unset($this->childToParent[$childExecutionId]);
+        unset($this->childToParent[$childExecutionId->toString()]);
     }
 }

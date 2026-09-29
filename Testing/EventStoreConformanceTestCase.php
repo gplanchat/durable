@@ -32,6 +32,7 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\SupersededPassException;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Mapping\EventDataMapper;
@@ -108,7 +109,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         } catch (SupersededPassException) {
         }
 
-        self::assertSame(1, $store->countEventsInStream('exec-fence'));
+        self::assertSame(1, $store->countEventsInStream(ExecutionId::fromString('exec-fence')));
     }
 
     /** DUR053: a fact from outside the pass (an activity outcome, a signal) carries no fence and invalidates nothing. */
@@ -123,7 +124,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store->append(new WorkflowSignalReceived('exec-outside', 'approve', []));
         $store->appendFenced(new TimerCompleted('exec-outside', 'timer-1'), $pass);
 
-        self::assertSame(2, $store->countEventsInStream('exec-outside'));
+        self::assertSame(2, $store->countEventsInStream(ExecutionId::fromString('exec-outside')));
     }
 
     public function testEachExecutionHasItsOwnEpoch(): void
@@ -137,7 +138,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
 
         $store->appendFenced(new TimerCompleted('exec-a', 'timer-1'), $first);
 
-        self::assertSame(1, $store->countEventsInStream('exec-a'));
+        self::assertSame(1, $store->countEventsInStream(ExecutionId::fromString('exec-a')));
     }
 
     public function testAStreamComesBackInInsertionOrder(): void
@@ -150,7 +151,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             $expected[] = $event::class;
         }
 
-        self::assertSame($expected, self::classesOf($store->readStream('exec-order')));
+        self::assertSame($expected, self::classesOf($store->readStream(ExecutionId::fromString('exec-order'))));
     }
 
     /**
@@ -167,7 +168,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
             $store->append($event);
         }
 
-        $readBack = iterator_to_array($store->readStream('exec-fidelity'), false);
+        $readBack = iterator_to_array($store->readStream(ExecutionId::fromString('exec-fidelity')), false);
 
         self::assertCount(\count($fixtures), $readBack, 'the stream must return as many events as it was given');
 
@@ -192,8 +193,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
             $store->append($event);
         }
 
-        $first = self::classesOf($store->readStream('exec-passes'));
-        $second = self::classesOf($store->readStream('exec-passes'));
+        $first = self::classesOf($store->readStream(ExecutionId::fromString('exec-passes')));
+        $second = self::classesOf($store->readStream(ExecutionId::fromString('exec-passes')));
 
         self::assertNotSame([], $first);
         self::assertSame($first, $second, 'reading the stream again must return the same thing, not nothing');
@@ -206,13 +207,13 @@ abstract class EventStoreConformanceTestCase extends TestCase
             $store->append($event);
         }
 
-        foreach ($store->readStream('exec-partial') as $ignored) {
+        foreach ($store->readStream(ExecutionId::fromString('exec-partial')) as $ignored) {
             break; // abandon the stream on its first element
         }
 
         self::assertSame(
             \count(self::mappedEventFixtures('exec-partial')),
-            \count(self::classesOf($store->readStream('exec-partial'))),
+            \count(self::classesOf($store->readStream(ExecutionId::fromString('exec-partial')))),
         );
     }
 
@@ -224,8 +225,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store->append(new ExecutionStarted('exec-b', ['who' => 'b']));
         $store->append(new ExecutionCompleted('exec-a', 'done-a'));
 
-        $streamA = iterator_to_array($store->readStream('exec-a'), false);
-        $streamB = iterator_to_array($store->readStream('exec-b'), false);
+        $streamA = iterator_to_array($store->readStream(ExecutionId::fromString('exec-a')), false);
+        $streamB = iterator_to_array($store->readStream(ExecutionId::fromString('exec-b')), false);
 
         self::assertCount(2, $streamA);
         self::assertCount(1, $streamB);
@@ -240,20 +241,20 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store = $this->createEventStore();
         $fixtures = self::mappedEventFixtures('exec-count');
 
-        self::assertSame(0, $store->countEventsInStream('exec-count'), 'an empty stream counts zero');
+        self::assertSame(0, $store->countEventsInStream(ExecutionId::fromString('exec-count')), 'an empty stream counts zero');
 
         foreach (array_values($fixtures) as $index => $event) {
             $store->append($event);
             self::assertSame(
                 $index + 1,
-                $store->countEventsInStream('exec-count'),
+                $store->countEventsInStream(ExecutionId::fromString('exec-count')),
                 'the count must follow every write',
             );
         }
 
         self::assertSame(
-            \count(self::classesOf($store->readStream('exec-count'))),
-            $store->countEventsInStream('exec-count'),
+            \count(self::classesOf($store->readStream(ExecutionId::fromString('exec-count')))),
+            $store->countEventsInStream(ExecutionId::fromString('exec-count')),
         );
     }
 
@@ -268,10 +269,10 @@ abstract class EventStoreConformanceTestCase extends TestCase
             $store->append($event);
         }
 
-        $plain = self::classesOf($store->readStream('exec-dated'));
+        $plain = self::classesOf($store->readStream(ExecutionId::fromString('exec-dated')));
         $dated = [];
 
-        foreach ($store->readStreamWithRecordedAt('exec-dated') as $entry) {
+        foreach ($store->readStreamWithRecordedAt(ExecutionId::fromString('exec-dated')) as $entry) {
             self::assertArrayHasKey('event', $entry);
             self::assertArrayHasKey('recordedAt', $entry);
             self::assertInstanceOf(Event::class, $entry['event']);
@@ -289,9 +290,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $store = $this->createEventStore();
         $store->append(new ExecutionStarted('exec-known', []));
 
-        self::assertSame([], self::classesOf($store->readStream('exec-nobody')));
-        self::assertSame([], iterator_to_array($store->readStreamWithRecordedAt('exec-nobody'), false));
-        self::assertSame(0, $store->countEventsInStream('exec-nobody'));
+        self::assertSame([], self::classesOf($store->readStream(ExecutionId::fromString('exec-nobody'))));
+        self::assertSame([], iterator_to_array($store->readStreamWithRecordedAt(ExecutionId::fromString('exec-nobody')), false));
+        self::assertSame(0, $store->countEventsInStream(ExecutionId::fromString('exec-nobody')));
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Exception\RunFilterUnavailableException;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunEvent;
 use Gplanchat\Durable\Observation\WorkflowRunFilter;
@@ -138,7 +139,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
 
         self::assertCount(3, $listed);
         foreach ($listed as $run) {
-            self::assertEquals($run, $this->catalogUnderTest()->findRun($run->executionId), $this->executionIdOf($run) . ' is found as it is listed');
+            self::assertEquals($run, $this->catalogUnderTest()->findRun(ExecutionId::fromString($run->executionId)), $this->executionIdOf($run) . ' is found as it is listed');
         }
     }
 
@@ -146,8 +147,8 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
     {
         $this->startRun('exec-1', 'App\\OrderWorkflow');
 
-        self::assertNull($this->catalogUnderTest()->findRun('exec-nobody'));
-        self::assertNull($this->catalogUnderTest()->findRun('0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b'), 'an id shaped like a run id, known to nobody');
+        self::assertNull($this->catalogUnderTest()->findRun(ExecutionId::fromString('exec-nobody')));
+        self::assertNull($this->catalogUnderTest()->findRun(ExecutionId::fromString('0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b')), 'an id shaped like a run id, known to nobody');
     }
 
     /**

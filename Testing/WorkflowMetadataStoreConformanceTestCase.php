@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use PHPUnit\Framework\TestCase;
 
@@ -28,8 +29,8 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
         $store = $this->createMetadataStore();
         $payload = ['order' => ['id' => '0042', 'total' => 12.5], 'flags' => [true, false]];
 
-        $store->save('exec-1', 'App\\OrderWorkflow', $payload);
-        $stored = $store->get('exec-1');
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', $payload);
+        $stored = $store->get(ExecutionId::fromString('exec-1'));
 
         self::assertNotNull($stored);
         self::assertSame('App\\OrderWorkflow', $stored['workflowType']);
@@ -40,16 +41,16 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     {
         $store = $this->createMetadataStore();
 
-        self::assertNull($store->get('exec-nobody'));
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-nobody'));
+        self::assertNull($store->get(ExecutionId::fromString('exec-nobody')));
+        self::assertFalse($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-nobody')));
     }
 
     public function testAFreshlySavedExecutionIsActive(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\OrderWorkflow', []);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', []);
 
-        self::assertTrue($store->hasActiveWorkflowMetadata('exec-1'));
+        self::assertTrue($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')));
     }
 
     /**
@@ -58,13 +59,13 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     public function testCompletingLeavesTheRowReadableAndStopsItBeingActive(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\OrderWorkflow', ['input' => 'kept']);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', ['input' => 'kept']);
 
-        $store->markCompleted('exec-1');
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
 
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'), 'a finished execution is not resumable any more');
+        self::assertFalse($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')), 'a finished execution is not resumable any more');
 
-        $stored = $store->get('exec-1');
+        $stored = $store->get(ExecutionId::fromString('exec-1'));
         self::assertNotNull($stored, 'completing does not delete: the profiler still reads the type');
         self::assertSame('App\\OrderWorkflow', $stored['workflowType']);
         self::assertSame(['input' => 'kept'], $stored['payload']);
@@ -73,37 +74,37 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     public function testCompletingTwiceIsNotAnError(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\OrderWorkflow', []);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', []);
 
-        $store->markCompleted('exec-1');
-        $store->markCompleted('exec-1');
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
 
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'));
-        self::assertNotNull($store->get('exec-1'));
+        self::assertFalse($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')));
+        self::assertNotNull($store->get(ExecutionId::fromString('exec-1')));
     }
 
     public function testCompletingAnUnknownExecutionIsNotAnError(): void
     {
         $store = $this->createMetadataStore();
-        $store->markCompleted('exec-nobody');
+        $store->markCompleted(ExecutionId::fromString('exec-nobody'));
 
-        self::assertNull($store->get('exec-nobody'));
+        self::assertNull($store->get(ExecutionId::fromString('exec-nobody')));
     }
 
     public function testSavingAgainRepublishesTheExecution(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\OrderWorkflow', ['v' => 1]);
-        $store->markCompleted('exec-1');
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', ['v' => 1]);
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
 
-        $store->save('exec-1', 'App\\ContinuedWorkflow', ['v' => 2]);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\ContinuedWorkflow', ['v' => 2]);
 
-        $stored = $store->get('exec-1');
+        $stored = $store->get(ExecutionId::fromString('exec-1'));
         self::assertNotNull($stored);
         self::assertSame('App\\ContinuedWorkflow', $stored['workflowType']);
         self::assertSame(['v' => 2], $stored['payload']);
         self::assertTrue(
-            $store->hasActiveWorkflowMetadata('exec-1'),
+            $store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')),
             'writing the metadata again starts from a resumable execution',
         );
     }
@@ -111,34 +112,34 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     public function testDeletingRemovesTheRowEntirely(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\OrderWorkflow', []);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', []);
 
-        $store->delete('exec-1');
+        $store->delete(ExecutionId::fromString('exec-1'));
 
-        self::assertNull($store->get('exec-1'));
-        self::assertFalse($store->hasActiveWorkflowMetadata('exec-1'));
+        self::assertNull($store->get(ExecutionId::fromString('exec-1')));
+        self::assertFalse($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')));
     }
 
     public function testDeletingAnUnknownExecutionIsNotAnError(): void
     {
         $store = $this->createMetadataStore();
-        $store->delete('exec-nobody');
+        $store->delete(ExecutionId::fromString('exec-nobody'));
 
-        self::assertNull($store->get('exec-nobody'));
+        self::assertNull($store->get(ExecutionId::fromString('exec-nobody')));
     }
 
     public function testExecutionsDoNotLeakIntoEachOther(): void
     {
         $store = $this->createMetadataStore();
-        $store->save('exec-1', 'App\\One', ['n' => 1]);
-        $store->save('exec-2', 'App\\Two', ['n' => 2]);
+        $store->save(ExecutionId::fromString('exec-1'), 'App\\One', ['n' => 1]);
+        $store->save(ExecutionId::fromString('exec-2'), 'App\\Two', ['n' => 2]);
 
-        $store->markCompleted('exec-1');
-        $store->delete('exec-1');
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
+        $store->delete(ExecutionId::fromString('exec-1'));
 
-        $second = $store->get('exec-2');
+        $second = $store->get(ExecutionId::fromString('exec-2'));
         self::assertNotNull($second);
         self::assertSame('App\\Two', $second['workflowType']);
-        self::assertTrue($store->hasActiveWorkflowMetadata('exec-2'));
+        self::assertTrue($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-2')));
     }
 }

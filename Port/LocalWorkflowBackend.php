@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 use Gplanchat\Durable\ExecutionEngine;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * Local implementation of the workflow backend (EventStore + Messenger).
@@ -21,8 +22,8 @@ final class LocalWorkflowBackend implements WorkflowBackendInterface
         private readonly ExecutionEngine $engine,
     ) {}
 
-    public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed
+    public function start(ExecutionId $executionId, callable $handler, ?string $workflowType = null): mixed
     {
-        return $this->engine->start($executionId, $handler, $workflowType);
+        return $this->engine->start($executionId->toString(), $handler, $workflowType);
     }
 }

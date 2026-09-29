@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Port for workflow backends (e.g. the local implementation, Temporal).
  *
@@ -19,11 +21,11 @@ interface WorkflowBackendInterface
     /**
      * Starts a workflow execution.
      *
-     * @param string      $executionId  Unique identifier of the execution
+     * @param ExecutionId $executionId  Unique identifier of the execution
      * @param callable    $handler      Workflow handler (ExecutionContext, ExecutionRuntime) -> mixed
      * @param string|null $workflowType Registered type (toolbar / observability); optional
      *
      * @return mixed The workflow's result
      */
-    public function start(string $executionId, callable $handler, ?string $workflowType = null): mixed;
+    public function start(ExecutionId $executionId, callable $handler, ?string $workflowType = null): mixed;
 }

@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Temporarily links a child run to its parent, to finalise the parent journal in Messenger async mode.
  */
 interface ChildWorkflowParentLinkStoreInterface
 {
-    public function link(string $childExecutionId, string $parentExecutionId): void;
+    public function link(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void;
 
-    public function getParentExecutionId(string $childExecutionId): ?string;
+    public function getParentExecutionId(ExecutionId $childExecutionId): ?ExecutionId;
 
     /**
-     * @return list<string> children recorded for this parent (order not guaranteed)
+     * @return list<ExecutionId> children recorded for this parent (order not guaranteed)
      */
-    public function getChildExecutionIdsForParent(string $parentExecutionId): array;
+    public function getChildExecutionIdsForParent(ExecutionId $parentExecutionId): array;
 
-    public function unlink(string $childExecutionId): void;
+    public function unlink(ExecutionId $childExecutionId): void;
 }

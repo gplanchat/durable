@@ -19,6 +19,7 @@ use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
 use Gplanchat\Durable\Nexus\NexusOperationHeaders;
@@ -183,7 +184,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     {
         // Replay goes through cancelLosers() again on every resume: without this guard the
         // journal would accumulate one TimerCancelled per replay.
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->eventStore->readStream(ExecutionId::fromString($this->executionId)) as $event) {
             if ($event instanceof TimerCancelled && $event->timerId() === $timerId) {
                 return;
             }
@@ -197,7 +198,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         $this->activityTransport->removePendingFor($this->executionId, $activityId);
         // Same guard as cancelTimer(): a race loser stays unsettled on replay, and every resume
         // cancels it again (#678).
-        foreach ($this->eventStore->readStream($this->executionId) as $event) {
+        foreach ($this->eventStore->readStream(ExecutionId::fromString($this->executionId)) as $event) {
             if ($event instanceof ActivityCancelled && $event->activityId() === $activityId) {
                 return;
             }

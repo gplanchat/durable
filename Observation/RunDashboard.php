@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\SystemClock;
 use Psr\Clock\ClockInterface;
@@ -97,7 +98,7 @@ final class RunDashboard
     public function run(string $executionId): array
     {
         [$backend, $catalog] = $this->backend();
-        $run = $catalog?->findRun($executionId);
+        $run = $catalog?->findRun(ExecutionId::fromString($executionId));
 
         return [
             'backend' => $backend,

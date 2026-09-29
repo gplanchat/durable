@@ -28,6 +28,7 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\History\CancellationDelivery;
 use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
@@ -73,7 +74,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
      */
     private function events(): array
     {
-        return $this->events ??= iterator_to_array($this->eventStore->readStream($this->executionId), false);
+        return $this->events ??= iterator_to_array($this->eventStore->readStream(ExecutionId::fromString($this->executionId)), false);
     }
 
     public function findActivitySlotResult(int $slot): ?SlotOutcome
@@ -369,13 +370,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findScheduledChildExecutionId(int $slot): ?string
+    public function findScheduledChildExecutionId(int $slot): ?ExecutionId
     {
         $index = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
-                    return $event->childExecutionId();
+                    return ExecutionId::fromString($event->childExecutionId());
                 }
                 ++$index;
             }
@@ -435,7 +436,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function hasChildExecutionId(string $childExecutionId): bool
+    public function hasChildExecutionId(ExecutionId $childExecutionId): bool
     {
         foreach ($this->eventStore->readStream($childExecutionId) as $_event) {
             return true;
@@ -444,7 +445,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return false;
     }
 
-    public function hasChildExecutionCompletedSuccessfully(string $childExecutionId): bool
+    public function hasChildExecutionCompletedSuccessfully(ExecutionId $childExecutionId): bool
     {
         foreach ($this->eventStore->readStream($childExecutionId) as $event) {
             if ($event instanceof ExecutionCompleted) {

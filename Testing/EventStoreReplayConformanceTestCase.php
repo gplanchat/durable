@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\Port\History\RecordedMessage;
 use Gplanchat\Durable\Port\History\SideEffectOutcome;
@@ -209,8 +210,9 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         }
         self::assertFalse($fromSubject->hasSideEffectForSlot(2), 'two side effects, no third');
 
-        $referenceChild = (string) $fromReference->findScheduledChildExecutionId(0);
+        $referenceChild = $fromReference->findScheduledChildExecutionId(0);
         $childId = $fromSubject->findScheduledChildExecutionId(0);
+        self::assertNotNull($referenceChild);
         self::assertNotNull($childId);
         self::assertSame($fromReference->childWorkflowInputForSlot(0), $fromSubject->childWorkflowInputForSlot(0));
         self::assertSame($fromReference->findChildWorkflowForSlot(0)?->result, $fromSubject->findChildWorkflowForSlot(0)?->result);
@@ -257,7 +259,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
     private static function journalShape(EventStoreInterface $store, string $executionId): array
     {
         $shape = [];
-        foreach ($store->readStream($executionId) as $event) {
+        foreach ($store->readStream(ExecutionId::fromString($executionId)) as $event) {
             $shape[] = [$event::class, self::scrub($event->payload())];
         }
 

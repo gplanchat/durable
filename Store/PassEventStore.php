@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * The journal as one pass sees it (DUR053): every append goes through the fence the pass claimed,
@@ -36,17 +37,17 @@ final class PassEventStore implements EventStoreInterface
         $this->store->appendFenced($event, $this->fence);
     }
 
-    public function readStream(string $executionId): iterable
+    public function readStream(ExecutionId $executionId): iterable
     {
         return $this->store->readStream($executionId);
     }
 
-    public function readStreamWithRecordedAt(string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId $executionId): iterable
     {
         return $this->store->readStreamWithRecordedAt($executionId);
     }
 
-    public function countEventsInStream(string $executionId): int
+    public function countEventsInStream(ExecutionId $executionId): int
     {
         return $this->store->countEventsInStream($executionId);
     }

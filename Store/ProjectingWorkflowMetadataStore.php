@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 
 /**
@@ -23,28 +24,28 @@ final class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
         private readonly WorkflowRunProjectionInterface $projection,
     ) {}
 
-    public function save(string $executionId, string $workflowType, array $payload): void
+    public function save(ExecutionId $executionId, string $workflowType, array $payload): void
     {
         $this->inner->save($executionId, $workflowType, $payload);
-        $this->projection->recordStart($executionId, $workflowType);
+        $this->projection->recordStart($executionId->toString(), $workflowType);
     }
 
-    public function markCompleted(string $executionId): void
+    public function markCompleted(ExecutionId $executionId): void
     {
         $this->inner->markCompleted($executionId);
     }
 
-    public function get(string $executionId): ?array
+    public function get(ExecutionId $executionId): ?array
     {
         return $this->inner->get($executionId);
     }
 
-    public function hasActiveWorkflowMetadata(string $executionId): bool
+    public function hasActiveWorkflowMetadata(ExecutionId $executionId): bool
     {
         return $this->inner->hasActiveWorkflowMetadata($executionId);
     }
 
-    public function delete(string $executionId): void
+    public function delete(ExecutionId $executionId): void
     {
         $this->inner->delete($executionId);
     }
