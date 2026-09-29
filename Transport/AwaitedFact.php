@@ -9,6 +9,7 @@ use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
@@ -68,7 +69,7 @@ final readonly class AwaitedFact
         }
 
         $missing = array_fill_keys($this->ids, true);
-        foreach ($journal->readStream($executionId) as $event) {
+        foreach ($journal->readStream(ExecutionId::fromString($executionId)) as $event) {
             $id = match (true) {
                 AwaitedFactKind::Child === $this->kind && ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) => $event->childExecutionId(),
                 AwaitedFactKind::Signal === $this->kind && $event instanceof WorkflowSignalReceived => $event->requestId(),

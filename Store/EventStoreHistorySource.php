@@ -74,7 +74,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
      */
     private function events(): array
     {
-        return $this->events ??= iterator_to_array($this->eventStore->readStream($this->executionId), false);
+        return $this->events ??= iterator_to_array($this->eventStore->readStream(ExecutionId::fromString($this->executionId)), false);
     }
 
     public function findActivitySlotResult(int $slot): ?SlotOutcome

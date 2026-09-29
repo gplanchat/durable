@@ -33,6 +33,7 @@ use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -75,7 +76,7 @@ final class JournalRunHistoryReader
         $history = [];
         $sequence = 0;
 
-        foreach ($this->events->readStreamWithRecordedAt($runId) as $entry) {
+        foreach ($this->events->readStreamWithRecordedAt(ExecutionId::fromString($runId)) as $entry) {
             $event = $entry['event'];
             $recordedAt = $entry['recordedAt'] ?? null;
 

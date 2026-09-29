@@ -112,7 +112,7 @@ final class InMemoryWorkflowRunner
                 throw WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds);
             }
 
-            $before = $this->eventStore->countEventsInStream($executionId);
+            $before = $this->eventStore->countEventsInStream(ExecutionId::fromString($executionId));
             $this->runActivityWorker($executionId, $runtime, $clock, max(0.0, ((float) ($deadline - hrtime(true))) / 1e9));
             // Timers already due fire on every round; time itself does not move yet.
             $runtime->checkTimers($this->timerContext($executionId, $runtime), PassEventStore::open($this->eventStore, $executionId));
@@ -130,7 +130,7 @@ final class InMemoryWorkflowRunner
             // forever — a test that forgets to deliver its signal froze everything after it.
             // ponytail: detection by absence of progress; a real timer scheduler would call
             // for a virtual clock.
-            if ($this->eventStore->countEventsInStream($executionId) === $before) {
+            if ($this->eventStore->countEventsInStream(ExecutionId::fromString($executionId)) === $before) {
                 // Nothing moves any more: only now are we allowed to move time forward. Doing
                 // it sooner would hand the timer a race the activity was in the middle of
                 // winning.

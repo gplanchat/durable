@@ -11,6 +11,7 @@ use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 
 /**
@@ -28,7 +29,7 @@ final class ActivityEventJournal
         string $executionId,
         string $activityId,
     ): bool {
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityCompleted && $event->activityId() === $activityId) {
                 return true;
             }
@@ -65,7 +66,7 @@ final class ActivityEventJournal
         string $activityId,
     ): ActivityCompleted|ActivityFailed|ActivityCatastrophicFailure|ActivityCancelled|null {
         $last = null;
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if (!$event instanceof ActivityCompleted
                 && !$event instanceof ActivityFailed
                 && !$event instanceof ActivityCatastrophicFailure
@@ -132,7 +133,7 @@ final class ActivityEventJournal
         string $activityId,
         int $attempt,
     ): bool {
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityTaskFailed
                 && $event->activityId() === $activityId
                 && $event->attempt() === $attempt
@@ -156,7 +157,7 @@ final class ActivityEventJournal
         int $attempt,
     ): bool {
         $willRetry = false;
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityRetryQueued && $event->activityId() === $activityId && $event->attempt() === $attempt + 1) {
                 return false;
             }
@@ -179,7 +180,7 @@ final class ActivityEventJournal
         string $activityId,
         int $attempt,
     ): bool {
-        foreach ($eventStore->readStream($executionId) as $event) {
+        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof ActivityTaskStarted
                 && $event->activityId() === $activityId
                 && $event->attempt() === $attempt

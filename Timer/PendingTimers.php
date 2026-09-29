@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Timer;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -22,7 +23,7 @@ final class PendingTimers
     public static function of(EventStoreInterface $journal, string $executionId): array
     {
         $pending = [];
-        foreach ($journal->readStream($executionId) as $event) {
+        foreach ($journal->readStream(ExecutionId::fromString($executionId)) as $event) {
             if ($event instanceof TimerScheduled) {
                 $pending[$event->timerId()] = $event->scheduledAt();
             }
