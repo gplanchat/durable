@@ -72,17 +72,17 @@ final class ProjectingEventStore implements FencedEventStoreInterface
         if ($event instanceof ExecutionStarted
             && !isset($event->payload()['continuedFromExecutionId'])
             && $this->projection instanceof WorkflowRunPickupProjectionInterface) {
-            $this->projection->recordPickup($event->executionId());
+            $this->projection->recordPickup(ExecutionId::fromString($event->executionId()));
         }
 
         // The run waits on this activity while a worker runs it: the attempt number is only known here.
         if ($event instanceof ActivityTaskStarted && $this->projection instanceof WorkflowRunWaitProjectionInterface) {
-            $this->projection->recordWait($event->executionId(), WaitReason::attempt($event));
+            $this->projection->recordWait(ExecutionId::fromString($event->executionId()), WaitReason::attempt($event));
         }
 
         $status = self::outcomeOf($event);
         if (null !== $status) {
-            $this->projection->recordOutcome($event->executionId(), $status);
+            $this->projection->recordOutcome(ExecutionId::fromString($event->executionId()), $status);
         }
     }
 
