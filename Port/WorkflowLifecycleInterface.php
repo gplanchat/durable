@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * The lifecycle outcomes of a run, as the backend records them.
@@ -28,7 +29,7 @@ interface WorkflowLifecycleInterface
      *
      * @throws \Throwable to prevent the run from starting
      */
-    public function onBeforeRun(string $executionId): void;
+    public function onBeforeRun(ExecutionId|string $executionId): void;
 
     /**
      * Has a cancellation been requested and **not yet delivered** to the workflow?
@@ -37,7 +38,7 @@ interface WorkflowLifecycleInterface
      * task, a permanent "yes" would raise the cancellation inside the compensation waits
      * themselves, and the workflow could never compensate.
      */
-    public function isCancellationPending(string $executionId): bool;
+    public function isCancellationPending(ExecutionId|string $executionId): bool;
 
     /**
      * The cancellation has just been raised inside the fiber; `$cancelledOperationIds` lists the
@@ -49,7 +50,7 @@ interface WorkflowLifecycleInterface
      *
      * @param list<string> $cancelledOperationIds
      */
-    public function onCancellationDelivered(string $executionId, array $cancelledOperationIds): void;
+    public function onCancellationDelivered(ExecutionId|string $executionId, array $cancelledOperationIds): void;
 
     /**
      * The cancellation went through the handler without being swallowed: the execution ends
@@ -57,12 +58,12 @@ interface WorkflowLifecycleInterface
      *
      * @throws \Throwable to propagate the ending to the caller
      */
-    public function onCancelled(string $executionId, WorkflowCancelledFailure $failure): void;
+    public function onCancelled(ExecutionId|string $executionId, WorkflowCancelledFailure $failure): void;
 
     /**
      * The handler ran all the way through.
      */
-    public function onCompleted(string $executionId, mixed $result): void;
+    public function onCompleted(ExecutionId|string $executionId, mixed $result): void;
 
     /**
      * The fiber is waiting on an unsettled awaitable; the matching command is already in the buffer.
@@ -71,19 +72,19 @@ interface WorkflowLifecycleInterface
      *
      * @throws \Throwable to signal the suspension to the caller rather than hand control back
      */
-    public function onSuspended(string $executionId, Awaitable $pending): void;
+    public function onSuspended(ExecutionId|string $executionId, Awaitable $pending): void;
 
     /**
      * **Normal** termination: the current run stops in order to chain a new one.
      *
      * @throws \Throwable to propagate the request to the caller
      */
-    public function onContinuedAsNew(string $executionId, ContinueAsNewRequested $request): void;
+    public function onContinuedAsNew(ExecutionId|string $executionId, ContinueAsNewRequested $request): void;
 
     /**
      * The handler did not handle an error.
      *
      * @throws \Throwable to propagate the failure to the caller
      */
-    public function onFailed(string $executionId, \Throwable $failure): void;
+    public function onFailed(ExecutionId|string $executionId, \Throwable $failure): void;
 }
