@@ -44,8 +44,10 @@ final class ProjectingEventStore implements FencedEventStoreInterface
     }
 
     /** Forwarded to a store that fences; over one that cannot, a fence that fences nothing (DUR053). */
-    public function claimPass(string $executionId): PassFence
+    public function claimPass(ExecutionId|string $executionId): PassFence
     {
+        $executionId = (string) $executionId;
+
         return $this->inner instanceof FencedEventStoreInterface
             ? $this->inner->claimPass($executionId)
             : PassFence::none($executionId);

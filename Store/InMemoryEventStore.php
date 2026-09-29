@@ -37,8 +37,9 @@ final class InMemoryEventStore implements FencedEventStoreInterface
         ];
     }
 
-    public function claimPass(string $executionId): PassFence
+    public function claimPass(ExecutionId|string $executionId): PassFence
     {
+        $executionId = (string) $executionId;
         $this->epochs[$executionId] = ($this->epochs[$executionId] ?? 0) + 1;
 
         return new PassFence($executionId, $this->epochs[$executionId]);

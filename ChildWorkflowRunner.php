@@ -57,8 +57,10 @@ final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
      *
      * @throws ChildWorkflowStartDeferred when {@see $asyncMessengerStart}: no ChildWorkflowCompleted appended here
      */
-    public function runChild(string $childExecutionId, string $workflowType, array $input, ?string $parentExecutionId = null): mixed
+    public function runChild(ExecutionId|string $childExecutionId, string $workflowType, array $input, ExecutionId|string|null $parentExecutionId = null): mixed
     {
+        $childExecutionId = (string) $childExecutionId;
+        $parentExecutionId = null === $parentExecutionId ? null : (string) $parentExecutionId;
         if ($this->asyncMessengerStart) {
             if (null === $parentExecutionId || '' === $parentExecutionId) {
                 throw new \InvalidArgumentException('parentExecutionId is required for async Messenger child workflow start.');

@@ -117,11 +117,12 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     }
 
     public function scheduleChildWorkflow(
-        string $childExecutionId,
+        ExecutionId|string $childExecutionId,
         string $childWorkflowType,
         array $input,
         ChildWorkflowOptions $options,
     ): void {
+        $childExecutionId = (string) $childExecutionId;
         // The wire form is built here: the journal records the flat metadata the old code was
         // already giving it, including the two keys the core used to add by hand.
         $this->append(new ChildWorkflowScheduled(
@@ -146,8 +147,9 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         ));
     }
 
-    public function completeChildWorkflow(string $childExecutionId, mixed $result): void
+    public function completeChildWorkflow(ExecutionId|string $childExecutionId, mixed $result): void
     {
+        $childExecutionId = (string) $childExecutionId;
         $this->append(new ChildWorkflowCompleted(
             $this->executionId,
             $childExecutionId,
@@ -155,8 +157,9 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         ));
     }
 
-    public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void
+    public function failChildWorkflow(ExecutionId|string $childExecutionId, \Throwable $reason): void
     {
+        $childExecutionId = (string) $childExecutionId;
         // Through the projector, like an async child: the kind, class and context come from the
         // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
         $this->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(

@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Exception\SupersededPassException;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * A journal that keeps a superseded pass from writing (DUR053, #505).
@@ -22,7 +23,7 @@ interface FencedEventStoreInterface extends EventStoreInterface
      * Makes the execution's epoch one higher and returns it. Every fence claimed before is stale
      * from then on.
      */
-    public function claimPass(string $executionId): PassFence;
+    public function claimPass(ExecutionId|string $executionId): PassFence;
 
     /**
      * Appends while `$fence` is still the execution's newest claim.
