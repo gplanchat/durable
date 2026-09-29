@@ -53,26 +53,22 @@ final class InMemoryEventStore implements FencedEventStoreInterface
         $this->append($event);
     }
 
-    public function readStream(ExecutionId|string $executionId): iterable
+    public function readStream(ExecutionId $executionId): iterable
     {
-        $executionId = (string) $executionId;
         foreach ($this->readStreamWithRecordedAt($executionId) as $entry) {
             yield $entry['event'];
         }
     }
 
-    public function readStreamWithRecordedAt(ExecutionId|string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId $executionId): iterable
     {
-        $executionId = (string) $executionId;
-        foreach ($this->streams[$executionId] ?? [] as $entry) {
+        foreach ($this->streams[$executionId->toString()] ?? [] as $entry) {
             yield $entry;
         }
     }
 
-    public function countEventsInStream(ExecutionId|string $executionId): int
+    public function countEventsInStream(ExecutionId $executionId): int
     {
-        $executionId = (string) $executionId;
-
-        return \count($this->streams[$executionId] ?? []);
+        return \count($this->streams[$executionId->toString()] ?? []);
     }
 }

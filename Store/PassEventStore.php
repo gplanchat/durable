@@ -37,24 +37,18 @@ final class PassEventStore implements EventStoreInterface
         $this->store->appendFenced($event, $this->fence);
     }
 
-    public function readStream(ExecutionId|string $executionId): iterable
+    public function readStream(ExecutionId $executionId): iterable
     {
-        $executionId = (string) $executionId;
-
         return $this->store->readStream($executionId);
     }
 
-    public function readStreamWithRecordedAt(ExecutionId|string $executionId): iterable
+    public function readStreamWithRecordedAt(ExecutionId $executionId): iterable
     {
-        $executionId = (string) $executionId;
-
         return $this->store->readStreamWithRecordedAt($executionId);
     }
 
-    public function countEventsInStream(ExecutionId|string $executionId): int
+    public function countEventsInStream(ExecutionId $executionId): int
     {
-        $executionId = (string) $executionId;
-
         return $this->store->countEventsInStream($executionId);
     }
 }

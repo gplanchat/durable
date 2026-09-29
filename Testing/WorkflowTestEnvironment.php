@@ -111,7 +111,7 @@ final class WorkflowTestEnvironment
      *
      * Useful for assertions of your own:
      * ```php
-     * foreach ($env->getEventStore()->readStream($executionId) as $event) {
+     * foreach ($env->getEventStore()->readStream(ExecutionId::fromString($executionId)) as $event) {
      *     if ($event instanceof ExecutionCompleted) { ... }
      * }
      * ```
