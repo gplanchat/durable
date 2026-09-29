@@ -28,6 +28,7 @@ use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\History\CancellationDelivery;
 use Gplanchat\Durable\Port\History\ChildWorkflowOutcome;
@@ -429,8 +430,9 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function hasChildExecutionId(string $childExecutionId): bool
+    public function hasChildExecutionId(ExecutionId|string $childExecutionId): bool
     {
+        $childExecutionId = (string) $childExecutionId;
         foreach ($this->eventStore->readStream($childExecutionId) as $_event) {
             return true;
         }
@@ -438,8 +440,9 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return false;
     }
 
-    public function hasChildExecutionCompletedSuccessfully(string $childExecutionId): bool
+    public function hasChildExecutionCompletedSuccessfully(ExecutionId|string $childExecutionId): bool
     {
+        $childExecutionId = (string) $childExecutionId;
         foreach ($this->eventStore->readStream($childExecutionId) as $event) {
             if ($event instanceof ExecutionCompleted) {
                 return true;

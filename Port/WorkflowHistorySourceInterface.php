@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Read-only access to recorded workflow history for slot-based replay.
  *
@@ -196,10 +198,10 @@ interface WorkflowHistorySourceInterface
     /**
      * Returns whether the given child execution ID has already been scheduled (for reuse policy checks).
      */
-    public function hasChildExecutionId(string $childExecutionId): bool;
+    public function hasChildExecutionId(ExecutionId|string $childExecutionId): bool;
 
     /**
      * Returns whether the given child execution has completed successfully.
      */
-    public function hasChildExecutionCompletedSuccessfully(string $childExecutionId): bool;
+    public function hasChildExecutionCompletedSuccessfully(ExecutionId|string $childExecutionId): bool;
 }
