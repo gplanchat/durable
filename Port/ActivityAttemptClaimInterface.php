@@ -19,5 +19,5 @@ interface ActivityAttemptClaimInterface
     /**
      * @return (\Closure(): void)|null the release, or null when another worker holds the attempt
      */
-    public function claim(ExecutionId|string $executionId, string $activityId, int $attempt): ?\Closure;
+    public function claim(ExecutionId $executionId, string $activityId, int $attempt): ?\Closure;
 }

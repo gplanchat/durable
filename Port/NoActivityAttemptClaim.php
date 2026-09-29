@@ -11,7 +11,7 @@ use Gplanchat\Durable\ExecutionId;
  */
 final class NoActivityAttemptClaim implements ActivityAttemptClaimInterface
 {
-    public function claim(ExecutionId|string $executionId, string $activityId, int $attempt): \Closure
+    public function claim(ExecutionId $executionId, string $activityId, int $attempt): \Closure
     {
         return static function (): void {};
     }

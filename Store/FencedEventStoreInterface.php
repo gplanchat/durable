@@ -23,7 +23,7 @@ interface FencedEventStoreInterface extends EventStoreInterface
      * Makes the execution's epoch one higher and returns it. Every fence claimed before is stale
      * from then on.
      */
-    public function claimPass(ExecutionId|string $executionId): PassFence;
+    public function claimPass(ExecutionId $executionId): PassFence;
 
     /**
      * Appends while `$fence` is still the execution's newest claim.

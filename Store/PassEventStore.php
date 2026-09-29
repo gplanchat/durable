@@ -28,7 +28,7 @@ final class PassEventStore implements EventStoreInterface
     public static function open(EventStoreInterface $store, string $executionId): EventStoreInterface
     {
         return $store instanceof FencedEventStoreInterface
-            ? new self($store, $store->claimPass($executionId))
+            ? new self($store, $store->claimPass(ExecutionId::fromString($executionId)))
             : $store;
     }
 

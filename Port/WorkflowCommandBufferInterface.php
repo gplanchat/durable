@@ -86,7 +86,7 @@ interface WorkflowCommandBufferInterface
      * @param array<string, mixed> $input
      */
     public function scheduleChildWorkflow(
-        ExecutionId|string $childExecutionId,
+        ExecutionId $childExecutionId,
         string $childWorkflowType,
         array $input,
         ChildWorkflowOptions $options,
@@ -108,14 +108,14 @@ interface WorkflowCommandBufferInterface
      *
      * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
-    public function completeChildWorkflow(ExecutionId|string $childExecutionId, mixed $result): void;
+    public function completeChildWorkflow(ExecutionId $childExecutionId, mixed $result): void;
 
     /**
      * The failure counterpart of {@see completeChildWorkflow()}, honoured and refused alike.
      *
      * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
-    public function failChildWorkflow(ExecutionId|string $childExecutionId, \Throwable $reason): void;
+    public function failChildWorkflow(ExecutionId $childExecutionId, \Throwable $reason): void;
 
     /**
      * Records the version an execution resolved for a declared change point.
