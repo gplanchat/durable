@@ -46,7 +46,7 @@ final class ConformanceWorkflow
         // A change point in the conformance workflow: this is what forces every adapter to round
         // trip the version marker, and not just the reference. A store that lost `VersionMarked`
         // would swing an in-flight execution back onto the other branch — silently.
-        $wf->version('conformance-change', ChangePoint::DEFAULT_VERSION, 1);
+        $wf->version('conformance-change', minSupported: ChangePoint::DEFAULT_VERSION, maxSupported: 1);
         $nested = $wf->sideEffect(static fn(): array => ['nested' => ['deep' => true], 'ratio' => 0.1]);
         $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
         $wf->sleep(Duration::seconds(0.001));
