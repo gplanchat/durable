@@ -360,7 +360,7 @@ final class WorkflowEnvironment
      * write one.
      *
      *     [$a, $b] = $env->await($env->all($x, $y));
-     *     $env->await($env->all($x, $y), Duration::seconds(30));
+     *     $env->await($env->all($x, $y), deadline: Duration::seconds(30));
      *
      * One member failing is the whole thing failing: the quorum is full, so nothing can reach it
      * any more as soon as a single member is missing.
@@ -398,7 +398,7 @@ final class WorkflowEnvironment
      * A composite that settles when **$count** members have succeeded — three quotes out of eight
      * are enough to decide, and the other five then cost nothing but their latency.
      *
-     *     $prices = $env->await($env->some(3, ...$providers), Duration::seconds(2));
+     *     $prices = $env->await($env->some(3, ...$providers), deadline: Duration::seconds(2));
      *
      * It returns the results of the first $count to succeed, **indexed by their declaration
      * position**: that is how the caller knows which ones answered. Members still racing when the
@@ -468,7 +468,7 @@ final class WorkflowEnvironment
      * execution in progress.
      *
      * ```php
-     * if ($this->environment->version('add-discount', ChangePoint::DEFAULT_VERSION, 1) === ChangePoint::DEFAULT_VERSION) {
+     * if ($this->environment->version('add-discount', minSupported: ChangePoint::DEFAULT_VERSION, maxSupported: 1) === ChangePoint::DEFAULT_VERSION) {
      *     $total = $this->await($this->billing->totalWithoutDiscount($basket));
      * } else {
      *     $total = $this->await($this->billing->totalWithDiscount($basket));
