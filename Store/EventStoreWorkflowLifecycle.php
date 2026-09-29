@@ -83,7 +83,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         // ActivityCancelled / TimerCancelled already carry the workflow_cancelled reason, which
         // rejects those awaits on replay. A condition has no such event: this one is what places
         // the delivery in the journal for it (#317).
-        $this->eventStore->append(new WorkflowCancellationDelivered($executionId->toString(), $cancelledOperationIds));
+        $this->eventStore->append(new WorkflowCancellationDelivered($executionId, $cancelledOperationIds));
     }
 
     public function onCancelled(ExecutionId $executionId, WorkflowCancelledFailure $failure): void
@@ -95,7 +95,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             }
         }
 
-        $this->eventStore->append(new WorkflowExecutionCancelled($executionId->toString(), $failure->reason, $source));
+        $this->eventStore->append(new WorkflowExecutionCancelled($executionId, $failure->reason, $source));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Cancelled);
 
         throw new WorkflowCancelledException($executionId->toString(), $failure->reason);
@@ -103,7 +103,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onCompleted(ExecutionId $executionId, mixed $result): void
     {
-        $this->eventStore->append(new ExecutionCompleted($executionId->toString(), $result));
+        $this->eventStore->append(new ExecutionCompleted($executionId, $result));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::CompletedSuccessfully);
     }
 
@@ -126,7 +126,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     {
         $request = $request->withNextExecutionId(ExecutionId::generate()->toString());
         $this->eventStore->append(new WorkflowContinuedAsNew(
-            $executionId->toString(),
+            $executionId,
             $request->workflowType,
             $request->payload,
             null !== $request->options ? $request->options->toMetadata() : [],
@@ -138,7 +138,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onFailed(ExecutionId $executionId, \Throwable $failure): void
     {
-        $this->eventStore->append(WorkflowFailureClassifier::classify($executionId->toString(), $failure));
+        $this->eventStore->append(WorkflowFailureClassifier::classify($executionId, $failure));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
 
         throw match (true) {

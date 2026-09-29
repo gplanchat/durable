@@ -101,10 +101,10 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $older = $store->claimPass(ExecutionId::fromString('exec-fence'));
         $newer = $store->claimPass(ExecutionId::fromString('exec-fence'));
 
-        $store->appendFenced(new ExecutionStarted('exec-fence', ['by' => 'newer']), $newer);
+        $store->appendFenced(new ExecutionStarted(ExecutionId::fromString('exec-fence'), ['by' => 'newer']), $newer);
 
         try {
-            $store->appendFenced(new ExecutionStarted('exec-fence', ['by' => 'older']), $older);
+            $store->appendFenced(new ExecutionStarted(ExecutionId::fromString('exec-fence'), ['by' => 'older']), $older);
             self::fail('a superseded pass must not append');
         } catch (SupersededPassException) {
         }
@@ -121,8 +121,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
         }
         $pass = $store->claimPass(ExecutionId::fromString('exec-outside'));
 
-        $store->append(new WorkflowSignalReceived('exec-outside', 'approve', []));
-        $store->appendFenced(new TimerCompleted('exec-outside', 'timer-1'), $pass);
+        $store->append(new WorkflowSignalReceived(ExecutionId::fromString('exec-outside'), 'approve', []));
+        $store->appendFenced(new TimerCompleted(ExecutionId::fromString('exec-outside'), 'timer-1'), $pass);
 
         self::assertSame(2, $store->countEventsInStream(ExecutionId::fromString('exec-outside')));
     }
@@ -136,7 +136,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         $first = $store->claimPass(ExecutionId::fromString('exec-a'));
         $store->claimPass(ExecutionId::fromString('exec-b'));
 
-        $store->appendFenced(new TimerCompleted('exec-a', 'timer-1'), $first);
+        $store->appendFenced(new TimerCompleted(ExecutionId::fromString('exec-a'), 'timer-1'), $first);
 
         self::assertSame(1, $store->countEventsInStream(ExecutionId::fromString('exec-a')));
     }
@@ -221,9 +221,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
     {
         $store = $this->createEventStore();
 
-        $store->append(new ExecutionStarted('exec-a', ['who' => 'a']));
-        $store->append(new ExecutionStarted('exec-b', ['who' => 'b']));
-        $store->append(new ExecutionCompleted('exec-a', 'done-a'));
+        $store->append(new ExecutionStarted(ExecutionId::fromString('exec-a'), ['who' => 'a']));
+        $store->append(new ExecutionStarted(ExecutionId::fromString('exec-b'), ['who' => 'b']));
+        $store->append(new ExecutionCompleted(ExecutionId::fromString('exec-a'), 'done-a'));
 
         $streamA = iterator_to_array($store->readStream(ExecutionId::fromString('exec-a')), false);
         $streamB = iterator_to_array($store->readStream(ExecutionId::fromString('exec-b')), false);
@@ -288,7 +288,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
     public function testAnUnknownExecutionIsEmptyRatherThanAnError(): void
     {
         $store = $this->createEventStore();
-        $store->append(new ExecutionStarted('exec-known', []));
+        $store->append(new ExecutionStarted(ExecutionId::fromString('exec-known'), []));
 
         self::assertSame([], self::classesOf($store->readStream(ExecutionId::fromString('exec-nobody'))));
         self::assertSame([], iterator_to_array($store->readStreamWithRecordedAt(ExecutionId::fromString('exec-nobody')), false));
@@ -355,16 +355,16 @@ abstract class EventStoreConformanceTestCase extends TestCase
         ];
 
         $events = [
-            new ExecutionStarted($executionId, ['input' => $nested]),
-            new ActivityScheduled($executionId, 'act-1', 'quote', ['lines' => ['a', 'b']], ['queue' => 'default']),
-            new ActivityTaskStarted($executionId, 'act-1', 'quote', 1),
-            new ActivityRetryQueued($executionId, 'act-1', 2),
-            new ActivityTaskFailed($executionId, 'act-1', 'quote', 1, \RuntimeException::class, 'transient', ActivityRetryState::InProgress),
-            new ActivityTaskCompleted($executionId, 'act-1', $nested),
-            new ActivityCompleted($executionId, 'act-1', $nested),
-            new VersionMarked($executionId, 'add-discount', 1),
+            new ExecutionStarted(ExecutionId::fromString($executionId), ['input' => $nested]),
+            new ActivityScheduled(ExecutionId::fromString($executionId), 'act-1', 'quote', ['lines' => ['a', 'b']], ['queue' => 'default']),
+            new ActivityTaskStarted(ExecutionId::fromString($executionId), 'act-1', 'quote', 1),
+            new ActivityRetryQueued(ExecutionId::fromString($executionId), 'act-1', 2),
+            new ActivityTaskFailed(ExecutionId::fromString($executionId), 'act-1', 'quote', 1, \RuntimeException::class, 'transient', ActivityRetryState::InProgress),
+            new ActivityTaskCompleted(ExecutionId::fromString($executionId), 'act-1', $nested),
+            new ActivityCompleted(ExecutionId::fromString($executionId), 'act-1', $nested),
+            new VersionMarked(ExecutionId::fromString($executionId), 'add-discount', 1),
             new ActivityFailed(
-                $executionId,
+                ExecutionId::fromString($executionId),
                 'act-2',
                 \LogicException::class,
                 'nope',
@@ -376,8 +376,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 3,
                 ActivityRetryState::MaximumAttemptsReached,
             ),
-            new ActivityCancelled($executionId, 'act-3', 'workflow cancelled'),
-            ActivityCatastrophicFailure::fromStoredPayload($executionId, [
+            new ActivityCancelled(ExecutionId::fromString($executionId), 'act-3', 'workflow cancelled'),
+            ActivityCatastrophicFailure::fromStoredPayload(ExecutionId::fromString($executionId), [
                 'activityId' => 'act-4',
                 'activityName' => 'quote',
                 'attempt' => 2,
@@ -385,12 +385,12 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 'exceptionMessage' => 'out of memory',
                 'reasonCode' => 'fatal',
             ]),
-            new TimerScheduled($executionId, 'timer-1', 1735689600.5, 'cooldown'),
-            new TimerCompleted($executionId, 'timer-1'),
-            new TimerCancelled($executionId, 'timer-2', 'superseded'),
-            new SideEffectRecorded($executionId, 'side-1', $nested),
+            new TimerScheduled(ExecutionId::fromString($executionId), 'timer-1', 1735689600.5, 'cooldown'),
+            new TimerCompleted(ExecutionId::fromString($executionId), 'timer-1'),
+            new TimerCancelled(ExecutionId::fromString($executionId), 'timer-2', 'superseded'),
+            new SideEffectRecorded(ExecutionId::fromString($executionId), 'side-1', $nested),
             new ChildWorkflowScheduled(
-                $executionId,
+                ExecutionId::fromString($executionId),
                 'child-1',
                 'Child\\Type',
                 ['payload' => $nested],
@@ -398,29 +398,29 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 'requested-id',
                 ['queue' => 'children'],
             ),
-            new ChildWorkflowCompleted($executionId, 'child-1', $nested),
-            new ChildWorkflowFailed($executionId, 'child-2', 'child blew up', 7, 'workflow_handler_failure', \LogicException::class, ['ctx' => $nested]),
-            new WorkflowSignalReceived($executionId, 'approve', ['by' => 'someone', 'payload' => $nested], 'request-1'),
+            new ChildWorkflowCompleted(ExecutionId::fromString($executionId), 'child-1', $nested),
+            new ChildWorkflowFailed(ExecutionId::fromString($executionId), 'child-2', 'child blew up', 7, 'workflow_handler_failure', \LogicException::class, ['ctx' => $nested]),
+            new WorkflowSignalReceived(ExecutionId::fromString($executionId), 'approve', ['by' => 'someone', 'payload' => $nested], 'request-1'),
             new WorkflowUpdateHandled(
-                $executionId,
+                ExecutionId::fromString($executionId),
                 'amend',
                 ['delta' => $nested],
                 $nested,
                 new FailureEnvelope(\LogicException::class, 'rejected', 9, ['ctx' => $nested], '#0 {main}', []),
             ),
-            new WorkflowCancellationRequested($executionId, 'user asked', 'parent-1'),
-            new WorkflowCancellationDelivered($executionId, ['act-1', 'timer-1']),
-            new WorkflowCancellationDelivered($executionId, []),
-            new WorkflowExecutionCancelled($executionId, 'user asked', 'parent-1'),
-            new WorkflowContinuedAsNew($executionId, 'Next\\Type', ['carry' => $nested], ['reason' => 'history size'], 'exec-next'),
-            WorkflowExecutionFailed::fromStoredPayload($executionId, [
+            new WorkflowCancellationRequested(ExecutionId::fromString($executionId), 'user asked', 'parent-1'),
+            new WorkflowCancellationDelivered(ExecutionId::fromString($executionId), ['act-1', 'timer-1']),
+            new WorkflowCancellationDelivered(ExecutionId::fromString($executionId), []),
+            new WorkflowExecutionCancelled(ExecutionId::fromString($executionId), 'user asked', 'parent-1'),
+            new WorkflowContinuedAsNew(ExecutionId::fromString($executionId), 'Next\\Type', ['carry' => $nested], ['reason' => 'history size'], 'exec-next'),
+            WorkflowExecutionFailed::fromStoredPayload(ExecutionId::fromString($executionId), [
                 'kind' => WorkflowExecutionFailed::KIND_WORKFLOW_HANDLER,
                 'failureClass' => \RuntimeException::class,
                 'failureMessage' => 'handler threw',
                 'failureCode' => 13,
                 'context' => ['ctx' => $nested],
             ]),
-            new ExecutionCompleted($executionId, $nested),
+            new ExecutionCompleted(ExecutionId::fromString($executionId), $nested),
         ];
 
         $byClass = [];
