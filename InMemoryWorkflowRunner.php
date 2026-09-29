@@ -46,11 +46,17 @@ final class InMemoryWorkflowRunner
          */
         private readonly float $budgetSeconds = self::DEFAULT_BUDGET_SECONDS,
         /**
-         * Where the virtual time starts, and the clock the activity queue runs on: it must be the
-         * clock `$activityTransport` stamps its due times with. Handed a different one, the drain
-         * never sees a delayed retry fall due and the run ends as budget exhausted.
+         * The clock the activity queue runs on, and where the virtual time starts unless
+         * `$virtualTimeStartsAt` says otherwise: it must be the clock `$activityTransport` stamps
+         * its due times with. Handed a different one, the drain never sees a delayed retry fall
+         * due and the run ends as budget exhausted.
          */
         ?ClockInterface $clock = null,
+        /**
+         * Where the virtual time starts, when it is not the queue's clock: an inline child starts
+         * at its parent's virtual now, while its queue keeps the transport's clock (#652).
+         */
+        private readonly ?ClockInterface $virtualTimeStartsAt = null,
     ) {
         $this->clock = $clock ?? new SystemClock();
     }
@@ -67,7 +73,7 @@ final class InMemoryWorkflowRunner
         // moves from one due time to the next, never on its own.
         // An object, not a variable: an arrow function captures by value, and the clock would
         // never move.
-        $clock = new VirtualClock((float) $this->clock->now()->format('U.u'));
+        $clock = new VirtualClock((float) ($this->virtualTimeStartsAt ?? $this->clock)->now()->format('U.u'));
 
         $runtime = new ExecutionRuntime(
             $this->eventStore,
@@ -90,6 +96,7 @@ final class InMemoryWorkflowRunner
                     $this->workflowRegistry,
                     $this->activityExecutor,
                     $this->maxActivityRetries,
+                    queueClock: $this->clock,
                 )
                 : null,
             new ParentChildWorkflowCoordinator($this->eventStore),
