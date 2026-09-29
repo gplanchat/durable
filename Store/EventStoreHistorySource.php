@@ -112,6 +112,12 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             return null;
         }
 
+        // A race loser stays unsettled, as a losing timer does: replay settles the race on its
+        // winner again, and cancels the loser again. Read back as a rejection, it settled first
+        // and won the race it had lost (#678). Whatever it recorded afterwards is not read either.
+        if (ActivityCancellationReason::RACE_SUPERSEDED === ($cancelledReasonByActivityId[$activityId] ?? null)) {
+            return null;
+        }
         if (isset($catastrophicByActivityId[$activityId])) {
             return new SlotOutcome(null, $catastrophicByActivityId[$activityId]);
         }
