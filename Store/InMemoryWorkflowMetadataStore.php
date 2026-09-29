@@ -17,38 +17,33 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
     /**
      * @param array<string, mixed> $payload
      */
-    public function save(ExecutionId|string $executionId, string $workflowType, array $payload): void
+    public function save(ExecutionId $executionId, string $workflowType, array $payload): void
     {
-        $executionId = (string) $executionId;
-        $this->metadata[$executionId] = [
+        $this->metadata[$executionId->toString()] = [
             'workflowType' => $workflowType,
             'payload' => $payload,
             'completed' => false,
         ];
     }
 
-    public function markCompleted(ExecutionId|string $executionId): void
+    public function markCompleted(ExecutionId $executionId): void
     {
-        $executionId = (string) $executionId;
-        if (!isset($this->metadata[$executionId])) {
+        if (!isset($this->metadata[$executionId->toString()])) {
             return;
         }
-        $this->metadata[$executionId]['completed'] = true;
+        $this->metadata[$executionId->toString()]['completed'] = true;
     }
 
     /**
      * @return array{workflowType: string, payload: array<string, mixed>, completed?: bool}|null
      */
-    public function get(ExecutionId|string $executionId): ?array
+    public function get(ExecutionId $executionId): ?array
     {
-        $executionId = (string) $executionId;
-
-        return $this->metadata[$executionId] ?? null;
+        return $this->metadata[$executionId->toString()] ?? null;
     }
 
-    public function hasActiveWorkflowMetadata(ExecutionId|string $executionId): bool
+    public function hasActiveWorkflowMetadata(ExecutionId $executionId): bool
     {
-        $executionId = (string) $executionId;
         $m = $this->get($executionId);
         if (null === $m) {
             return false;
@@ -57,9 +52,8 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
         return !($m['completed'] ?? false);
     }
 
-    public function delete(ExecutionId|string $executionId): void
+    public function delete(ExecutionId $executionId): void
     {
-        $executionId = (string) $executionId;
-        unset($this->metadata[$executionId]);
+        unset($this->metadata[$executionId->toString()]);
     }
 }

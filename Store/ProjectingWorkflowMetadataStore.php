@@ -24,36 +24,29 @@ final class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
         private readonly WorkflowRunProjectionInterface $projection,
     ) {}
 
-    public function save(ExecutionId|string $executionId, string $workflowType, array $payload): void
+    public function save(ExecutionId $executionId, string $workflowType, array $payload): void
     {
-        $executionId = (string) $executionId;
         $this->inner->save($executionId, $workflowType, $payload);
-        $this->projection->recordStart($executionId, $workflowType);
+        $this->projection->recordStart($executionId->toString(), $workflowType);
     }
 
-    public function markCompleted(ExecutionId|string $executionId): void
+    public function markCompleted(ExecutionId $executionId): void
     {
-        $executionId = (string) $executionId;
         $this->inner->markCompleted($executionId);
     }
 
-    public function get(ExecutionId|string $executionId): ?array
+    public function get(ExecutionId $executionId): ?array
     {
-        $executionId = (string) $executionId;
-
         return $this->inner->get($executionId);
     }
 
-    public function hasActiveWorkflowMetadata(ExecutionId|string $executionId): bool
+    public function hasActiveWorkflowMetadata(ExecutionId $executionId): bool
     {
-        $executionId = (string) $executionId;
-
         return $this->inner->hasActiveWorkflowMetadata($executionId);
     }
 
-    public function delete(ExecutionId|string $executionId): void
+    public function delete(ExecutionId $executionId): void
     {
-        $executionId = (string) $executionId;
         $this->inner->delete($executionId);
     }
 }
