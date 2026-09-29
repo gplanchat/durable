@@ -27,5 +27,5 @@ interface WorkflowTimerDispatcher
      * @param int $delayMs Wait before the wake-up. `0` means "as soon as the current work is
      *                     finished", not "right now".
      */
-    public function dispatchTimerFire(ExecutionId|string $executionId, int $delayMs = 0): void;
+    public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void;
 }

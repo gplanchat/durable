@@ -42,7 +42,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         private ?ParentChildWorkflowCoordinatorInterface $parentChildCoordinator = null,
     ) {}
 
-    public function onBeforeRun(ExecutionId|string $executionId): void
+    public function onBeforeRun(ExecutionId $executionId): void
     {
         // Nothing to pre-empt: the cancellation is delivered inside the fiber, at the wait
         // point, to let the workflow compensate.
@@ -54,11 +54,10 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
      * the compensation waits. Journals written before that event existed carry the delivery only
      * as an operation cancelled with the workflow_cancelled reason, which still counts.
      */
-    public function isCancellationPending(ExecutionId|string $executionId): bool
+    public function isCancellationPending(ExecutionId $executionId): bool
     {
-        $executionId = (string) $executionId;
         $requested = false;
-        foreach ($this->eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
                 $requested = true;
             }
@@ -79,60 +78,55 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         return $requested;
     }
 
-    public function onCancellationDelivered(ExecutionId|string $executionId, array $cancelledOperationIds): void
+    public function onCancellationDelivered(ExecutionId $executionId, array $cancelledOperationIds): void
     {
-        $executionId = (string) $executionId;
         // ActivityCancelled / TimerCancelled already carry the workflow_cancelled reason, which
         // rejects those awaits on replay. A condition has no such event: this one is what places
         // the delivery in the journal for it (#317).
-        $this->eventStore->append(new WorkflowCancellationDelivered($executionId, $cancelledOperationIds));
+        $this->eventStore->append(new WorkflowCancellationDelivered($executionId->toString(), $cancelledOperationIds));
     }
 
-    public function onCancelled(ExecutionId|string $executionId, WorkflowCancelledFailure $failure): void
+    public function onCancelled(ExecutionId $executionId, WorkflowCancelledFailure $failure): void
     {
-        $executionId = (string) $executionId;
         $source = null;
-        foreach ($this->eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
                 $source = $event->sourceParentExecutionId();
             }
         }
 
-        $this->eventStore->append(new WorkflowExecutionCancelled($executionId, $failure->reason, $source));
+        $this->eventStore->append(new WorkflowExecutionCancelled($executionId->toString(), $failure->reason, $source));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Cancelled);
 
-        throw new WorkflowCancelledException($executionId, $failure->reason);
+        throw new WorkflowCancelledException($executionId->toString(), $failure->reason);
     }
 
-    public function onCompleted(ExecutionId|string $executionId, mixed $result): void
+    public function onCompleted(ExecutionId $executionId, mixed $result): void
     {
-        $executionId = (string) $executionId;
-        $this->eventStore->append(new ExecutionCompleted($executionId, $result));
+        $this->eventStore->append(new ExecutionCompleted($executionId->toString(), $result));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::CompletedSuccessfully);
     }
 
-    public function onSuspended(ExecutionId|string $executionId, Awaitable $pending): void
+    public function onSuspended(ExecutionId $executionId, Awaitable $pending): void
     {
-        $executionId = (string) $executionId;
         // Must go through the composites: an any(activity, timer) really is waiting on a deadline.
         $waitingOnTimer = AwaitableInspector::waitsOnTimer($pending);
 
         throw new WorkflowSuspendedException(
-            \sprintf('Workflow %s suspended (fiber mode)', $executionId),
+            \sprintf('Workflow %s suspended (fiber mode)', $executionId->toString()),
             0,
             null,
             $waitingOnTimer,
             $waitingOnTimer,
-            WaitReason::describe($pending, $this->eventStore, $executionId),
+            WaitReason::describe($pending, $this->eventStore, $executionId->toString()),
         );
     }
 
-    public function onContinuedAsNew(ExecutionId|string $executionId, ContinueAsNewRequested $request): void
+    public function onContinuedAsNew(ExecutionId $executionId, ContinueAsNewRequested $request): void
     {
-        $executionId = (string) $executionId;
         $request = $request->withNextExecutionId(ExecutionId::generate()->toString());
         $this->eventStore->append(new WorkflowContinuedAsNew(
-            $executionId,
+            $executionId->toString(),
             $request->workflowType,
             $request->payload,
             null !== $request->options ? $request->options->toMetadata() : [],
@@ -142,10 +136,9 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         throw $request;
     }
 
-    public function onFailed(ExecutionId|string $executionId, \Throwable $failure): void
+    public function onFailed(ExecutionId $executionId, \Throwable $failure): void
     {
-        $executionId = (string) $executionId;
-        $this->eventStore->append(WorkflowFailureClassifier::classify($executionId, $failure));
+        $this->eventStore->append(WorkflowFailureClassifier::classify($executionId->toString(), $failure));
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
 
         throw match (true) {

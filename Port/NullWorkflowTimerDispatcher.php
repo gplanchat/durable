@@ -12,5 +12,5 @@ use Gplanchat\Durable\ExecutionId;
  */
 final class NullWorkflowTimerDispatcher implements WorkflowTimerDispatcher
 {
-    public function dispatchTimerFire(ExecutionId|string $executionId, int $delayMs = 0): void {}
+    public function dispatchTimerFire(ExecutionId $executionId, int $delayMs = 0): void {}
 }

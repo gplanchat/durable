@@ -24,18 +24,17 @@ final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordin
         private readonly ?WorkflowResumeDispatcher $resumeDispatcher = null,
     ) {}
 
-    public function onParentClosed(ExecutionId|string $parentExecutionId, ParentClosureReason $reason): void
+    public function onParentClosed(ExecutionId $parentExecutionId, ParentClosureReason $reason): void
     {
-        $parentExecutionId = (string) $parentExecutionId;
-        foreach ($this->collectScheduledChildren(ExecutionId::fromString($parentExecutionId)) as $row) {
+        foreach ($this->collectScheduledChildren($parentExecutionId) as $row) {
             if (!self::isChildRunActive($this->eventStore, $row['childExecutionId']->toString())) {
                 continue;
             }
 
             match ($row['policy']) {
-                ParentClosePolicy::Terminate => $this->terminateChild($row['childExecutionId'], $parentExecutionId),
+                ParentClosePolicy::Terminate => $this->terminateChild($row['childExecutionId'], $parentExecutionId->toString()),
                 ParentClosePolicy::Abandon => null,
-                ParentClosePolicy::RequestCancel => $this->requestCancelChild($row['childExecutionId'], $parentExecutionId),
+                ParentClosePolicy::RequestCancel => $this->requestCancelChild($row['childExecutionId'], $parentExecutionId->toString()),
             };
         }
     }

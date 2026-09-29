@@ -12,5 +12,5 @@ use Gplanchat\Durable\ParentClosureReason;
  */
 interface ParentChildWorkflowCoordinatorInterface
 {
-    public function onParentClosed(ExecutionId|string $parentExecutionId, ParentClosureReason $reason): void;
+    public function onParentClosed(ExecutionId $parentExecutionId, ParentClosureReason $reason): void;
 }
