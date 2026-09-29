@@ -26,11 +26,11 @@ interface WorkflowRunProjectionInterface
      * An execution starts. The **name** can only come from the metadata store:
      * `ExecutionStarted` does not carry the workflow type.
      */
-    public function recordStart(ExecutionId|string $executionId, string $workflowType): void;
+    public function recordStart(ExecutionId $executionId, string $workflowType): void;
 
     /**
      * What the execution became. It comes from the journal, the only place where the outcome is a
      * fact.
      */
-    public function recordOutcome(ExecutionId|string $executionId, WorkflowRunStatus $status): void;
+    public function recordOutcome(ExecutionId $executionId, WorkflowRunStatus $status): void;
 }

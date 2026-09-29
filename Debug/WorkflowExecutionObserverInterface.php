@@ -14,7 +14,7 @@ interface WorkflowExecutionObserverInterface
     /**
      * @param string $workflowType Type registered in the WorkflowRegistry (or fallback label)
      */
-    public function onWorkflowRun(ExecutionId|string $executionId, string $workflowType, bool $isResume): void;
+    public function onWorkflowRun(ExecutionId $executionId, string $workflowType, bool $isResume): void;
 
     /**
      * One activity execution attempt (includes the retries when there are several calls).
@@ -22,7 +22,7 @@ interface WorkflowExecutionObserverInterface
      * @param class-string<\Throwable>|null $errorClass
      */
     public function onActivityExecuted(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         string $activityName,
         float $durationSeconds,

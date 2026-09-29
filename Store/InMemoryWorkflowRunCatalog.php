@@ -73,31 +73,28 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
     /**
      * An execution starts, or restarts under another type after a continue-as-new.
      */
-    public function recordStart(ExecutionId|string $executionId, string $workflowType): void
+    public function recordStart(ExecutionId $executionId, string $workflowType): void
     {
-        $executionId = (string) $executionId;
-        $this->runs[$executionId] = [
+        $this->runs[$executionId->toString()] = [
             'workflowType' => $workflowType,
             'status' => WorkflowRunStatus::Running,
-            'startedAt' => $this->runs[$executionId]['startedAt'] ?? $this->now(),
+            'startedAt' => $this->runs[$executionId->toString()]['startedAt'] ?? $this->now(),
             'endedAt' => null,
-            'pickedUp' => $this->runs[$executionId]['pickedUp'] ?? false,
+            'pickedUp' => $this->runs[$executionId->toString()]['pickedUp'] ?? false,
         ];
     }
 
-    public function recordPickup(ExecutionId|string $executionId): void
+    public function recordPickup(ExecutionId $executionId): void
     {
-        $executionId = (string) $executionId;
-        if (isset($this->runs[$executionId])) {
-            $this->runs[$executionId]['pickedUp'] = true;
+        if (isset($this->runs[$executionId->toString()])) {
+            $this->runs[$executionId->toString()]['pickedUp'] = true;
         }
     }
 
-    public function recordWait(ExecutionId|string $executionId, ?string $waitingOn): void
+    public function recordWait(ExecutionId $executionId, ?string $waitingOn): void
     {
-        $executionId = (string) $executionId;
-        if (isset($this->runs[$executionId])) {
-            $this->runs[$executionId]['waitingOn'] = $waitingOn;
+        if (isset($this->runs[$executionId->toString()])) {
+            $this->runs[$executionId->toString()]['waitingOn'] = $waitingOn;
         }
     }
 
@@ -105,15 +102,14 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
      * The outcome of an execution. An outcome on an execution that never started is ignored: the
      * catalog describes what it saw begin, it does not invent a row out of an ending.
      */
-    public function recordOutcome(ExecutionId|string $executionId, WorkflowRunStatus $status): void
+    public function recordOutcome(ExecutionId $executionId, WorkflowRunStatus $status): void
     {
-        $executionId = (string) $executionId;
-        if (!isset($this->runs[$executionId])) {
+        if (!isset($this->runs[$executionId->toString()])) {
             return;
         }
 
-        $this->runs[$executionId]['status'] = $status;
-        $this->runs[$executionId]['endedAt'] = $this->now();
+        $this->runs[$executionId->toString()]['status'] = $status;
+        $this->runs[$executionId->toString()]['endedAt'] = $this->now();
     }
 
     public function canFilterRuns(?WorkflowRunFilter $filter = null): bool

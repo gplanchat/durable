@@ -88,13 +88,12 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
         return $next;
     }
 
-    public function removePendingFor(ExecutionId|string $executionId, string $activityId): bool
+    public function removePendingFor(ExecutionId $executionId, string $activityId): bool
     {
-        $executionId = (string) $executionId;
         $removed = false;
         $next = [];
         foreach ($this->pending as $row) {
-            if (!$removed && $row['message']->executionId === $executionId && $row['message']->activityId === $activityId) {
+            if (!$removed && $row['message']->executionId === $executionId->toString() && $row['message']->activityId === $activityId) {
                 $removed = true;
 
                 continue;

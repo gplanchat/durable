@@ -23,5 +23,5 @@ interface WorkflowRunPickupProjectionInterface
     /**
      * A worker picked the execution up. Recording it twice changes nothing.
      */
-    public function recordPickup(ExecutionId|string $executionId): void;
+    public function recordPickup(ExecutionId $executionId): void;
 }

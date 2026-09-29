@@ -20,10 +20,10 @@ use Gplanchat\Durable\ExecutionId;
  */
 final class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
 {
-    public function onWorkflowRun(ExecutionId|string $executionId, string $workflowType, bool $isResume): void {}
+    public function onWorkflowRun(ExecutionId $executionId, string $workflowType, bool $isResume): void {}
 
     public function onActivityExecuted(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         string $activityName,
         float $durationSeconds,

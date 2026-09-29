@@ -17,7 +17,7 @@ interface WorkflowDispatchObserverInterface
      * @param string|null          $transportNames where the dispatch went ("temporal", Messenger transport names)
      */
     public function onWorkflowDispatchRequested(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $workflowType,
         array $payload,
         bool $isResume,

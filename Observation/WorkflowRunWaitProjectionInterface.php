@@ -20,5 +20,5 @@ interface WorkflowRunWaitProjectionInterface
      * Nexus operation), clears it rather than leave the previous one standing. Read only while the
      * run is running.
      */
-    public function recordWait(ExecutionId|string $executionId, ?string $waitingOn): void;
+    public function recordWait(ExecutionId $executionId, ?string $waitingOn): void;
 }
