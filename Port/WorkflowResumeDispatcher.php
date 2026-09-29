@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Transport\AwaitedFact;
 
 /**
@@ -17,7 +18,7 @@ interface WorkflowResumeDispatcher
      * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates to
      *        hand back to the execution for the pass this resume triggers
      */
-    public function dispatchResume(string $executionId, array $pendingUpdates = []): void;
+    public function dispatchResume(ExecutionId|string $executionId, array $pendingUpdates = []): void;
 
     /**
      * Sends, **now**, a resume that announces a fact not journalled yet (DUR050, DUR052): an
@@ -28,12 +29,12 @@ interface WorkflowResumeDispatcher
      * (the writer could die first), and where a resume runs inline (a `sync` route) it must not be
      * sent at all: it would always run before the append.
      */
-    public function dispatchResumeAwaiting(string $executionId, AwaitedFact $fact): void;
+    public function dispatchResumeAwaiting(ExecutionId|string $executionId, AwaitedFact $fact): void;
 
     /**
      * Starts a new run (blank history) after a continue-as-new or equivalent.
      *
      * @param array<string, mixed> $payload
      */
-    public function dispatchNewWorkflowRun(string $executionId, string $workflowType, array $payload): void;
+    public function dispatchNewWorkflowRun(ExecutionId|string $executionId, string $workflowType, array $payload): void;
 }

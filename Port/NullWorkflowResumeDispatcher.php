@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Transport\AwaitedFact;
 
 /**
@@ -11,17 +12,17 @@ use Gplanchat\Durable\Transport\AwaitedFact;
  */
 final class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
 {
-    public function dispatchResume(string $executionId, array $pendingUpdates = []): void
+    public function dispatchResume(ExecutionId|string $executionId, array $pendingUpdates = []): void
     {
         // No-op
     }
 
-    public function dispatchResumeAwaiting(string $executionId, AwaitedFact $fact): void
+    public function dispatchResumeAwaiting(ExecutionId|string $executionId, AwaitedFact $fact): void
     {
         // No-op
     }
 
-    public function dispatchNewWorkflowRun(string $executionId, string $workflowType, array $payload): void
+    public function dispatchNewWorkflowRun(ExecutionId|string $executionId, string $workflowType, array $payload): void
     {
         // No-op
     }
