@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The optional fourth write of run observation: what a suspended execution waits on (#324).
  *
@@ -18,5 +20,5 @@ interface WorkflowRunWaitProjectionInterface
      * Nexus operation), clears it rather than leave the previous one standing. Read only while the
      * run is running.
      */
-    public function recordWait(string $executionId, ?string $waitingOn): void;
+    public function recordWait(ExecutionId|string $executionId, ?string $waitingOn): void;
 }

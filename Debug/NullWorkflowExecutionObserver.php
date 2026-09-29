@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Debug;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The observer for when nobody observes.
  *
@@ -18,10 +20,10 @@ namespace Gplanchat\Durable\Debug;
  */
 final class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
 {
-    public function onWorkflowRun(string $executionId, string $workflowType, bool $isResume): void {}
+    public function onWorkflowRun(ExecutionId|string $executionId, string $workflowType, bool $isResume): void {}
 
     public function onActivityExecuted(
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         string $activityName,
         float $durationSeconds,

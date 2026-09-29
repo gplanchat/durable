@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The optional third write of run observation: a worker picked the execution up (#447).
  *
@@ -21,5 +23,5 @@ interface WorkflowRunPickupProjectionInterface
     /**
      * A worker picked the execution up. Recording it twice changes nothing.
      */
-    public function recordPickup(string $executionId): void;
+    public function recordPickup(ExecutionId|string $executionId): void;
 }

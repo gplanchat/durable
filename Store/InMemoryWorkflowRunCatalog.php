@@ -73,8 +73,9 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
     /**
      * An execution starts, or restarts under another type after a continue-as-new.
      */
-    public function recordStart(string $executionId, string $workflowType): void
+    public function recordStart(ExecutionId|string $executionId, string $workflowType): void
     {
+        $executionId = (string) $executionId;
         $this->runs[$executionId] = [
             'workflowType' => $workflowType,
             'status' => WorkflowRunStatus::Running,
@@ -84,15 +85,17 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
         ];
     }
 
-    public function recordPickup(string $executionId): void
+    public function recordPickup(ExecutionId|string $executionId): void
     {
+        $executionId = (string) $executionId;
         if (isset($this->runs[$executionId])) {
             $this->runs[$executionId]['pickedUp'] = true;
         }
     }
 
-    public function recordWait(string $executionId, ?string $waitingOn): void
+    public function recordWait(ExecutionId|string $executionId, ?string $waitingOn): void
     {
+        $executionId = (string) $executionId;
         if (isset($this->runs[$executionId])) {
             $this->runs[$executionId]['waitingOn'] = $waitingOn;
         }
@@ -102,8 +105,9 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
      * The outcome of an execution. An outcome on an execution that never started is ignored: the
      * catalog describes what it saw begin, it does not invent a row out of an ending.
      */
-    public function recordOutcome(string $executionId, WorkflowRunStatus $status): void
+    public function recordOutcome(ExecutionId|string $executionId, WorkflowRunStatus $status): void
     {
+        $executionId = (string) $executionId;
         if (!isset($this->runs[$executionId])) {
             return;
         }

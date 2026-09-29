@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Observation;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The write side of run observation (DUR037).
  *
@@ -24,11 +26,11 @@ interface WorkflowRunProjectionInterface
      * An execution starts. The **name** can only come from the metadata store:
      * `ExecutionStarted` does not carry the workflow type.
      */
-    public function recordStart(string $executionId, string $workflowType): void;
+    public function recordStart(ExecutionId|string $executionId, string $workflowType): void;
 
     /**
      * What the execution became. It comes from the journal, the only place where the outcome is a
      * fact.
      */
-    public function recordOutcome(string $executionId, WorkflowRunStatus $status): void;
+    public function recordOutcome(ExecutionId|string $executionId, WorkflowRunStatus $status): void;
 }
