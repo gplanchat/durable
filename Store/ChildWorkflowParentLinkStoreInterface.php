@@ -11,14 +11,14 @@ use Gplanchat\Durable\ExecutionId;
  */
 interface ChildWorkflowParentLinkStoreInterface
 {
-    public function link(ExecutionId|string $childExecutionId, ExecutionId|string $parentExecutionId): void;
+    public function link(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void;
 
-    public function getParentExecutionId(ExecutionId|string $childExecutionId): ?string;
+    public function getParentExecutionId(ExecutionId $childExecutionId): ?ExecutionId;
 
     /**
-     * @return list<string> children recorded for this parent (order not guaranteed)
+     * @return list<ExecutionId> children recorded for this parent (order not guaranteed)
      */
-    public function getChildExecutionIdsForParent(ExecutionId|string $parentExecutionId): array;
+    public function getChildExecutionIdsForParent(ExecutionId $parentExecutionId): array;
 
-    public function unlink(ExecutionId|string $childExecutionId): void;
+    public function unlink(ExecutionId $childExecutionId): void;
 }

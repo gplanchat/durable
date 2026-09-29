@@ -14,36 +14,32 @@ final class InMemoryChildWorkflowParentLinkStore implements ChildWorkflowParentL
     /** @var array<string, string> childExecutionId => parentExecutionId */
     private array $childToParent = [];
 
-    public function link(ExecutionId|string $childExecutionId, ExecutionId|string $parentExecutionId): void
+    public function link(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void
     {
-        $childExecutionId = (string) $childExecutionId;
-        $parentExecutionId = (string) $parentExecutionId;
-        $this->childToParent[$childExecutionId] = $parentExecutionId;
+        $this->childToParent[$childExecutionId->toString()] = $parentExecutionId->toString();
     }
 
-    public function getParentExecutionId(ExecutionId|string $childExecutionId): ?string
+    public function getParentExecutionId(ExecutionId $childExecutionId): ?ExecutionId
     {
-        $childExecutionId = (string) $childExecutionId;
+        $parent = $this->childToParent[$childExecutionId->toString()] ?? null;
 
-        return $this->childToParent[$childExecutionId] ?? null;
+        return null === $parent ? null : ExecutionId::fromString($parent);
     }
 
-    public function getChildExecutionIdsForParent(ExecutionId|string $parentExecutionId): array
+    public function getChildExecutionIdsForParent(ExecutionId $parentExecutionId): array
     {
-        $parentExecutionId = (string) $parentExecutionId;
         $children = [];
-        foreach ($this->childToParent as $childExecutionId => $p) {
-            if ($p === $parentExecutionId) {
-                $children[] = $childExecutionId;
+        foreach ($this->childToParent as $child => $parent) {
+            if ($parent === $parentExecutionId->toString()) {
+                $children[] = ExecutionId::fromString((string) $child);
             }
         }
 
         return $children;
     }
 
-    public function unlink(ExecutionId|string $childExecutionId): void
+    public function unlink(ExecutionId $childExecutionId): void
     {
-        $childExecutionId = (string) $childExecutionId;
-        unset($this->childToParent[$childExecutionId]);
+        unset($this->childToParent[$childExecutionId->toString()]);
     }
 }

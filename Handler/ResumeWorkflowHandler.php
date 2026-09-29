@@ -152,13 +152,13 @@ final class ResumeWorkflowHandler
 
     private function finalizeAsyncChildOnParentIfLinked(ExecutionId $childId, mixed $result, ?\Throwable $failure): void
     {
-        $parentId = $this->childWorkflowParentLinkStore->getParentExecutionId($childId);
-        if (null === $parentId) {
+        $parent = $this->childWorkflowParentLinkStore->getParentExecutionId($childId);
+        if (null === $parent) {
             return;
         }
         // The events and the awaited fact still carry strings (#638 follow-up).
         $childExecutionId = $childId->toString();
-        $parent = ExecutionId::fromString($parentId);
+        $parentId = $parent->toString();
 
         // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
         // redelivered after a crash still finds the link, and resumes the parent without a second
