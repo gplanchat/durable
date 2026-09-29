@@ -20,7 +20,7 @@ final readonly class WorkflowUpdateHandled implements Event
      * @param array<string, mixed> $arguments
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $updateName,
         private array $arguments,
         private mixed $result,
@@ -42,7 +42,7 @@ final readonly class WorkflowUpdateHandled implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function updateName(): string

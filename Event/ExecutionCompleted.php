@@ -9,13 +9,13 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class ExecutionCompleted implements Event
 {
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private mixed $result = null,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function result(): mixed

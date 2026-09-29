@@ -19,7 +19,7 @@ use Gplanchat\Durable\Failure\ActivityRetryState;
 final readonly class ActivityTaskFailed implements Event
 {
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $activityId,
         private string $activityName,
         private int $attempt,
@@ -30,7 +30,7 @@ final readonly class ActivityTaskFailed implements Event
     ) {}
 
     public static function forThrowable(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         string $activityName,
         int $attempt,
@@ -47,7 +47,7 @@ final readonly class ActivityTaskFailed implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function activityId(): string

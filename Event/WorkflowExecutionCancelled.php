@@ -19,14 +19,14 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class WorkflowExecutionCancelled implements Event
 {
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $reason,
         private ?string $sourceParentExecutionId = null,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function reason(): string

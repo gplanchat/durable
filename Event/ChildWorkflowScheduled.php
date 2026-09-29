@@ -17,7 +17,7 @@ final readonly class ChildWorkflowScheduled implements Event
      * @param array<string, mixed> $schedulingMetadata Temporal-aligned options (namespace, task_queue, timeouts, …)
      */
     public function __construct(
-        private ExecutionId|string $parentExecutionId,
+        private ExecutionId $parentExecutionId,
         private string $childExecutionId,
         private string $childWorkflowType,
         private array $input,
@@ -28,7 +28,7 @@ final readonly class ChildWorkflowScheduled implements Event
 
     public function executionId(): string
     {
-        return (string) $this->parentExecutionId;
+        return $this->parentExecutionId->toString();
     }
 
     public function childExecutionId(): string

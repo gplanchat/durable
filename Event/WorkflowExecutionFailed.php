@@ -27,7 +27,7 @@ final readonly class WorkflowExecutionFailed implements Event
      * @param array<string, mixed> $context
      */
     private function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $kind,
         private string $failureClass,
         private string $failureMessage,
@@ -38,7 +38,7 @@ final readonly class WorkflowExecutionFailed implements Event
     /**
      * @param array<string, mixed> $p
      */
-    public static function fromStoredPayload(ExecutionId|string $executionId, array $p): self
+    public static function fromStoredPayload(ExecutionId $executionId, array $p): self
     {
         return new self(
             $executionId,
@@ -56,7 +56,7 @@ final readonly class WorkflowExecutionFailed implements Event
      * The triplet is in the context rather than melted into the message: a failure that does not
      * name its endpoint leaves you looking for which of the three gave up.
      */
-    public static function unhandledNexusOperationFailure(ExecutionId|string $executionId, DurableNexusOperationFailedException $cause): self
+    public static function unhandledNexusOperationFailure(ExecutionId $executionId, DurableNexusOperationFailedException $cause): self
     {
         return new self(
             $executionId,
@@ -74,7 +74,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function unhandledActivityFailure(ExecutionId|string $executionId, string $activityId, string $activityName, \Throwable $cause): self
+    public static function unhandledActivityFailure(ExecutionId $executionId, string $activityId, string $activityName, \Throwable $cause): self
     {
         return new self(
             $executionId,
@@ -89,7 +89,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function unhandledDeclaredActivityFailure(ExecutionId|string $executionId, \Throwable $cause): self
+    public static function unhandledDeclaredActivityFailure(ExecutionId $executionId, \Throwable $cause): self
     {
         return new self(
             $executionId,
@@ -101,7 +101,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function unhandledActivitySuperseded(ExecutionId|string $executionId, \Throwable $cause): self
+    public static function unhandledActivitySuperseded(ExecutionId $executionId, \Throwable $cause): self
     {
         return new self(
             $executionId,
@@ -117,7 +117,7 @@ final readonly class WorkflowExecutionFailed implements Event
      * An uncaught workflow deadline: distinct from a handler failure, it says *which* wait did
      * not succeed (ADR DUR032).
      */
-    public static function deadlineExceeded(ExecutionId|string $executionId, DeadlineExceededException $cause): self
+    public static function deadlineExceeded(ExecutionId $executionId, DeadlineExceededException $cause): self
     {
         return new self(
             $executionId,
@@ -129,7 +129,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function unhandledCatastrophicActivity(ExecutionId|string $executionId, \Throwable $cause): self
+    public static function unhandledCatastrophicActivity(ExecutionId $executionId, \Throwable $cause): self
     {
         return new self(
             $executionId,
@@ -141,7 +141,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function workflowHandlerFailure(ExecutionId|string $executionId, \Throwable $e): self
+    public static function workflowHandlerFailure(ExecutionId $executionId, \Throwable $e): self
     {
         return new self(
             $executionId,
@@ -153,7 +153,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function terminatedByParent(ExecutionId|string $childExecutionId, string $parentExecutionId, string $message = 'Child workflow terminated: parent closed'): self
+    public static function terminatedByParent(ExecutionId $childExecutionId, string $parentExecutionId, string $message = 'Child workflow terminated: parent closed'): self
     {
         return new self(
             $childExecutionId,
@@ -167,7 +167,7 @@ final readonly class WorkflowExecutionFailed implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function kind(): string

@@ -20,7 +20,7 @@ final readonly class WorkflowContinuedAsNew implements Event
      * @param ?string $newExecutionId The run that continues this one; null on a journal written before #322
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $nextWorkflowType,
         private array $nextPayload,
         private array $continuationMetadata = [],
@@ -34,7 +34,7 @@ final readonly class WorkflowContinuedAsNew implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function nextWorkflowType(): string

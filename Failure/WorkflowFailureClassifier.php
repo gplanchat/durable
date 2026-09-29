@@ -24,7 +24,7 @@ final class WorkflowFailureClassifier
 {
     private function __construct() {}
 
-    public static function classify(ExecutionId|string $executionId, \Throwable $e): WorkflowExecutionFailed
+    public static function classify(ExecutionId $executionId, \Throwable $e): WorkflowExecutionFailed
     {
         return match (true) {
             $e instanceof DurableCatastrophicActivityFailureException => WorkflowExecutionFailed::unhandledCatastrophicActivity($executionId, $e),

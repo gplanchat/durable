@@ -12,14 +12,14 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class ChildWorkflowCompleted implements Event
 {
     public function __construct(
-        private ExecutionId|string $parentExecutionId,
+        private ExecutionId $parentExecutionId,
         private string $childExecutionId,
         private mixed $result,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->parentExecutionId;
+        return $this->parentExecutionId->toString();
     }
 
     public function childExecutionId(): string

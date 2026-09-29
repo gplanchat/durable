@@ -13,7 +13,7 @@ final readonly class ActivityScheduled implements Event
      * @param array<string, mixed> $metadata
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $activityId,
         private string $activityName,
         private array $payload,
@@ -22,7 +22,7 @@ final readonly class ActivityScheduled implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function activityId(): string

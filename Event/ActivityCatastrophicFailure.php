@@ -13,7 +13,7 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class ActivityCatastrophicFailure implements Event
 {
     private function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $activityId,
         private string $activityName,
         private int $attempt,
@@ -25,7 +25,7 @@ final readonly class ActivityCatastrophicFailure implements Event
     /**
      * @param array<string, mixed> $p
      */
-    public static function fromStoredPayload(ExecutionId|string $executionId, array $p): self
+    public static function fromStoredPayload(ExecutionId $executionId, array $p): self
     {
         return new self(
             $executionId,
@@ -39,7 +39,7 @@ final readonly class ActivityCatastrophicFailure implements Event
     }
 
     public static function forThrowable(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         string $activityName,
         int $attempt,
@@ -64,7 +64,7 @@ final readonly class ActivityCatastrophicFailure implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function activityId(): string

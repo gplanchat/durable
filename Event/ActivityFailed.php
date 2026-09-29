@@ -15,7 +15,7 @@ final readonly class ActivityFailed implements Event
      * @param list<array{class: string, message: string, code: int}> $failurePrevious
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $activityId,
         private string $failureClass,
         private string $failureMessage,
@@ -30,7 +30,7 @@ final readonly class ActivityFailed implements Event
     ) {}
 
     public static function fromEnvelope(
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         FailureEnvelope $envelope,
         string $activityName = '',
@@ -54,7 +54,7 @@ final readonly class ActivityFailed implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function activityId(): string

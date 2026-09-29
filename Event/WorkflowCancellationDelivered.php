@@ -19,13 +19,13 @@ final readonly class WorkflowCancellationDelivered implements Event
      * @param list<string> $targets
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private array $targets,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     /**

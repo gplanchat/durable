@@ -21,14 +21,14 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class TimerCancelled implements Event
 {
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $timerId,
         private string $reason,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function timerId(): string

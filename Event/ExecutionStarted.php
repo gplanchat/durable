@@ -12,13 +12,13 @@ final readonly class ExecutionStarted implements Event
      * @param array<string, mixed> $payload
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private array $payload = [],
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     /**

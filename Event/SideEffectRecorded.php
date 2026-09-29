@@ -15,14 +15,14 @@ use Gplanchat\Durable\ExecutionId;
 final readonly class SideEffectRecorded implements Event
 {
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $sideEffectId,
         private mixed $result,
     ) {}
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function sideEffectId(): string

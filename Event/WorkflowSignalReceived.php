@@ -16,7 +16,7 @@ final readonly class WorkflowSignalReceived implements Event
      * @param array<string, mixed> $payload
      */
     public function __construct(
-        private ExecutionId|string $executionId,
+        private ExecutionId $executionId,
         private string $signalName,
         private array $payload,
         /** The delivery's request id (DUR052); null on a signal journalled before it was kept. */
@@ -30,7 +30,7 @@ final readonly class WorkflowSignalReceived implements Event
 
     public function executionId(): string
     {
-        return (string) $this->executionId;
+        return $this->executionId->toString();
     }
 
     public function signalName(): string
