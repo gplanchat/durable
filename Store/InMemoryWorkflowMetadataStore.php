@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * In-memory implementation of the WorkflowMetadataStore (tests).
  */
@@ -15,8 +17,9 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
     /**
      * @param array<string, mixed> $payload
      */
-    public function save(string $executionId, string $workflowType, array $payload): void
+    public function save(ExecutionId|string $executionId, string $workflowType, array $payload): void
     {
+        $executionId = (string) $executionId;
         $this->metadata[$executionId] = [
             'workflowType' => $workflowType,
             'payload' => $payload,
@@ -24,8 +27,9 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
         ];
     }
 
-    public function markCompleted(string $executionId): void
+    public function markCompleted(ExecutionId|string $executionId): void
     {
+        $executionId = (string) $executionId;
         if (!isset($this->metadata[$executionId])) {
             return;
         }
@@ -35,13 +39,16 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
     /**
      * @return array{workflowType: string, payload: array<string, mixed>, completed?: bool}|null
      */
-    public function get(string $executionId): ?array
+    public function get(ExecutionId|string $executionId): ?array
     {
+        $executionId = (string) $executionId;
+
         return $this->metadata[$executionId] ?? null;
     }
 
-    public function hasActiveWorkflowMetadata(string $executionId): bool
+    public function hasActiveWorkflowMetadata(ExecutionId|string $executionId): bool
     {
+        $executionId = (string) $executionId;
         $m = $this->get($executionId);
         if (null === $m) {
             return false;
@@ -50,8 +57,9 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
         return !($m['completed'] ?? false);
     }
 
-    public function delete(string $executionId): void
+    public function delete(ExecutionId|string $executionId): void
     {
+        $executionId = (string) $executionId;
         unset($this->metadata[$executionId]);
     }
 }
