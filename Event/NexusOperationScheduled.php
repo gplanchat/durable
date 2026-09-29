@@ -26,9 +26,9 @@ final readonly class NexusOperationScheduled implements Event
         private string $operation,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function scheduledEventId(): int

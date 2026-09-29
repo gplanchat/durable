@@ -19,9 +19,9 @@ final readonly class NexusOperationCancelled implements Event
         private int $scheduledEventId,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function scheduledEventId(): int

@@ -17,9 +17,9 @@ final readonly class ActivityCancelled implements Event
         private string $reason,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function activityId(): string

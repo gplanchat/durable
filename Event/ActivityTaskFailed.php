@@ -45,9 +45,9 @@ final readonly class ActivityTaskFailed implements Event
         return new self($executionId, $activityId, $activityName, $attempt, $e::class, $message, $retryState);
     }
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function activityId(): string

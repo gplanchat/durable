@@ -26,9 +26,9 @@ final readonly class ChildWorkflowScheduled implements Event
         private array $schedulingMetadata = [],
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->parentExecutionId->toString();
+        return $this->parentExecutionId;
     }
 
     public function childExecutionId(): string

@@ -53,7 +53,7 @@ final class EventDataMapper
     public static function fromDomainEvent(Event $event): array
     {
         return [
-            'execution_id' => $event->executionId(),
+            'execution_id' => $event->executionId()->toString(),
             'event_type' => $event::class,
             'payload' => $event->payload(),
         ];

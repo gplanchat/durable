@@ -231,9 +231,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
         self::assertCount(2, $streamA);
         self::assertCount(1, $streamB);
         foreach ($streamA as $event) {
-            self::assertSame('exec-a', $event->executionId());
+            self::assertSame('exec-a', $event->executionId()->toString());
         }
-        self::assertSame('exec-b', $streamB[0]->executionId());
+        self::assertSame('exec-b', $streamB[0]->executionId()->toString());
     }
 
     public function testCountingAgreesWithTheStreamLength(): void

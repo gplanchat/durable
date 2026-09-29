@@ -24,9 +24,9 @@ final readonly class WorkflowExecutionCancelled implements Event
         private ?string $sourceParentExecutionId = null,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function reason(): string

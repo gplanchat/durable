@@ -21,9 +21,9 @@ final readonly class ActivityRetryQueued implements Event
         private int $attempt,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function activityId(): string

@@ -27,7 +27,7 @@ final class InMemoryEventStore implements FencedEventStoreInterface
 
     public function append(Event $event): void
     {
-        $id = $event->executionId();
+        $id = $event->executionId()->toString();
         if (!isset($this->streams[$id])) {
             $this->streams[$id] = [];
         }

@@ -17,9 +17,9 @@ final readonly class ChildWorkflowCompleted implements Event
         private mixed $result,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->parentExecutionId->toString();
+        return $this->parentExecutionId;
     }
 
     public function childExecutionId(): string

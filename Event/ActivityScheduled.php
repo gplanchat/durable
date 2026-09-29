@@ -20,9 +20,9 @@ final readonly class ActivityScheduled implements Event
         private array $metadata = [],
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function activityId(): string

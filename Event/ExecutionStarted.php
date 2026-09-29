@@ -16,9 +16,9 @@ final readonly class ExecutionStarted implements Event
         private array $payload = [],
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     /**

@@ -13,9 +13,9 @@ final readonly class ExecutionCompleted implements Event
         private mixed $result = null,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function result(): mixed

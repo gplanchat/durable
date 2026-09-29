@@ -20,9 +20,9 @@ final readonly class SideEffectRecorded implements Event
         private mixed $result,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     public function sideEffectId(): string

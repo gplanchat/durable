@@ -23,9 +23,9 @@ final readonly class WorkflowCancellationDelivered implements Event
         private array $targets,
     ) {}
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     /**
