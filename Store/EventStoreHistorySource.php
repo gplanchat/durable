@@ -364,13 +364,13 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function findScheduledChildExecutionId(int $slot): ?string
+    public function findScheduledChildExecutionId(int $slot): ?ExecutionId
     {
         $index = 0;
         foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
-                    return $event->childExecutionId();
+                    return ExecutionId::fromString($event->childExecutionId());
                 }
                 ++$index;
             }
@@ -430,9 +430,8 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return null;
     }
 
-    public function hasChildExecutionId(ExecutionId|string $childExecutionId): bool
+    public function hasChildExecutionId(ExecutionId $childExecutionId): bool
     {
-        $childExecutionId = (string) $childExecutionId;
         foreach ($this->eventStore->readStream($childExecutionId) as $_event) {
             return true;
         }
@@ -440,9 +439,8 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         return false;
     }
 
-    public function hasChildExecutionCompletedSuccessfully(ExecutionId|string $childExecutionId): bool
+    public function hasChildExecutionCompletedSuccessfully(ExecutionId $childExecutionId): bool
     {
-        $childExecutionId = (string) $childExecutionId;
         foreach ($this->eventStore->readStream($childExecutionId) as $event) {
             if ($event instanceof ExecutionCompleted) {
                 return true;

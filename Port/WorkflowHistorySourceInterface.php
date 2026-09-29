@@ -123,7 +123,7 @@ interface WorkflowHistorySourceInterface
     /**
      * Returns the child execution ID scheduled at slot N, or null.
      */
-    public function findScheduledChildExecutionId(int $slot): ?string;
+    public function findScheduledChildExecutionId(int $slot): ?ExecutionId;
 
     /**
      * Returns the workflow **type** of the child recorded at slot N, or null if none was.
@@ -198,10 +198,10 @@ interface WorkflowHistorySourceInterface
     /**
      * Returns whether the given child execution ID has already been scheduled (for reuse policy checks).
      */
-    public function hasChildExecutionId(ExecutionId|string $childExecutionId): bool;
+    public function hasChildExecutionId(ExecutionId $childExecutionId): bool;
 
     /**
      * Returns whether the given child execution has completed successfully.
      */
-    public function hasChildExecutionCompletedSuccessfully(ExecutionId|string $childExecutionId): bool;
+    public function hasChildExecutionCompletedSuccessfully(ExecutionId $childExecutionId): bool;
 }

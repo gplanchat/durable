@@ -601,10 +601,10 @@ final class ExecutionContext
         }
 
         $scheduledId = $this->historySource->findScheduledChildExecutionId($slotIndex);
-        $childExecutionId = $scheduledId ?? ($options->workflowId ?? $this->uuid());
+        $childExecutionId = $scheduledId?->toString() ?? ($options->workflowId ?? $this->uuid());
 
         if (null === $scheduledId && null !== $options->workflowId) {
-            $this->assertChildWorkflowIdAllowed($options, $childExecutionId);
+            $this->assertChildWorkflowIdAllowed($options, ExecutionId::fromString($childExecutionId));
         }
 
         if (null === $scheduledId) {
@@ -890,7 +890,7 @@ final class ExecutionContext
         }
     }
 
-    private function assertChildWorkflowIdAllowed(ChildWorkflowOptions $options, string $childExecutionId): void
+    private function assertChildWorkflowIdAllowed(ChildWorkflowOptions $options, ExecutionId $childExecutionId): void
     {
         if (WorkflowIdReusePolicy::AllowDuplicate === $options->workflowIdReusePolicy) {
             return;
