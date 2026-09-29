@@ -178,8 +178,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         self::runConformanceWorkflow($reference, 'exec-reference');
         self::runConformanceWorkflow($subject, 'exec-subject');
         // A message recorded on both journals, read back through the shared cursor.
-        $reference->append(new WorkflowSignalReceived('exec-reference', 'conformance-signal', ['n' => 1]));
-        $subject->append(new WorkflowSignalReceived('exec-subject', 'conformance-signal', ['n' => 1]));
+        $reference->append(new WorkflowSignalReceived(ExecutionId::fromString('exec-reference'), 'conformance-signal', ['n' => 1]));
+        $subject->append(new WorkflowSignalReceived(ExecutionId::fromString('exec-subject'), 'conformance-signal', ['n' => 1]));
 
         $fromReference = new EventStoreHistorySource($reference, 'exec-reference');
         $fromSubject = new EventStoreHistorySource($subject, 'exec-subject');

@@ -31,6 +31,7 @@ use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\ParentClosePolicy;
 
@@ -71,6 +72,7 @@ final class EventDataMapper
         if (!\is_string($executionId)) {
             throw new \InvalidArgumentException('toDomainEvent: missing execution_id');
         }
+        $id = ExecutionId::fromString($executionId);
         $rawPayload = $record['payload'] ?? null;
         $payload = \is_string($rawPayload) ? json_decode($rawPayload, true, 512, \JSON_THROW_ON_ERROR) : $rawPayload;
         if (!\is_array($payload)) {
@@ -79,40 +81,40 @@ final class EventDataMapper
         /* @var array<string, mixed> $payload */
 
         return match ($eventType) {
-            ExecutionStarted::class => new ExecutionStarted($executionId, $payload),
-            ExecutionCompleted::class => new ExecutionCompleted($executionId, $payload['result'] ?? null),
+            ExecutionStarted::class => new ExecutionStarted($id, $payload),
+            ExecutionCompleted::class => new ExecutionCompleted($id, $payload['result'] ?? null),
             ActivityScheduled::class => new ActivityScheduled(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (string) $payload['activityName'],
                 \is_array($payload['payload'] ?? null) ? $payload['payload'] : [],
                 \is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
             ),
             ActivityCancelled::class => new ActivityCancelled(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (string) $payload['reason'],
             ),
-            ActivityCompleted::class => new ActivityCompleted($executionId, (string) $payload['activityId'], $payload['result'] ?? null),
-            VersionMarked::class => new VersionMarked($executionId, (string) $payload['changeId'], (int) $payload['version']),
+            ActivityCompleted::class => new ActivityCompleted($id, (string) $payload['activityId'], $payload['result'] ?? null),
+            VersionMarked::class => new VersionMarked($id, (string) $payload['changeId'], (int) $payload['version']),
             ActivityTaskStarted::class => new ActivityTaskStarted(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (string) $payload['activityName'],
                 (int) ($payload['attempt'] ?? 1),
             ),
             ActivityRetryQueued::class => new ActivityRetryQueued(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (int) $payload['attempt'],
             ),
             ActivityTaskCompleted::class => new ActivityTaskCompleted(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 $payload['result'] ?? null,
             ),
             ActivityFailed::class => new ActivityFailed(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (string) $payload['failureClass'],
                 (string) $payload['failureMessage'],
@@ -125,7 +127,7 @@ final class EventDataMapper
                 isset($payload['retryState']) ? ActivityRetryState::tryFrom((string) $payload['retryState']) : null,
             ),
             ActivityTaskFailed::class => new ActivityTaskFailed(
-                $executionId,
+                $id,
                 (string) $payload['activityId'],
                 (string) ($payload['activityName'] ?? ''),
                 (int) ($payload['attempt'] ?? 1),
@@ -133,35 +135,35 @@ final class EventDataMapper
                 (string) ($payload['failureMessage'] ?? ''),
                 ActivityRetryState::tryFrom((string) ($payload['retryState'] ?? '')) ?? ActivityRetryState::InProgress,
             ),
-            ActivityCatastrophicFailure::class => ActivityCatastrophicFailure::fromStoredPayload($executionId, $payload),
-            WorkflowExecutionFailed::class => WorkflowExecutionFailed::fromStoredPayload($executionId, $payload),
+            ActivityCatastrophicFailure::class => ActivityCatastrophicFailure::fromStoredPayload($id, $payload),
+            WorkflowExecutionFailed::class => WorkflowExecutionFailed::fromStoredPayload($id, $payload),
             TimerScheduled::class => new TimerScheduled(
-                $executionId,
+                $id,
                 (string) $payload['timerId'],
                 (float) $payload['scheduledAt'],
                 isset($payload['summary']) ? (string) $payload['summary'] : '',
             ),
-            TimerCompleted::class => new TimerCompleted($executionId, (string) $payload['timerId']),
-            TimerCancelled::class => new TimerCancelled($executionId, (string) $payload['timerId'], (string) ($payload['reason'] ?? '')),
-            SideEffectRecorded::class => new SideEffectRecorded($executionId, (string) $payload['sideEffectId'], $payload['result'] ?? null),
-            ChildWorkflowScheduled::class => self::toDomainEventChildWorkflowScheduled($executionId, $payload),
-            ChildWorkflowCompleted::class => new ChildWorkflowCompleted($executionId, (string) $payload['childExecutionId'], $payload['result'] ?? null),
-            ChildWorkflowFailed::class => self::toDomainEventChildWorkflowFailed($executionId, $payload),
+            TimerCompleted::class => new TimerCompleted($id, (string) $payload['timerId']),
+            TimerCancelled::class => new TimerCancelled($id, (string) $payload['timerId'], (string) ($payload['reason'] ?? '')),
+            SideEffectRecorded::class => new SideEffectRecorded($id, (string) $payload['sideEffectId'], $payload['result'] ?? null),
+            ChildWorkflowScheduled::class => self::toDomainEventChildWorkflowScheduled($id, $payload),
+            ChildWorkflowCompleted::class => new ChildWorkflowCompleted($id, (string) $payload['childExecutionId'], $payload['result'] ?? null),
+            ChildWorkflowFailed::class => self::toDomainEventChildWorkflowFailed($id, $payload),
             WorkflowContinuedAsNew::class => new WorkflowContinuedAsNew(
-                $executionId,
+                $id,
                 (string) $payload['nextWorkflowType'],
                 \is_array($payload['nextPayload'] ?? null) ? $payload['nextPayload'] : [],
                 \is_array($payload['continuationMetadata'] ?? null) ? $payload['continuationMetadata'] : [],
                 isset($payload['newExecutionId']) ? (string) $payload['newExecutionId'] : null,
             ),
             WorkflowSignalReceived::class => new WorkflowSignalReceived(
-                $executionId,
+                $id,
                 (string) $payload['signalName'],
                 \is_array($payload['signalPayload'] ?? null) ? $payload['signalPayload'] : [],
                 \is_string($payload['requestId'] ?? null) ? $payload['requestId'] : null,
             ),
             WorkflowUpdateHandled::class => new WorkflowUpdateHandled(
-                $executionId,
+                $id,
                 (string) $payload['updateName'],
                 \is_array($payload['arguments'] ?? null) ? $payload['arguments'] : [],
                 $payload['result'] ?? null,
@@ -171,13 +173,13 @@ final class EventDataMapper
                     (int) ($payload['failure']['code'] ?? 0),
                 ) : null,
             ),
-            WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($executionId, $payload),
+            WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($id, $payload),
             WorkflowCancellationDelivered::class => new WorkflowCancellationDelivered(
-                $executionId,
+                $id,
                 array_values(array_map(strval(...), (array) ($payload['targets'] ?? []))),
             ),
             WorkflowExecutionCancelled::class => new WorkflowExecutionCancelled(
-                $executionId,
+                $id,
                 (string) ($payload['reason'] ?? ''),
                 isset($payload['sourceParentExecutionId']) ? (string) $payload['sourceParentExecutionId'] : null,
             ),
@@ -188,7 +190,7 @@ final class EventDataMapper
     /**
      * @param array<string, mixed> $p
      */
-    private static function toDomainEventChildWorkflowScheduled(string $executionId, array $p): ChildWorkflowScheduled
+    private static function toDomainEventChildWorkflowScheduled(ExecutionId $executionId, array $p): ChildWorkflowScheduled
     {
         $policyValue = $p['parentClosePolicy'] ?? ParentClosePolicy::Terminate->value;
         $policy = ParentClosePolicy::from(\is_string($policyValue) ? $policyValue : ParentClosePolicy::Terminate->value);
@@ -217,7 +219,7 @@ final class EventDataMapper
     /**
      * @param array<string, mixed> $p
      */
-    private static function toDomainEventChildWorkflowFailed(string $executionId, array $p): ChildWorkflowFailed
+    private static function toDomainEventChildWorkflowFailed(ExecutionId $executionId, array $p): ChildWorkflowFailed
     {
         $ctx = $p['workflowFailureContext'] ?? [];
         if (!\is_array($ctx)) {
@@ -238,7 +240,7 @@ final class EventDataMapper
     /**
      * @param array<string, mixed> $p
      */
-    private static function toDomainEventWorkflowCancellationRequested(string $executionId, array $p): WorkflowCancellationRequested
+    private static function toDomainEventWorkflowCancellationRequested(ExecutionId $executionId, array $p): WorkflowCancellationRequested
     {
         $source = $p['sourceParentExecutionId'] ?? null;
         if ('' === $source) {
