@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
+use Gplanchat\Durable\Activity\RetryLimit;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Versioning\ChangePoint;
@@ -11,7 +13,8 @@ use Gplanchat\Durable\WorkflowEnvironment;
 
 /**
  * The workflow {@see EventStoreReplayConformanceTestCase} runs against every adapter: a change
- * point, an activity, a timer, two side effects (one with a nested payload) and a child. A class
+ * point, an activity, a timer, two side effects (one with a nested payload), a race a timer wins
+ * against a failing activity, and a child. A class
  * rather than a closure, so that a worker process running it on a server can register the very
  * same body (#326).
  *
@@ -30,10 +33,13 @@ final class ConformanceWorkflow
             'currency' => 'EUR',
             'lines' => $payload['lines'] ?? [],
         ]);
+        $executor->register('durable.conformance.reject', static function (): never {
+            throw new \RuntimeException('rejected, to lose the race');
+        });
     }
 
     /**
-     * @return array{nested: mixed, quote: mixed, flag: mixed, child: mixed}
+     * @return array{nested: mixed, quote: mixed, flag: mixed, race: string, child: mixed}
      */
     public static function run(WorkflowEnvironment $wf): array
     {
@@ -45,8 +51,20 @@ final class ConformanceWorkflow
         $quote = $wf->await($wf->activityStub(ConformanceActivities::class)->quote(['a', 'b']));
         $wf->sleep(Duration::seconds(0.001));
         $flag = $wf->sideEffect(static fn(): string => 'after-timer');
+        // A race the timer wins: the activity fails at once and waits out a backoff far longer than
+        // the timer, so it is cancelled as the loser. Every backend must read that loser back as
+        // unsettled, and the await after the race must still go on (#678, #681, #701).
+        $winner = $wf->await($wf->any(
+            // Not integral on purpose: a JSON store reads 30.0 back as 30, and the journals differ.
+            $wf->activityStub(ConformanceActivities::class, new ActivityOptions(
+                retryLimit: RetryLimit::ofAttempts(5),
+                initialInterval: Duration::seconds(30.5),
+                backoffCoefficient: 1.5,
+            ))->reject(),
+            $wf->timer(Duration::seconds(2)),
+        ));
         $child = $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class)->run('hello'));
 
-        return ['nested' => $nested, 'quote' => $quote, 'flag' => $flag, 'child' => $child];
+        return ['nested' => $nested, 'quote' => $quote, 'flag' => $flag, 'race' => null === $winner ? 'timer' : 'activity', 'child' => $child];
     }
 }
