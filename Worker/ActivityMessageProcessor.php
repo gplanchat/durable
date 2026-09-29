@@ -13,6 +13,7 @@ use Gplanchat\Durable\Event\ActivityRetryQueued;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Exception\ActivityAttemptDeferred;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityFailureEventFactory;
 use Gplanchat\Durable\Failure\ActivityRetryState;
 use Gplanchat\Durable\Port\ActivityAttemptClaimInterface;
@@ -85,7 +86,7 @@ final class ActivityMessageProcessor
             $message->activityId,
             $message->attempt,
         )) {
-            $this->resumeDispatcher->dispatchResume($message->executionId);
+            $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
 
             return null;
         }
@@ -193,13 +194,13 @@ final class ActivityMessageProcessor
             $settled = true;
             // Sent before the append and again after (DUR050): a worker that dies in between leaves
             // a resume that waits for the outcome, instead of an outcome nobody resumes.
-            $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
+            $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
             $this->eventStore->append(new ActivityCompleted(
                 $message->executionId,
                 $message->activityId,
                 $result,
             ));
-            $this->resumeDispatcher->dispatchResume($message->executionId);
+            $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
         } catch (\Throwable $e) {
             if ($settled) {
                 throw $e;
@@ -276,7 +277,7 @@ final class ActivityMessageProcessor
 
     private function appendActivityFailure(ActivityMessage $message, \Throwable $e, ActivityRetryState $retryState): void
     {
-        $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
+        $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
         $this->eventStore->append(ActivityFailureEventFactory::fromActivityThrowable(
             $message->executionId,
             $message->activityId,
@@ -285,18 +286,18 @@ final class ActivityMessageProcessor
             $e,
             $retryState,
         ));
-        $this->resumeDispatcher->dispatchResume($message->executionId);
+        $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
     }
 
     private function appendActivityCancelled(ActivityMessage $message, string $reason): void
     {
-        $this->resumeDispatcher->dispatchResumeAwaiting($message->executionId, AwaitedFact::activity($message->activityId));
+        $this->resumeDispatcher->dispatchResumeAwaiting(ExecutionId::fromString($message->executionId), AwaitedFact::activity($message->activityId));
         $this->eventStore->append(new ActivityCancelled(
             $message->executionId,
             $message->activityId,
             $reason,
         ));
-        $this->resumeDispatcher->dispatchResume($message->executionId);
+        $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
     }
 
     private static function secondsSince(int $t0): float
