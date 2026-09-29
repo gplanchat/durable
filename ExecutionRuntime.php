@@ -210,14 +210,33 @@ final class ExecutionRuntime
 
             $wait = $dueAt - (float) $queueClock->now()->format('U.u');
             if ($wait > 0) {
+                // A timer that falls due during the backoff fires before the retry, as on Temporal:
+                // wait only until then and hand back, so the caller fires it and resumes (#653).
+                // An attempt itself is never cut short: the virtual clock still does not move
+                // while an activity runs.
+                $timerWait = null !== $waitedOn ? $this->secondsUntilNextTimer($context, $waitedOn) : null;
+                $timerFirst = null !== $timerWait && $timerWait < $wait;
                 $waitStartedAt = hrtime(true);
-                usleep((int) ceil($wait * 1_000_000.0));
+                usleep((int) ceil(($timerFirst ? $timerWait : $wait) * 1_000_000.0));
                 $waitedOn?->advance(((float) (hrtime(true) - $waitStartedAt)) / 1e9);
+                if ($timerFirst) {
+                    return;
+                }
             }
             if (!$this->drainActivityQueueOnce($context)) {
                 return;
             }
         }
+    }
+
+    /**
+     * Seconds until the context's next pending timer falls due on the virtual clock, or null.
+     */
+    private function secondsUntilNextTimer(ExecutionContext $context, VirtualClock $clock): ?float
+    {
+        $pending = PendingTimers::of($this->eventStore, $context->executionId());
+
+        return [] === $pending ? null : max(0.0, min($pending) - $clock->seconds());
     }
 
     public function getActivityTransport(): ActivityTransportInterface
