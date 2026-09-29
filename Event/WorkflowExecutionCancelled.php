@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * End of execution on cancellation — the terminal counterpart of
  * {@see WorkflowCancellationRequested}, which had none: a child in
@@ -17,14 +19,14 @@ namespace Gplanchat\Durable\Event;
 final readonly class WorkflowExecutionCancelled implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $reason,
         private ?string $sourceParentExecutionId = null,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function reason(): string

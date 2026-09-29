@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 final readonly class TimerScheduled implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $timerId,
         private float $scheduledAt,
         private string $summary = '',
@@ -15,7 +17,7 @@ final readonly class TimerScheduled implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function timerId(): string

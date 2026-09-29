@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The requested cancellation was raised inside the workflow, at the await it was waiting on.
  *
@@ -17,13 +19,13 @@ final readonly class WorkflowCancellationDelivered implements Event
      * @param list<string> $targets
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private array $targets,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     /**

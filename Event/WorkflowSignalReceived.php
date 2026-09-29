@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Signal received by the execution. The order in the journal is the order of application: each
  * signal is handed to its handler at its rank, one by one.
@@ -14,7 +16,7 @@ final readonly class WorkflowSignalReceived implements Event
      * @param array<string, mixed> $payload
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $signalName,
         private array $payload,
         /** The delivery's request id (DUR052); null on a signal journalled before it was kept. */
@@ -28,7 +30,7 @@ final readonly class WorkflowSignalReceived implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function signalName(): string

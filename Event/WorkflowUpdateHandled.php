@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
 /**
@@ -19,7 +20,7 @@ final readonly class WorkflowUpdateHandled implements Event
      * @param array<string, mixed> $arguments
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $updateName,
         private array $arguments,
         private mixed $result,
@@ -41,7 +42,7 @@ final readonly class WorkflowUpdateHandled implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function updateName(): string

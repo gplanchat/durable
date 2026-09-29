@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * A Nexus operation has gone past a bound.
  *
@@ -13,13 +15,13 @@ namespace Gplanchat\Durable\Event;
 final readonly class NexusOperationTimedOut implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private int $scheduledEventId,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function scheduledEventId(): int

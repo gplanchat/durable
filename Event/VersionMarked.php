@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * An execution has met a change point, and the answer it received is now its own — forever.
  *
@@ -14,14 +16,14 @@ namespace Gplanchat\Durable\Event;
 final readonly class VersionMarked implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $changeId,
         private int $version,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function changeId(): string

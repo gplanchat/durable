@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Result of a {@see \Gplanchat\Durable\ExecutionContext::sideEffect()} call persisted in the journal.
  *
@@ -13,14 +15,14 @@ namespace Gplanchat\Durable\Event;
 final readonly class SideEffectRecorded implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $sideEffectId,
         private mixed $result,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function sideEffectId(): string

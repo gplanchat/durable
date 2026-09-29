@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * A scheduled timer will not fire (e.g. loser of a {@see \Gplanchat\Durable\WorkflowEnvironment::any()}).
  *
@@ -19,14 +21,14 @@ namespace Gplanchat\Durable\Event;
 final readonly class TimerCancelled implements Event
 {
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $timerId,
         private string $reason,
     ) {}
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function timerId(): string

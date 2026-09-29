@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Event;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * The current run ends in order to chain a new run with the given payload / type.
  *
@@ -18,7 +20,7 @@ final readonly class WorkflowContinuedAsNew implements Event
      * @param ?string $newExecutionId The run that continues this one; null on a journal written before #322
      */
     public function __construct(
-        private string $executionId,
+        private ExecutionId|string $executionId,
         private string $nextWorkflowType,
         private array $nextPayload,
         private array $continuationMetadata = [],
@@ -32,7 +34,7 @@ final readonly class WorkflowContinuedAsNew implements Event
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return (string) $this->executionId;
     }
 
     public function nextWorkflowType(): string
