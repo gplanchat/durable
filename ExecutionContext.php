@@ -72,10 +72,8 @@ final class ExecutionContext
     /** Whether the workflow's cancellation has been raised in the fiber during this pass. */
     private bool $cancellationRaised = false;
 
-    private readonly ExecutionId $executionId;
-
     public function __construct(
-        ExecutionId|string $executionId,
+        private readonly ExecutionId $executionId,
         private readonly WorkflowHistorySourceInterface $historySource,
         private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
@@ -87,9 +85,7 @@ final class ExecutionContext
          * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
          */
         private readonly array $pendingUpdates = [],
-    ) {
-        $this->executionId = $executionId instanceof ExecutionId ? $executionId : ExecutionId::fromString($executionId);
-    }
+    ) {}
 
     /**
      * The query handlers of this execution.

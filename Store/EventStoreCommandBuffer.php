@@ -53,12 +53,12 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
-        ExecutionId|string $executionId,
+        ExecutionId $executionId,
         ?ClockInterface $clock = null,
         private readonly ?EventStoreHistorySource $history = null,
     ) {
         $this->clock = $clock ?? new SystemClock();
-        $this->id = $executionId instanceof ExecutionId ? $executionId : ExecutionId::fromString($executionId);
+        $this->id = $executionId;
     }
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
