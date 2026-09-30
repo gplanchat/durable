@@ -98,8 +98,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
         if (null === $store) {
             return;
         }
-        $older = $store->claimPass('exec-fence');
-        $newer = $store->claimPass('exec-fence');
+        $older = $store->claimPass(ExecutionId::fromString('exec-fence'));
+        $newer = $store->claimPass(ExecutionId::fromString('exec-fence'));
 
         $store->appendFenced(new ExecutionStarted('exec-fence', ['by' => 'newer']), $newer);
 
@@ -119,7 +119,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
         if (null === $store) {
             return;
         }
-        $pass = $store->claimPass('exec-outside');
+        $pass = $store->claimPass(ExecutionId::fromString('exec-outside'));
 
         $store->append(new WorkflowSignalReceived('exec-outside', 'approve', []));
         $store->appendFenced(new TimerCompleted('exec-outside', 'timer-1'), $pass);
@@ -133,8 +133,8 @@ abstract class EventStoreConformanceTestCase extends TestCase
         if (null === $store) {
             return;
         }
-        $first = $store->claimPass('exec-a');
-        $store->claimPass('exec-b');
+        $first = $store->claimPass(ExecutionId::fromString('exec-a'));
+        $store->claimPass(ExecutionId::fromString('exec-b'));
 
         $store->appendFenced(new TimerCompleted('exec-a', 'timer-1'), $first);
 

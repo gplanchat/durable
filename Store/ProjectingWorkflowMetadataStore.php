@@ -27,7 +27,7 @@ final class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
     public function save(ExecutionId $executionId, string $workflowType, array $payload): void
     {
         $this->inner->save($executionId, $workflowType, $payload);
-        $this->projection->recordStart($executionId->toString(), $workflowType);
+        $this->projection->recordStart($executionId, $workflowType);
     }
 
     public function markCompleted(ExecutionId $executionId): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Claims one attempt of an activity for the worker about to run it.
  *
@@ -17,5 +19,5 @@ interface ActivityAttemptClaimInterface
     /**
      * @return (\Closure(): void)|null the release, or null when another worker holds the attempt
      */
-    public function claim(string $executionId, string $activityId, int $attempt): ?\Closure;
+    public function claim(ExecutionId $executionId, string $activityId, int $attempt): ?\Closure;
 }

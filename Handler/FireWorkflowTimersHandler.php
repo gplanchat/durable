@@ -81,7 +81,7 @@ final class FireWorkflowTimersHandler
         );
 
         if (null !== $ms) {
-            $this->timerDispatcher->dispatchTimerFire($message->executionId, max(0, $ms));
+            $this->timerDispatcher->dispatchTimerFire(ExecutionId::fromString($message->executionId), max(0, $ms));
         }
     }
 

@@ -603,12 +603,14 @@ final class ExecutionContext
         $scheduledId = $this->historySource->findScheduledChildExecutionId($slotIndex);
         $childExecutionId = $scheduledId?->toString() ?? ($options->workflowId ?? $this->uuid());
 
+        $childId = $scheduledId ?? ExecutionId::fromString($childExecutionId);
+
         if (null === $scheduledId && null !== $options->workflowId) {
-            $this->assertChildWorkflowIdAllowed($options, ExecutionId::fromString($childExecutionId));
+            $this->assertChildWorkflowIdAllowed($options, $childId);
         }
 
         if (null === $scheduledId) {
-            $this->buffer()->scheduleChildWorkflow($childExecutionId, $childWorkflowType, $input, $options);
+            $this->buffer()->scheduleChildWorkflow($childId, $childWorkflowType, $input, $options);
         }
 
         if (null !== $scheduledId && $this->childWorkflowRunner->defersChildStart()) {
@@ -616,12 +618,12 @@ final class ExecutionContext
         }
 
         try {
-            $result = $this->childWorkflowRunner->runChild($childExecutionId, $childWorkflowType, $input, $this->executionId);
+            $result = $this->childWorkflowRunner->runChild($childId, $childWorkflowType, $input, ExecutionId::fromString($this->executionId));
             // The CHILD's outcome, not the current run's: completeWorkflow() here closed the
             // parent's log with the child's result, and never wrote the ChildWorkflowCompleted
             // that findChildWorkflowForSlot() looks for on replay — so the child was re-run on
             // every resume of the parent.
-            $this->buffer()->completeChildWorkflow($childExecutionId, $result);
+            $this->buffer()->completeChildWorkflow($childId, $result);
             $deferred->resolve($result);
         } catch (ChildWorkflowStartDeferred) {
             return $deferred->awaitable();
@@ -630,7 +632,7 @@ final class ExecutionContext
             // not to be reported as one.
             throw $refusal;
         } catch (\Throwable $e) {
-            $this->buffer()->failChildWorkflow($childExecutionId, $e);
+            $this->buffer()->failChildWorkflow($childId, $e);
             // Read back from the journal when it holds the failure already, so the pass rejects
             // with the exception the replay will build: same kind, class, and no previous (#318).
             $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)->failed ?? new DurableChildWorkflowFailedException(

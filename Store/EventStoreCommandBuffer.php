@@ -117,7 +117,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
     }
 
     public function scheduleChildWorkflow(
-        string $childExecutionId,
+        ExecutionId $childExecutionId,
         string $childWorkflowType,
         array $input,
         ChildWorkflowOptions $options,
@@ -126,7 +126,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         // already giving it, including the two keys the core used to add by hand.
         $this->append(new ChildWorkflowScheduled(
             $this->executionId,
-            $childExecutionId,
+            $childExecutionId->toString(),
             $childWorkflowType,
             $input,
             $options->parentClosePolicy,
@@ -146,23 +146,23 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
         ));
     }
 
-    public function completeChildWorkflow(string $childExecutionId, mixed $result): void
+    public function completeChildWorkflow(ExecutionId $childExecutionId, mixed $result): void
     {
         $this->append(new ChildWorkflowCompleted(
             $this->executionId,
-            $childExecutionId,
+            $childExecutionId->toString(),
             $result,
         ));
     }
 
-    public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void
+    public function failChildWorkflow(ExecutionId $childExecutionId, \Throwable $reason): void
     {
         // Through the projector, like an async child: the kind, class and context come from the
         // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
         $this->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
             $this->eventStore,
             $this->executionId,
-            $childExecutionId,
+            $childExecutionId->toString(),
             $reason,
         ));
     }
@@ -195,7 +195,7 @@ final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 
     public function cancelActivity(string $activityId, string $reason): void
     {
-        $this->activityTransport->removePendingFor($this->executionId, $activityId);
+        $this->activityTransport->removePendingFor(ExecutionId::fromString($this->executionId), $activityId);
         // Same guard as cancelTimer(): a race loser stays unsettled on replay, and every resume
         // cancels it again (#678).
         foreach ($this->eventStore->readStream(ExecutionId::fromString($this->executionId)) as $event) {

@@ -26,6 +26,10 @@ namespace Gplanchat\Durable\Observation;
  * exception or `durable:execution:diagnose` names (#514). `runId` stays the backend's own: the same
  * on a backend where one execution is one run, a UUID per run on Temporal, whose workflow id is a
  * sanitised form of the execution id that cannot be read back. It defaults to `runId`.
+ *
+ * `runId` stays a `string`, not an `ExecutionId` (#682): it is the backend's own run id, possibly
+ * sanitised, and on Temporal it is a server-side UUID that no execution was started with. Typing it
+ * as an execution id would claim it can be passed back to a port, which it cannot.
  */
 final readonly class WorkflowRunDescription
 {
