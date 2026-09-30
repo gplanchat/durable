@@ -29,6 +29,8 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  */
 final class WaitReason
 {
+    private function __construct() {}
+
     /**
      * @param Awaitable<mixed> $awaitable
      */

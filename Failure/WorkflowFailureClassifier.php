@@ -19,6 +19,8 @@ use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
  * Single point of passage for **both** fiber drivers ({@see \Gplanchat\Durable\ExecutionEngine}
  * and {@see \Gplanchat\Bridge\Temporal\Worker\WorkflowTaskRunner}): without it, the Temporal
  * driver flattened everything onto a single `kind`.
+ *
+ * @internal
  */
 final class WorkflowFailureClassifier
 {

@@ -6,6 +6,8 @@ namespace Gplanchat\Durable\Awaitable;
 
 /**
  * Structural predicates on an awaitable, shared by the points that decide on the wake-up.
+ *
+ * @internal
  */
 final class AwaitableInspector
 {

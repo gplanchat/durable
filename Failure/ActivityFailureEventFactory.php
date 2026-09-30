@@ -12,9 +12,13 @@ use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 /**
  * Builds a persistable activity failure event, or a catastrophic event when the failure cannot
  * be safely serialized for the journal.
+ *
+ * @internal
  */
 final class ActivityFailureEventFactory
 {
+    private function __construct() {}
+
     public static function fromActivityThrowable(
         ExecutionId $executionId,
         string $activityId,

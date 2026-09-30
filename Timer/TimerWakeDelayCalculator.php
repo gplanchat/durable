@@ -18,6 +18,8 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  */
 final class TimerWakeDelayCalculator
 {
+    private function __construct() {}
+
     /**
      * @return int milliseconds until {@see TimerScheduled::scheduledAt()} of the next pending timer
      *             (neither completed nor cancelled), or null if there is none

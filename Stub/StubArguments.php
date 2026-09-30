@@ -30,6 +30,8 @@ namespace Gplanchat\Durable\Stub;
  * `\BadMethodCallException` rather than `\Error` or `\ArgumentCountError` — because the call goes
  * through `__call`: it is the exception the SPL reserves for a method called wrongly, and it stays
  * catchable.
+ *
+ * @internal
  */
 final class StubArguments
 {

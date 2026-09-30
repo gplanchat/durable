@@ -28,6 +28,8 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  */
 final class NexusFulfilmentParameterNames
 {
+    private function __construct() {}
+
     /**
      * @param string       $refusedBy      what the reader must go and fix: the Symfony tag, the
      *                                     Laravel configuration key — the mechanism that refuses,
