@@ -123,7 +123,7 @@ final readonly class ExecutionEngine
             $this->parentChildCoordinator,
         ));
 
-        return $driver->run($context->executionId(), $context, $environment, $handler);
+        return $driver->run($context->executionId()->toString(), $context, $environment, $handler);
     }
 
     public function getRuntime(): ExecutionRuntime

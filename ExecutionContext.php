@@ -100,9 +100,9 @@ final class ExecutionContext
         return $this->queryHandlers ??= new QueryHandlerRegistry();
     }
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
-        return $this->executionId->toString();
+        return $this->executionId;
     }
 
     /**
