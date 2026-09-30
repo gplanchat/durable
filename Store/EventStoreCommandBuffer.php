@@ -53,12 +53,12 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
     public function __construct(
         private readonly EventStoreInterface $eventStore,
         private readonly ActivityTransportInterface $activityTransport,
-        private readonly string $executionId,
+        ExecutionId|string $executionId,
         ?ClockInterface $clock = null,
         private readonly ?EventStoreHistorySource $history = null,
     ) {
         $this->clock = $clock ?? new SystemClock();
-        $this->id = ExecutionId::fromString($executionId);
+        $this->id = $executionId instanceof ExecutionId ? $executionId : ExecutionId::fromString($executionId);
     }
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
@@ -79,7 +79,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             $metadata,
         ));
         $this->activityTransport->enqueue(new ActivityMessage(
-            $this->executionId,
+            $this->id->toString(),
             $activityId,
             $activityName,
             $payload,
@@ -164,7 +164,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
         $this->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
             $this->eventStore,
-            $this->executionId,
+            $this->id->toString(),
             $childExecutionId->toString(),
             $reason,
         ));

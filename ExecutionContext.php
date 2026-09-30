@@ -72,8 +72,10 @@ final class ExecutionContext
     /** Whether the workflow's cancellation has been raised in the fiber during this pass. */
     private bool $cancellationRaised = false;
 
+    private readonly ExecutionId $executionId;
+
     public function __construct(
-        private readonly string $executionId,
+        ExecutionId|string $executionId,
         private readonly WorkflowHistorySourceInterface $historySource,
         private readonly WorkflowCommandBufferInterface $commandBuffer,
         private readonly ?ChildWorkflowRunnerInterface $childWorkflowRunner = null,
@@ -85,7 +87,9 @@ final class ExecutionContext
          * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
          */
         private readonly array $pendingUpdates = [],
-    ) {}
+    ) {
+        $this->executionId = $executionId instanceof ExecutionId ? $executionId : ExecutionId::fromString($executionId);
+    }
 
     /**
      * The query handlers of this execution.
@@ -102,7 +106,7 @@ final class ExecutionContext
 
     public function executionId(): string
     {
-        return $this->executionId;
+        return $this->executionId->toString();
     }
 
     /**
@@ -618,7 +622,7 @@ final class ExecutionContext
         }
 
         try {
-            $result = $this->childWorkflowRunner->runChild($childId, $childWorkflowType, $input, ExecutionId::fromString($this->executionId));
+            $result = $this->childWorkflowRunner->runChild($childId, $childWorkflowType, $input, $this->executionId);
             // The CHILD's outcome, not the current run's: completeWorkflow() here closed the
             // parent's log with the child's result, and never wrote the ChildWorkflowCompleted
             // that findChildWorkflowForSlot() looks for on replay — so the child was re-run on
@@ -763,7 +767,7 @@ final class ExecutionContext
 
         $this->buffer()->cancelActivity($activityId, $reason);
         $this->rejectActivity($activityId, ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
-            ? new WorkflowCancelledFailure($this->executionId, $reason)
+            ? new WorkflowCancelledFailure($this->executionId->toString(), $reason)
             : new ActivitySupersededException($activityId, $reason));
 
         return true;
@@ -788,7 +792,7 @@ final class ExecutionContext
         $this->buffer()->cancelNexusOperation($operationId, $reason);
 
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
-            $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
+            $deferred->reject(new WorkflowCancelledFailure($this->executionId->toString(), $reason));
         }
 
         return true;
@@ -814,7 +818,7 @@ final class ExecutionContext
         // A race loser is simply left unsettled; a workflow cancellation must on the contrary
         // throw, so that the workflow can compensate.
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === $reason) {
-            $deferred->reject(new WorkflowCancelledFailure($this->executionId, $reason));
+            $deferred->reject(new WorkflowCancelledFailure($this->executionId->toString(), $reason));
         }
 
         return true;
