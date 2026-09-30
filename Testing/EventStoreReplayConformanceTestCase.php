@@ -18,7 +18,8 @@ use Gplanchat\Durable\WorkflowRegistry;
 
 /**
  * The "replay" tier of DUR041: instead of writing fabricated events, it has them produced by a real
- * workflow — an activity, a timer, two side effects, one with a nested payload — then it compares
+ * workflow — an activity, a timer, two side effects, one with a nested payload, a race a timer
+ * wins — then it compares
  * what the replay reads back from the adapter with what it reads back from the reference.
  *
  * An adapter that drives a workflow inline extends this class and inherits both tiers. An adapter
@@ -74,7 +75,16 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
             $fromReference->findActivitySlotResult(0)->result,
             $fromSubject->findActivitySlotResult(0)->result,
         );
-        self::assertNull($fromSubject->findActivitySlotResult(1), 'only one activity was scheduled');
+        // The race loser: scheduled, then cancelled, and read back as unsettled on both sides.
+        self::assertNotNull($fromSubject->findScheduledActivityId(1), 'the race loser was scheduled');
+        self::assertNull($fromReference->findActivitySlotResult(1), 'the race loser stays unsettled on the reference');
+        self::assertNull($fromSubject->findActivitySlotResult(1), 'the race loser stays unsettled');
+        self::assertNull($fromSubject->findActivitySlotResult(2), 'two activities were scheduled');
+        foreach ([$fromReference, $fromSubject] as $history) {
+            $raceTimer = $history->findTimerSlotResult(1);
+            self::assertNotNull($raceTimer, 'the race timer fired');
+            self::assertNull($raceTimer->failed);
+        }
 
         // Side effects carry a `mixed`: that is where a JSON round trip distorts.
         self::assertInstanceOf(SideEffectOutcome::class, $fromSubject->findSideEffectForSlot(0));
@@ -117,8 +127,10 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         // A slot the workflow did not reach: null on both sides. That is what distinguishes
         // "nothing to compare" from "divergence", and an adapter answering the empty string would
         // have a growing workflow refused.
-        self::assertNull($fromSubject->activityNameForSlot(1));
+        self::assertSame('durable.conformance.reject', $fromSubject->activityNameForSlot(1));
         self::assertSame($fromReference->activityNameForSlot(1), $fromSubject->activityNameForSlot(1));
+        self::assertNull($fromSubject->activityNameForSlot(2));
+        self::assertSame($fromReference->activityNameForSlot(2), $fromSubject->activityNameForSlot(2));
 
         // The conformance workflow starts one child, and this backend refuses Nexus (DUR036): both
         // accessors must say so, and say it the same way.
@@ -187,7 +199,8 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
         // Identifiers are drawn per execution: what must agree is whether each lookup finds one.
         foreach ([$fromReference, $fromSubject] as $history) {
             self::assertNotNull($history->findScheduledActivityId(0));
-            self::assertNull($history->findScheduledActivityId(1));
+            self::assertNotNull($history->findScheduledActivityId(1), 'the race loser');
+            self::assertNull($history->findScheduledActivityId(2));
         }
         self::assertSame($fromReference->activityPayloadForSlot(0), $fromSubject->activityPayloadForSlot(0));
 
