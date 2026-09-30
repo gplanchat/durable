@@ -21,7 +21,7 @@ final readonly class WorkflowExecutionCancelled implements Event
     public function __construct(
         private ExecutionId $executionId,
         private string $reason,
-        private ?string $sourceParentExecutionId = null,
+        private ExecutionId|string|null $sourceParentExecutionId = null,
     ) {}
 
     public function executionId(): ExecutionId
@@ -36,14 +36,14 @@ final readonly class WorkflowExecutionCancelled implements Event
 
     public function sourceParentExecutionId(): ?string
     {
-        return $this->sourceParentExecutionId;
+        return null === $this->sourceParentExecutionId ? null : (string) $this->sourceParentExecutionId;
     }
 
     public function payload(): array
     {
         return [
             'reason' => $this->reason,
-            'sourceParentExecutionId' => $this->sourceParentExecutionId,
+            'sourceParentExecutionId' => null === $this->sourceParentExecutionId ? null : (string) $this->sourceParentExecutionId,
         ];
     }
 }

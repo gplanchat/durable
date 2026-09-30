@@ -153,7 +153,7 @@ final readonly class WorkflowExecutionFailed implements Event
         );
     }
 
-    public static function terminatedByParent(ExecutionId $childExecutionId, string $parentExecutionId, string $message = 'Child workflow terminated: parent closed'): self
+    public static function terminatedByParent(ExecutionId $childExecutionId, ExecutionId|string $parentExecutionId, string $message = 'Child workflow terminated: parent closed'): self
     {
         return new self(
             $childExecutionId,
@@ -161,7 +161,7 @@ final readonly class WorkflowExecutionFailed implements Event
             self::class,
             $message,
             0,
-            ['parentExecutionId' => $parentExecutionId],
+            ['parentExecutionId' => (string) $parentExecutionId],
         );
     }
 

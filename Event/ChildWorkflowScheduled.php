@@ -18,7 +18,7 @@ final readonly class ChildWorkflowScheduled implements Event
      */
     public function __construct(
         private ExecutionId $parentExecutionId,
-        private string $childExecutionId,
+        private ExecutionId|string $childExecutionId,
         private string $childWorkflowType,
         private array $input,
         private ParentClosePolicy $parentClosePolicy = ParentClosePolicy::Terminate,
@@ -33,7 +33,7 @@ final readonly class ChildWorkflowScheduled implements Event
 
     public function childExecutionId(): string
     {
-        return $this->childExecutionId;
+        return (string) $this->childExecutionId;
     }
 
     public function childWorkflowType(): string
@@ -73,7 +73,7 @@ final readonly class ChildWorkflowScheduled implements Event
     public function payload(): array
     {
         $p = [
-            'childExecutionId' => $this->childExecutionId,
+            'childExecutionId' => (string) $this->childExecutionId,
             'childWorkflowType' => $this->childWorkflowType,
             'input' => $this->input,
             'parentClosePolicy' => $this->parentClosePolicy->value,
