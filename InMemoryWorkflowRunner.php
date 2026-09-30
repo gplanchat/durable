@@ -14,6 +14,7 @@ use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Timer\VirtualClock;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -38,6 +39,7 @@ final readonly class InMemoryWorkflowRunner
         /**
          * Required to run child workflows: without a registry no child type can be resolved
          * and {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} throws.
+         * Without one, a continue-as-new still reaches the caller as ContinueAsNewRequested.
          */
         private readonly ?WorkflowRegistry $workflowRegistry = null,
         /**
@@ -82,7 +84,8 @@ final readonly class InMemoryWorkflowRunner
                 }
                 $startedExtras = ['continuedFromExecutionId' => $executionId];
                 $executionId = $e->nextExecutionId;
-                $workflowType = $e->workflowType;
+                // The alias, as ResumeWorkflowHandler journals it; the registry knows both keys.
+                $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($e->workflowType);
                 $handler = $this->workflowRegistry->getHandler($e->workflowType, $e->payload);
             }
         }
