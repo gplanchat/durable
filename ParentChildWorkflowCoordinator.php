@@ -17,7 +17,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 /**
  * Applies {@see ParentClosePolicy} to the children still active when the parent closes.
  */
-final class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordinatorInterface
+final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkflowCoordinatorInterface
 {
     public function __construct(
         private readonly EventStoreInterface $eventStore,

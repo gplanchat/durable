@@ -7,7 +7,7 @@ namespace Gplanchat\Durable\Awaitable;
 /**
  * @implements Awaitable<mixed>
  */
-final class AwaitableAdapter implements Awaitable
+final readonly class AwaitableAdapter implements Awaitable
 {
     public function __construct(
         private readonly Deferred $deferred,

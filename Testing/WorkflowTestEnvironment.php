@@ -29,7 +29,7 @@ use Gplanchat\Durable\WorkflowRegistry;
  * self::assertSame('Hello, World!', $result);
  * ```
  */
-final class WorkflowTestEnvironment
+final readonly class WorkflowTestEnvironment
 {
     private readonly InMemoryEventStore $eventStore;
     private readonly InMemoryActivityTransport $activityTransport;

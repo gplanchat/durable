@@ -18,7 +18,7 @@ use Gplanchat\Durable\Uuid\UuidGeneratorInterface;
 use Gplanchat\Durable\Worker\WorkflowFiberDriver;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 
-final class ExecutionEngine
+final readonly class ExecutionEngine
 {
     public function __construct(
         private readonly EventStoreInterface $eventStore,

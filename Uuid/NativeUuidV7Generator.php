@@ -13,7 +13,7 @@ use Psr\Clock\ClockInterface;
  * Layout (128 bits):
  *   [48-bit ms timestamp][4-bit ver=0x7][12-bit rand_a][2-bit variant=0b10][62-bit rand_b]
  */
-final class NativeUuidV7Generator implements UuidGeneratorInterface
+final readonly class NativeUuidV7Generator implements UuidGeneratorInterface
 {
     private readonly ClockInterface $clock;
 

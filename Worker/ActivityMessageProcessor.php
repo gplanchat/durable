@@ -35,7 +35,7 @@ use Psr\Clock\ClockInterface;
  * Reusable by the Symfony bundle ({@see \Gplanchat\Durable\Bundle\Handler\ActivityRunHandler})
  * and by other runtimes (workers consuming the same transport abstraction).
  */
-final class ActivityMessageProcessor
+final readonly class ActivityMessageProcessor
 {
     private readonly ClockInterface $clock;
 

@@ -19,7 +19,7 @@ use Psr\Clock\ClockInterface;
  * the parent resumes through {@see Handler\ResumeWorkflowHandler}, which appends
  * {@see Event\ChildWorkflowCompleted} / {@see Event\ChildWorkflowFailed}.
  */
-final class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
+final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
 {
     private readonly bool $asyncMessengerStart;
 

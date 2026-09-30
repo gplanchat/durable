@@ -16,7 +16,7 @@ use Gplanchat\Durable\ExecutionContext;
  *
  * @internal
  */
-final class ContextActivityScheduler implements ActivitySchedulerInterface
+final readonly class ContextActivityScheduler implements ActivitySchedulerInterface
 {
     public function __construct(
         private readonly ExecutionContext $context,

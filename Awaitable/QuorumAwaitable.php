@@ -25,7 +25,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements CompositeAwaitable<mixed>
  */
-final class QuorumAwaitable implements CompositeAwaitable
+final readonly class QuorumAwaitable implements CompositeAwaitable
 {
     /** @param list<Awaitable<mixed>> $awaitables */
     public function __construct(

@@ -18,7 +18,7 @@ use Psr\Cache\CacheItemPoolInterface;
  * workflow fulfils. Skipping inherited methods would make the operations declared on the served
  * contract vanish from the caller's view: declared, served, and nowhere to be found.
  */
-final class NexusContractResolver
+final readonly class NexusContractResolver
 {
     private const CACHE_PREFIX = 'durable.nexus_contract.';
     private const CACHE_TTL = 3600;

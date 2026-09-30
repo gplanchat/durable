@@ -17,7 +17,7 @@ use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */
-final class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
+final readonly class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
 {
     public function __construct(
         private readonly WorkflowMetadataStore $inner,

@@ -34,7 +34,7 @@ use Gplanchat\Durable\TaskQueue;
  * objects. Every option left out keeps the {@see ActivityOptions} default.
  */
 #[\Attribute(\Attribute::TARGET_PARAMETER)]
-final class Activities
+final readonly class Activities
 {
     /**
      * @param class-string $contract

@@ -9,7 +9,7 @@ use Gplanchat\Durable\ExecutionId;
 /**
  * Every attempt is granted: one process runs its messages one after another.
  */
-final class NoActivityAttemptClaim implements ActivityAttemptClaimInterface
+final readonly class NoActivityAttemptClaim implements ActivityAttemptClaimInterface
 {
     public function claim(ExecutionId $executionId, string $activityId, int $attempt): \Closure
     {

@@ -19,7 +19,7 @@ use Gplanchat\Durable\WorkflowEnvironment;
  *
  * Produces a factory compatible with WorkflowRegistry.
  */
-final class WorkflowDefinitionLoader
+final readonly class WorkflowDefinitionLoader
 {
     /**
      * Resolves the metadata for a child workflow stub (type + entry method).

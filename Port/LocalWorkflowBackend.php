@@ -16,7 +16,7 @@ use Gplanchat\Durable\ExecutionId;
  * @see WorkflowBackendInterface
  * @see DUR021 Symfony Messenger integration
  */
-final class LocalWorkflowBackend implements WorkflowBackendInterface
+final readonly class LocalWorkflowBackend implements WorkflowBackendInterface
 {
     public function __construct(
         private readonly ExecutionEngine $engine,

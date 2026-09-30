@@ -17,7 +17,7 @@ use Gplanchat\Durable\Stub\StubArguments;
  *
  * @template TActivity of object
  */
-final class ActivityStub
+final readonly class ActivityStub
 {
     /** @var array<string, string> */
     private array $methodToActivityName;

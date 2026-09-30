@@ -23,7 +23,7 @@ use Psr\Clock\ClockInterface;
  * then the workflow resumes (replay). Lets suspension behaviour be tested without
  * external processes or Messenger.
  */
-final class InMemoryWorkflowRunner
+final readonly class InMemoryWorkflowRunner
 {
     public const DEFAULT_BUDGET_SECONDS = 10.0;
 

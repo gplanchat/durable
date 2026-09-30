@@ -20,7 +20,7 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  * carries `#[FulfilsNexusOperation]` fulfils it, and what is registered is its **type** — the name
  * the server knows and the journal records.
  */
-final class NexusHandlerDeclarations
+final readonly class NexusHandlerDeclarations
 {
     /**
      * @param array<array-key, class-string> $handlers       handler => the contract it serves, or a

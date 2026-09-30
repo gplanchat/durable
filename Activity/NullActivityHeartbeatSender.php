@@ -10,7 +10,7 @@ use Gplanchat\Durable\Port\ActivityHeartbeatSenderInterface;
  * No-op heartbeat sender for the in-memory backend and test contexts.
  * Never signals cancellation.
  */
-final class NullActivityHeartbeatSender implements ActivityHeartbeatSenderInterface
+final readonly class NullActivityHeartbeatSender implements ActivityHeartbeatSenderInterface
 {
     public function sendHeartbeat(mixed $details = null): bool
     {

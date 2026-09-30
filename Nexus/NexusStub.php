@@ -24,7 +24,7 @@ use Gplanchat\Durable\Stub\StubArguments;
  *
  * @template TContract of object
  */
-final class NexusStub
+final readonly class NexusStub
 {
     /** @var array<string, string> method name => operation name */
     private array $methodToOperation;

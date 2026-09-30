@@ -10,7 +10,7 @@ namespace Gplanchat\Durable\Observation;
  * A key-name heuristic: a secret stored under an innocent key goes through. It is the default,
  * not a guarantee; an application with a known payload shape implements the interface itself.
  */
-final class KeyPatternPayloadRedactor implements PayloadRedactorInterface
+final readonly class KeyPatternPayloadRedactor implements PayloadRedactorInterface
 {
     public const MASK = '***';
 

@@ -30,7 +30,7 @@ use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */
-final class ProjectingEventStore implements FencedEventStoreInterface
+final readonly class ProjectingEventStore implements FencedEventStoreInterface
 {
     public function __construct(
         private readonly EventStoreInterface $inner,

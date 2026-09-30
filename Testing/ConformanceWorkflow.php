@@ -20,7 +20,7 @@ use Gplanchat\Durable\WorkflowEnvironment;
  *
  * @see DUR041
  */
-final class ConformanceWorkflow
+final readonly class ConformanceWorkflow
 {
     public const TYPE = 'durable.conformance';
 

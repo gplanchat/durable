@@ -15,7 +15,7 @@ use Gplanchat\Durable\ExecutionContext;
  *
  * @internal
  */
-final class ContextNexusOperationScheduler implements NexusOperationSchedulerInterface
+final readonly class ContextNexusOperationScheduler implements NexusOperationSchedulerInterface
 {
     public function __construct(
         private readonly ExecutionContext $context,

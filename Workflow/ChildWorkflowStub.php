@@ -16,7 +16,7 @@ use Gplanchat\Durable\Stub\StubArguments;
  *
  * @template TWorkflow of object
  */
-final class ChildWorkflowStub
+final readonly class ChildWorkflowStub
 {
     private string $workflowType;
 

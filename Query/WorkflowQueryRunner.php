@@ -11,7 +11,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  *
  * @see WorkflowQueryEvaluator for the reusable static logic
  */
-final class WorkflowQueryRunner
+final readonly class WorkflowQueryRunner
 {
     public function __construct(
         private readonly EventStoreInterface $eventStore,

@@ -40,7 +40,7 @@ use Psr\Clock\ClockInterface;
  *
  * Used by the in-memory backend. The Temporal backend uses TemporalWorkflowCommandBuffer instead.
  */
-final class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
+final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInterface
 {
     private readonly ClockInterface $clock;
 

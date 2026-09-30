@@ -17,7 +17,7 @@ namespace Gplanchat\Durable\Activity;
  * call. It therefore stays in `Activity\` by its history, but its text no longer says "activity"
  * where it speaks of both.
  */
-final class PayloadToContractMethodInvoker
+final readonly class PayloadToContractMethodInvoker
 {
     /**
      * @param class-string $contractClass

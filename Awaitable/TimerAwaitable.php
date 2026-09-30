@@ -11,7 +11,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements Awaitable<mixed>
  */
-final class TimerAwaitable implements Awaitable
+final readonly class TimerAwaitable implements Awaitable
 {
     /**
      * @param Awaitable<mixed> $inner

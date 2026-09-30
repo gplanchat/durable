@@ -20,7 +20,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements Awaitable<mixed>
  */
-final class NexusOperationAwaitable implements Awaitable
+final readonly class NexusOperationAwaitable implements Awaitable
 {
     /**
      * @param Awaitable<mixed> $inner

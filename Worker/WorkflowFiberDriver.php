@@ -23,7 +23,7 @@ use Gplanchat\Durable\WorkflowEnvironment;
  * one were missing from the other. They now go through
  * {@see WorkflowLifecycleInterface}, of which each backend is an implementation.
  */
-final class WorkflowFiberDriver
+final readonly class WorkflowFiberDriver
 {
     public function __construct(
         private readonly WorkflowLifecycleInterface $lifecycle,

@@ -16,7 +16,7 @@ use Gplanchat\Durable\ExecutionContext;
  *
  * @internal
  */
-final class ContextChildWorkflowScheduler implements ChildWorkflowSchedulerInterface
+final readonly class ContextChildWorkflowScheduler implements ChildWorkflowSchedulerInterface
 {
     public function __construct(
         private readonly ExecutionContext $context,

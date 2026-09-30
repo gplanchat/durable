@@ -17,7 +17,7 @@ use Gplanchat\Durable\ExecutionContext;
  *
  * @implements Awaitable<mixed>
  */
-final class CancellingCompositeAwaitable implements Awaitable
+final readonly class CancellingCompositeAwaitable implements Awaitable
 {
     /**
      * @param CompositeAwaitable<mixed> $inner

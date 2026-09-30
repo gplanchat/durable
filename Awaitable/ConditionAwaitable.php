@@ -18,7 +18,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements Awaitable<null>
  */
-final class ConditionAwaitable implements Awaitable
+final readonly class ConditionAwaitable implements Awaitable
 {
     /**
      * @param \Closure(): bool $predicate

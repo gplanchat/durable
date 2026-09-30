@@ -10,7 +10,7 @@ use Gplanchat\Durable\Transport\AwaitedFact;
 /**
  * No-op dispatcher for inline mode.
  */
-final class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
+final readonly class NullWorkflowResumeDispatcher implements WorkflowResumeDispatcher
 {
     public function dispatchResume(ExecutionId $executionId, array $pendingUpdates = []): void
     {

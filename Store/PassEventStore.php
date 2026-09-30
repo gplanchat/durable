@@ -14,7 +14,7 @@ use Gplanchat\Durable\ExecutionId;
  * Handed to a pass's writers only. A fact from outside the pass (an activity outcome, a signal)
  * goes on the store itself, unfenced.
  */
-final class PassEventStore implements EventStoreInterface
+final readonly class PassEventStore implements EventStoreInterface
 {
     private function __construct(
         private readonly FencedEventStoreInterface $store,

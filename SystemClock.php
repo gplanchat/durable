@@ -12,7 +12,7 @@ use Psr\Clock\ClockInterface;
  * Every class of the core that needs "now" takes a {@see ClockInterface} and falls back on this
  * one; a host hands its own (Symfony's `clock` service), a test a frozen one.
  */
-final class SystemClock implements ClockInterface
+final readonly class SystemClock implements ClockInterface
 {
     public function now(): \DateTimeImmutable
     {

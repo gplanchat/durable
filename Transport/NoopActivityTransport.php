@@ -9,7 +9,7 @@ use Gplanchat\Durable\ExecutionId;
 /**
  * Queues nothing: activities executed elsewhere (e.g. native Temporal worker with mirror interpreter).
  */
-final class NoopActivityTransport implements ActivityTransportInterface
+final readonly class NoopActivityTransport implements ActivityTransportInterface
 {
     public function enqueue(ActivityMessage $message): void {}
 

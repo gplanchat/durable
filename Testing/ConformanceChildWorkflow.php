@@ -14,7 +14,7 @@ use Gplanchat\Durable\Attribute\AsWorkflowMethod;
  * @see DUR041
  */
 #[AsWorkflow('durable.conformance.child')]
-final class ConformanceChildWorkflow
+final readonly class ConformanceChildWorkflow
 {
     /**
      * @return array{echo: string}

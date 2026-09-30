@@ -28,7 +28,7 @@ use Gplanchat\Durable\Transport\FireWorkflowTimersMessage;
  * DelayStamp), the handler re-dispatches the check message with a fresh delay so
  * the workflow eventually resumes once the timer actually expires.
  */
-final class FireWorkflowTimersHandler
+final readonly class FireWorkflowTimersHandler
 {
     public function __construct(
         private readonly EventStoreInterface $eventStore,

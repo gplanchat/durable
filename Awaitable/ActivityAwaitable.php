@@ -10,7 +10,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements Awaitable<mixed>
  */
-final class ActivityAwaitable implements Awaitable
+final readonly class ActivityAwaitable implements Awaitable
 {
     /**
      * @param Awaitable<mixed> $inner

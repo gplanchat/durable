@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Attribute;
 
 #[\Attribute(\Attribute::TARGET_CLASS)]
-final class AsWorkflow
+final readonly class AsWorkflow
 {
     public function __construct(
         public readonly string $name,

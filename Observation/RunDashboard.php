@@ -29,7 +29,7 @@ use Psr\Clock\ClockInterface;
  * an empty "task queue" column teaches the operator that the execution has no queue, when in fact
  * it is the backend that has no such notion. A missing key tells nothing false.
  */
-final class RunDashboard
+final readonly class RunDashboard
 {
     public const PAGE_SIZE = 20;
 

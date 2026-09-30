@@ -44,7 +44,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  * without its scheduling — purged journal, partial resumption — falls back to the identifier: an id
  * is worth more than a row without a name.
  */
-final class JournalRunHistoryReader
+final readonly class JournalRunHistoryReader
 {
     /**
      * The key of the action the execution is for itself. One only per history, and the first: it

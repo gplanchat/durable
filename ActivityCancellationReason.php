@@ -7,7 +7,7 @@ namespace Gplanchat\Durable;
 /**
  * Standard reasons for cancelling an operation still pending (activity or timer).
  */
-final class ActivityCancellationReason
+final readonly class ActivityCancellationReason
 {
     /** Loser of a {@see \Gplanchat\Durable\WorkflowEnvironment::any()}. */
     public const RACE_SUPERSEDED = 'race_superseded';

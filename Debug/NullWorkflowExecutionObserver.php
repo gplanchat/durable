@@ -18,7 +18,7 @@ use Gplanchat\Durable\ExecutionId;
  * execution nobody watches runs the same. It is the same reason that makes `Psr\Log\NullLogger` a
  * legitimate null object.
  */
-final class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
+final readonly class NullWorkflowExecutionObserver implements WorkflowExecutionObserverInterface
 {
     public function onWorkflowRun(ExecutionId $executionId, string $workflowType, bool $isResume): void {}
 

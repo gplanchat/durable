@@ -12,7 +12,7 @@ namespace Gplanchat\Durable\Awaitable;
  *
  * @implements CompositeAwaitable<mixed>
  */
-final class AnyAwaitable implements CompositeAwaitable
+final readonly class AnyAwaitable implements CompositeAwaitable
 {
     /** @param list<Awaitable<mixed>> $awaitables */
     public function __construct(

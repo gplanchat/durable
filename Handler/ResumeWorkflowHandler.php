@@ -35,7 +35,7 @@ use Gplanchat\Durable\WorkflowRegistry;
  * Six hosts of the selector do not go through the bundle; leaving it there would have meant as
  * many copies of the resume semantics, divergent at the first fix.
  */
-final class ResumeWorkflowHandler
+final readonly class ResumeWorkflowHandler
 {
     public function __construct(
         private readonly ExecutionEngine $engine,
