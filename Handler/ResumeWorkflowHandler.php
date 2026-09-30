@@ -111,16 +111,19 @@ final readonly class ResumeWorkflowHandler
             return;
         } catch (ContinueAsNewRequested $e) {
             $newId = null !== $e->nextExecutionId ? ExecutionId::fromString($e->nextExecutionId) : ExecutionId::generate();
-            // The parent link follows the chain (#859), as Temporal does. Moved before the old run is
-            // marked completed, which ends its redeliveries, and before the new run can finish; linked
-            // before unlinked, so a crash in between leaves a move the redelivery redoes.
+            // The parent link follows the chain (#859), as Temporal does. The next run is linked before
+            // it can start and finish. The old run keeps its link until it is marked completed: a
+            // redelivery before that replays it, possibly under another next id, and must still find
+            // the parent to link that one. After it, only a stale link on a completed run remains.
             $parent = $this->childWorkflowParentLinkStore->getParentExecutionId($id);
             if (null !== $parent) {
                 $this->childWorkflowParentLinkStore->link($newId, $parent);
-                $this->childWorkflowParentLinkStore->unlink($id);
             }
             // Superseded, not deleted (#322): the row is what the old run was started with.
             $this->metadataStore->markCompleted($id);
+            if (null !== $parent) {
+                $this->childWorkflowParentLinkStore->unlink($id);
+            }
             $newExecutionId = $newId->toString();
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
             $this->metadataStore->save($newId, $nextAlias, $e->payload);
@@ -187,7 +190,7 @@ final readonly class ResumeWorkflowHandler
     /**
      * Walks back the `continuedFromExecutionId` each continuation writes into its run's start.
      *
-     * ponytail: reads every run of the chain once, at the end of a linked child only; a column on
+     * ponytail: reads the head of every run's stream, at the end of a linked child only; a column on
      * the parent link would spare the reads if chains of linked children grow long.
      */
     private function firstRunOfTheChain(string $executionId): string
@@ -195,8 +198,10 @@ final readonly class ResumeWorkflowHandler
         while (true) {
             $predecessor = null;
             foreach ($this->eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
-                if ($event instanceof ExecutionStarted && \is_string($event->payload()['continuedFromExecutionId'] ?? null)) {
-                    $predecessor = $event->payload()['continuedFromExecutionId'];
+                // The first start is the run's own: the walk reads no further, and stops at the root.
+                if ($event instanceof ExecutionStarted) {
+                    $from = $event->payload()['continuedFromExecutionId'] ?? null;
+                    $predecessor = \is_string($from) ? $from : null;
                     break;
                 }
             }
