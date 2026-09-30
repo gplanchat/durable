@@ -111,7 +111,7 @@ final class NexusHandlerDeclarations
                     continue;
                 }
 
-                $unserved[] = $operation;
+                $unserved[$operation] = $method . '()';
             }
 
             if (0 === $served) {
@@ -128,12 +128,13 @@ final class NexusHandlerDeclarations
             // result nothing produces.
             if ([] !== $unserved) {
                 throw new \InvalidArgumentException(\sprintf(
-                    'Durable: operation "%s" of contract %s is served by nobody — %s has no method for it '
-                    . 'and no workflow claims it with #[FulfilsNexusOperation]. A caller would wait on a result '
+                    'Durable: operation "%s" of contract %s is served by nobody — handler %s does not implement '
+                    . '%s and no workflow claims it with #[FulfilsNexusOperation]. A caller would wait on a result '
                     . 'nothing produces.',
-                    implode('", "', $unserved),
+                    implode('", "', array_keys($unserved)),
                     $contract,
                     $handlerClass,
+                    implode(', ', $unserved),
                 ));
             }
         }
