@@ -55,11 +55,10 @@ final readonly class ConformanceWorkflow
         // the timer, so it is cancelled as the loser. Every backend must read that loser back as
         // unsettled, and the await after the race must still go on (#678, #681, #701).
         $winner = $wf->await($wf->any(
-            // Not integral on purpose: a JSON store reads 30.0 back as 30, and the journals differ.
             $wf->activityStub(ConformanceActivities::class, new ActivityOptions(
                 retryLimit: RetryLimit::ofAttempts(5),
-                initialInterval: Duration::seconds(30.5),
-                backoffCoefficient: 1.5,
+                initialInterval: Duration::seconds(30),
+                backoffCoefficient: 1.0,
             ))->reject(),
             $wf->timer(Duration::seconds(2)),
         ));

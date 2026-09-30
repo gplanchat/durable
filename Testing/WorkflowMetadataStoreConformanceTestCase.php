@@ -27,7 +27,7 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
     public function testWhatWasSavedComesBack(): void
     {
         $store = $this->createMetadataStore();
-        $payload = ['order' => ['id' => '0042', 'total' => 12.5], 'flags' => [true, false]];
+        $payload = ['order' => ['id' => '0042', 'total' => 12.5, 'shipping' => 30.0], 'flags' => [true, false]];
 
         $store->save(ExecutionId::fromString('exec-1'), 'App\\OrderWorkflow', $payload);
         $stored = $store->get(ExecutionId::fromString('exec-1'));
