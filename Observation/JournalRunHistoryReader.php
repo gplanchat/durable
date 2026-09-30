@@ -61,6 +61,19 @@ final readonly class JournalRunHistoryReader
      */
     public function read(string $runId, string $workflowName = ''): array
     {
+        return self::fromEntries($this->events->readStreamWithRecordedAt(ExecutionId::fromString($runId)), $workflowName);
+    }
+
+    /**
+     * The same history, from journal entries a caller already read: the profiler reads each journal
+     * once and draws its timeline from that read (#819).
+     *
+     * @param iterable<array{event: Event, recordedAt: \DateTimeImmutable|null}> $entries
+     *
+     * @return list<WorkflowRunEvent>
+     */
+    public static function fromEntries(iterable $entries, string $workflowName = ''): array
+    {
         /** @var array<string, string> $activityNames */
         $activityNames = [];
         // The terminal events of a Nexus operation carry nothing but the `scheduledEventId`: the
@@ -76,7 +89,7 @@ final readonly class JournalRunHistoryReader
         $history = [];
         $sequence = 0;
 
-        foreach ($this->events->readStreamWithRecordedAt(ExecutionId::fromString($runId)) as $entry) {
+        foreach ($entries as $entry) {
             $event = $entry['event'];
             $recordedAt = $entry['recordedAt'] ?? null;
 
