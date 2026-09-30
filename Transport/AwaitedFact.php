@@ -71,7 +71,7 @@ final readonly class AwaitedFact
         $missing = array_fill_keys($this->ids, true);
         foreach ($journal->readStream(ExecutionId::fromString($executionId)) as $event) {
             $id = match (true) {
-                AwaitedFactKind::Child === $this->kind && ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) => $event->childExecutionId(),
+                AwaitedFactKind::Child === $this->kind && ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) => $event->childExecutionId()->toString(),
                 AwaitedFactKind::Signal === $this->kind && $event instanceof WorkflowSignalReceived => $event->requestId(),
                 // A named timer may be cancelled before it fires; that settles it too.
                 AwaitedFactKind::Timer === $this->kind && ($event instanceof TimerCompleted || $event instanceof TimerCancelled) => $event->timerId(),

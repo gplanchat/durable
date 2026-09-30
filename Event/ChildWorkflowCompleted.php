@@ -13,7 +13,7 @@ final readonly class ChildWorkflowCompleted implements Event
 {
     public function __construct(
         private ExecutionId $parentExecutionId,
-        private ExecutionId|string $childExecutionId,
+        private ExecutionId $childExecutionId,
         private mixed $result,
     ) {}
 
@@ -22,9 +22,9 @@ final readonly class ChildWorkflowCompleted implements Event
         return $this->parentExecutionId;
     }
 
-    public function childExecutionId(): string
+    public function childExecutionId(): ExecutionId
     {
-        return (string) $this->childExecutionId;
+        return $this->childExecutionId;
     }
 
     public function result(): mixed
@@ -35,7 +35,7 @@ final readonly class ChildWorkflowCompleted implements Event
     public function payload(): array
     {
         return [
-            'childExecutionId' => (string) $this->childExecutionId,
+            'childExecutionId' => $this->childExecutionId->toString(),
             'result' => $this->result,
         ];
     }

@@ -16,7 +16,7 @@ final readonly class ChildWorkflowFailed implements Event
      */
     public function __construct(
         private ExecutionId $parentExecutionId,
-        private ExecutionId|string $childExecutionId,
+        private ExecutionId $childExecutionId,
         private string $failureMessage,
         private int $failureCode = 0,
         private ?string $workflowFailureKind = null,
@@ -29,9 +29,9 @@ final readonly class ChildWorkflowFailed implements Event
         return $this->parentExecutionId;
     }
 
-    public function childExecutionId(): string
+    public function childExecutionId(): ExecutionId
     {
-        return (string) $this->childExecutionId;
+        return $this->childExecutionId;
     }
 
     public function failureMessage(): string
@@ -65,7 +65,7 @@ final readonly class ChildWorkflowFailed implements Event
     public function payload(): array
     {
         $p = [
-            'childExecutionId' => (string) $this->childExecutionId,
+            'childExecutionId' => $this->childExecutionId->toString(),
             'failureMessage' => $this->failureMessage,
             'failureCode' => $this->failureCode,
         ];

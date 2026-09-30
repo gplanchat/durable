@@ -66,7 +66,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         foreach ($this->eventStore->readStream($parentExecutionId) as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 $out[] = [
-                    'childExecutionId' => ExecutionId::fromString($event->childExecutionId()),
+                    'childExecutionId' => $event->childExecutionId(),
                     'policy' => $event->parentClosePolicy(),
                 ];
             }
