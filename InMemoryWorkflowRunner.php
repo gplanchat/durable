@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowStuckException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
@@ -68,6 +69,30 @@ final readonly class InMemoryWorkflowRunner
      */
     public function run(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
+        $startedExtras = [];
+
+        // A continue-as-new chain is followed to its last run, as ResumeWorkflowHandler does on the
+        // journal backends (#802); each run gets its own budget.
+        while (true) {
+            try {
+                return $this->runOnce($executionId, $handler, $workflowType, $startedExtras);
+            } catch (ContinueAsNewRequested $e) {
+                if (null === $this->workflowRegistry || null === $e->nextExecutionId) {
+                    throw $e;
+                }
+                $startedExtras = ['continuedFromExecutionId' => $executionId];
+                $executionId = $e->nextExecutionId;
+                $workflowType = $e->workflowType;
+                $handler = $this->workflowRegistry->getHandler($e->workflowType, $e->payload);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $startedExtras merged into the run's ExecutionStarted
+     */
+    private function runOnce(string $executionId, callable $handler, ?string $workflowType, array $startedExtras): mixed
+    {
         // Virtual clock: an inline harness has nobody to deliver a timer wake-up, and waiting
         // out a due time for real would make every workflow that sleeps untestable. It only
         // moves from one due time to the next, never on its own.
@@ -105,7 +130,7 @@ final readonly class InMemoryWorkflowRunner
         // What the last suspension was waiting on, when that has a name: it is all that
         // separates "stuck" from "stuck on that particular condition" in the diagnosis.
         try {
-            return $engine->start($executionId, $handler, $workflowType);
+            return $engine->start($executionId, $handler, $workflowType, $startedExtras);
         } catch (WorkflowSuspendedException $e) {
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
             $waitingOn = $e->waitingOn();
