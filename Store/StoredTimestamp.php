@@ -11,6 +11,8 @@ namespace Gplanchat\Durable\Store;
  */
 final class StoredTimestamp
 {
+    private function __construct() {}
+
     public static function toDateTime(mixed $raw): ?\DateTimeImmutable
     {
         if ($raw instanceof \DateTimeImmutable) {

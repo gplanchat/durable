@@ -15,6 +15,8 @@ use PHPUnit\Framework\Assert;
  */
 final class JournalAssertions
 {
+    private function __construct() {}
+
     /**
      * @param string $expectedFailureClass the failure's class name, or '' for any failure
      */

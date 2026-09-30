@@ -47,6 +47,8 @@ use Gplanchat\Durable\ParentClosePolicy;
  */
 final class EventDataMapper
 {
+    private function __construct() {}
+
     /**
      * @return array{execution_id: string, event_type: string, payload: array<string, mixed>}
      */

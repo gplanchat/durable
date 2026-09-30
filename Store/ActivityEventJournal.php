@@ -24,6 +24,8 @@ use Gplanchat\Durable\Failure\ActivityRetryState;
  */
 final class ActivityEventJournal
 {
+    private function __construct() {}
+
     public static function hasTerminalOutcomeForActivity(
         EventStoreInterface $eventStore,
         string $executionId,

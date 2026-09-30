@@ -28,6 +28,8 @@ namespace Gplanchat\Durable\Observation;
  */
 final class RecordedDetails
 {
+    private function __construct() {}
+
     /**
      * @param array<string, mixed> $details
      */

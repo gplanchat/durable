@@ -14,6 +14,8 @@ use Gplanchat\Durable\ExecutionContext;
  * losing branches. Each had its own version, and they did not descend to the same depth: the
  * composite's stopped at the first level, so that an `all()` bounded by a deadline left its
  * activities running. A single traversal, called from both sides.
+ *
+ * @internal
  */
 final class AwaitableCancellation
 {

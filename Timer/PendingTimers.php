@@ -14,9 +14,13 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  * The timers a journal scheduled and neither fired nor cancelled: what fires next, what wakes the
  * run, and what a resume sent before the firing names (DUR052). Read in one place so the three
  * agree.
+ *
+ * @internal
  */
 final class PendingTimers
 {
+    private function __construct() {}
+
     /**
      * @return array<string, float> timer id => when it is due, in the order they were scheduled
      */

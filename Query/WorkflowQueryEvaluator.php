@@ -18,6 +18,8 @@ use Gplanchat\Durable\Store\EventStoreInterface;
  */
 final class WorkflowQueryEvaluator
 {
+    private function __construct() {}
+
     /**
      * Last {@see ExecutionCompleted} result present in the stream (null if there is none).
      */

@@ -18,6 +18,8 @@ namespace Gplanchat\Durable\Observation;
  */
 final class ReadableDuration
 {
+    private function __construct() {}
+
     public static function of(float $seconds): string
     {
         return match (true) {
