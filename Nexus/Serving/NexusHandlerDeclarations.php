@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Nexus\Serving;
 
+use Gplanchat\Durable\Attribute\AsNexusServiceHandler;
 use Gplanchat\Durable\Attribute\FulfilsNexusOperation;
 use Gplanchat\Durable\Nexus\NexusOperationName;
 use Gplanchat\Durable\Nexus\NexusService;
@@ -22,13 +23,16 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 final class NexusHandlerDeclarations
 {
     /**
-     * @param array<class-string, class-string> $handlers    handler => the contract it serves
-     * @param list<class-string>                $workflows   the declared workflows, where the
+     * @param array<array-key, class-string> $handlers       handler => the contract it serves, or a
+     *                                                        handler alone, whose contract its
+     *                                                        #[AsNexusServiceHandler] names
+     * @param list<class-string>             $workflows      the declared workflows, where the
      *                                                        operations they fulfil are read
-     * @param \Closure(class-string): object    $instantiate the host's way to get a handler
-     * @param string                            $source      where the host declares handlers, for
+     * @param \Closure(class-string): object $instantiate    the host's way to get a handler
+     * @param string                         $source         where the host declares handlers, for
      *                                                        the refusals to name it
-     * @param string                            $contractHint what a wrong contract means on this host
+     * @param string                         $contractHint   what a wrong contract means on this host
+     * @param string                         $workflowSource where the host declares workflows
      */
     public function __construct(
         private readonly array $handlers,
@@ -36,6 +40,7 @@ final class NexusHandlerDeclarations
         private readonly \Closure $instantiate,
         private readonly string $source,
         private readonly string $contractHint,
+        private readonly string $workflowSource,
     ) {}
 
     public function registerInto(NexusOperationRegistry $registry): void
@@ -43,7 +48,8 @@ final class NexusHandlerDeclarations
         $resolver = new NexusContractResolver(null);
         $claimed = $this->operationsClaimedByWorkflows();
 
-        foreach ($this->handlers as $handlerClass => $contract) {
+        foreach ($this->handlers as $key => $value) {
+            [$handlerClass, $contract] = \is_int($key) ? [$value, $this->contractNamedBy($value)] : [$key, $value];
             if (!interface_exists($contract)) {
                 throw new \InvalidArgumentException(\sprintf(
                     'Durable: "%s" is declared as the Nexus contract of %s, but no such interface exists. %s',
@@ -53,8 +59,20 @@ final class NexusHandlerDeclarations
                 ));
             }
 
+            $named = \is_int($key) ? $contract : $this->contractNamedBy($handlerClass, required: false);
+            if (null !== $named && $named !== $contract) {
+                throw new \InvalidArgumentException(\sprintf(
+                    'Durable: %s gives %s the contract %s, but its #[AsNexusServiceHandler] names %s.',
+                    $this->source,
+                    $handlerClass,
+                    $contract,
+                    $named,
+                ));
+            }
+
             $service = NexusService::named($resolver->serviceName($contract));
             $served = 0;
+            $unserved = [];
 
             foreach ($resolver->operations($contract) as $method => $operation) {
                 $name = NexusOperationName::named($operation);
@@ -89,7 +107,11 @@ final class NexusHandlerDeclarations
                         (new WorkflowDefinitionLoader())->workflowTypeForClass($workflowClass),
                     );
                     ++$served;
+
+                    continue;
                 }
+
+                $unserved[] = $operation;
             }
 
             if (0 === $served) {
@@ -101,7 +123,40 @@ final class NexusHandlerDeclarations
                     $contract,
                 ));
             }
+
+            // Symfony's NexusHandlerPass refuses the same at compile time: a caller would wait on a
+            // result nothing produces.
+            if ([] !== $unserved) {
+                throw new \InvalidArgumentException(\sprintf(
+                    'Durable: operation "%s" of contract %s is served by nobody — %s has no method for it '
+                    . 'and no workflow claims it with #[FulfilsNexusOperation]. A caller would wait on a result '
+                    . 'nothing produces.',
+                    implode('", "', $unserved),
+                    $contract,
+                    $handlerClass,
+                ));
+            }
         }
+    }
+
+    /** @return ($required is true ? class-string : class-string|null) */
+    private function contractNamedBy(string $handlerClass, bool $required = true): ?string
+    {
+        if (!class_exists($handlerClass)) {
+            throw new \InvalidArgumentException(\sprintf('Durable: "%s" is declared in %s, but no such class exists.', $handlerClass, $this->source));
+        }
+
+        $attributes = (new \ReflectionClass($handlerClass))->getAttributes(AsNexusServiceHandler::class);
+        if ([] === $attributes && $required) {
+            throw new \InvalidArgumentException(\sprintf(
+                'Durable: %s is listed alone in %s, so its contract must come from '
+                . '#[AsNexusServiceHandler]. Add the attribute, or declare it as handler => contract.',
+                $handlerClass,
+                $this->source,
+            ));
+        }
+
+        return [] === $attributes ? null : $attributes[0]->newInstance()->contract;
     }
 
     /** @return array<class-string, array<string, string>> contract => operation => workflow type */
@@ -111,7 +166,7 @@ final class NexusHandlerDeclarations
 
         foreach ($this->workflows as $workflowClass) {
             if (!class_exists($workflowClass)) {
-                continue;
+                throw new \InvalidArgumentException(\sprintf('Durable: "%s" is declared in %s, but no such class exists.', $workflowClass, $this->workflowSource));
             }
 
             foreach ((new \ReflectionClass($workflowClass))->getAttributes(FulfilsNexusOperation::class) as $attribute) {

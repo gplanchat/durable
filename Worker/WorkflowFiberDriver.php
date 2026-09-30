@@ -10,6 +10,7 @@ use Gplanchat\Durable\Awaitable\AwaitableCancellation;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\ExecutionContext;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\WorkflowLifecycleInterface;
 use Gplanchat\Durable\WorkflowEnvironment;
 
@@ -38,7 +39,8 @@ final class WorkflowFiberDriver
         WorkflowEnvironment $environment,
         callable $handler,
     ): mixed {
-        $this->lifecycle->onBeforeRun($executionId);
+        $id = ExecutionId::fromString($executionId);
+        $this->lifecycle->onBeforeRun($id);
 
         // Second argument deliberately not declared by most handlers: PHP accepts extra
         // arguments on a userland function, so a closure that takes only the environment keeps
@@ -54,7 +56,7 @@ final class WorkflowFiberDriver
         try {
             $suspended = $fiber->start();
         } catch (\Throwable $e) {
-            $this->dispatchThrowable($executionId, $e);
+            $this->dispatchThrowable($id, $e);
 
             return null;
         }
@@ -66,7 +68,7 @@ final class WorkflowFiberDriver
                 // caller took that null for a result: the run was marked completed with no
                 // ExecutionCompleted in the journal (#315). It is a failure, and it is written down.
                 self::abandon($context, $fiber);
-                $this->lifecycle->onFailed($executionId, new \LogicException(\sprintf(
+                $this->lifecycle->onFailed($id, new \LogicException(\sprintf(
                     'The workflow suspended with a value of type %s; only an Awaitable can be awaited. Use $env->await(), never Fiber::suspend() directly.',
                     get_debug_type($suspended),
                 )));
@@ -84,18 +86,18 @@ final class WorkflowFiberDriver
                 // raised again here, where the replay reaches the same await, and not recorded twice.
                 $recorded = $cancellationDelivered ? null : $context->cancellationDelivery();
                 $replayedOnCondition = null !== $recorded && [] === $recorded->targets;
-                if (!$cancellationDelivered && ($replayedOnCondition || $this->lifecycle->isCancellationPending($executionId))) {
+                if (!$cancellationDelivered && ($replayedOnCondition || $this->lifecycle->isCancellationPending($id))) {
                     $cancellationDelivered = true;
                     $context->markCancellationRaised();
                     $failure = new WorkflowCancelledFailure($executionId, ActivityCancellationReason::WORKFLOW_CANCELLED);
                     if (!$replayedOnCondition) {
-                        $this->lifecycle->onCancellationDelivered($executionId, self::cancelPending($context, $suspended));
+                        $this->lifecycle->onCancellationDelivered($id, self::cancelPending($context, $suspended));
                     }
 
                     try {
                         $suspended = $fiber->throw($failure);
                     } catch (\Throwable $e) {
-                        $this->dispatchThrowable($executionId, $e);
+                        $this->dispatchThrowable($id, $e);
 
                         return null;
                     }
@@ -105,7 +107,7 @@ final class WorkflowFiberDriver
 
                 // New command: already stacked in the WorkflowCommandBufferInterface.
                 self::abandon($context, $fiber);
-                $this->lifecycle->onSuspended($executionId, $suspended);
+                $this->lifecycle->onSuspended($id, $suspended);
 
                 return null;
             }
@@ -114,7 +116,7 @@ final class WorkflowFiberDriver
             try {
                 $suspended = $fiber->resume();
             } catch (\Throwable $e) {
-                $this->dispatchThrowable($executionId, $e);
+                $this->dispatchThrowable($id, $e);
 
                 return null;
             }
@@ -122,7 +124,7 @@ final class WorkflowFiberDriver
 
         if ($fiber->isTerminated()) {
             $result = $fiber->getReturn();
-            $this->lifecycle->onCompleted($executionId, $result);
+            $this->lifecycle->onCompleted($id, $result);
 
             return $result;
         }
@@ -130,22 +132,22 @@ final class WorkflowFiberDriver
         return null;
     }
 
-    private function dispatchThrowable(string $executionId, \Throwable $e): void
+    private function dispatchThrowable(ExecutionId $id, \Throwable $e): void
     {
         if ($e instanceof ContinueAsNewRequested) {
-            $this->lifecycle->onContinuedAsNew($executionId, $e);
+            $this->lifecycle->onContinuedAsNew($id, $e);
 
             return;
         }
 
         if ($e instanceof WorkflowCancelledFailure) {
             // The workflow did not swallow it: the execution ends cancelled, not failed.
-            $this->lifecycle->onCancelled($executionId, $e);
+            $this->lifecycle->onCancelled($id, $e);
 
             return;
         }
 
-        $this->lifecycle->onFailed($executionId, $e);
+        $this->lifecycle->onFailed($id, $e);
     }
 
     /**

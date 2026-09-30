@@ -37,7 +37,7 @@ final class ExecutionEngine
      */
     public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
-        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
+        $this->workflowExecutionObserver?->onWorkflowRun(ExecutionId::fromString($executionId), $workflowType ?? '(unknown)', false);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);
@@ -79,7 +79,7 @@ final class ExecutionEngine
      */
     public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {
-        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
+        $this->workflowExecutionObserver?->onWorkflowRun(ExecutionId::fromString($executionId), $workflowType ?? '(unknown)', true);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);

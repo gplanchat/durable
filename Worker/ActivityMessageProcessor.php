@@ -62,7 +62,8 @@ final class ActivityMessageProcessor
     {
         // A copy of an attempt another worker holds: not now, and not never, since a holder that
         // died keeps its claim until the lock TTL. The host delivers it again later (#590).
-        $release = $this->attemptClaim->claim($message->executionId, $message->activityId, $message->attempt);
+        $id = ExecutionId::fromString($message->executionId);
+        $release = $this->attemptClaim->claim($id, $message->activityId, $message->attempt);
         if (null === $release) {
             throw new ActivityAttemptDeferred($message->executionId, $message->activityId, $message->attempt);
         }
@@ -76,6 +77,7 @@ final class ActivityMessageProcessor
 
     private function processClaimed(ActivityMessage $message): ?\Throwable
     {
+        $id = ExecutionId::fromString($message->executionId);
         // A redelivery of an attempt that already ran is answered by the journal, not run again:
         // re-running a failed attempt would also queue its retry a second time (#319). An outcome
         // was followed by a resume, which may be the very send that failed and caused this
@@ -159,7 +161,7 @@ final class ActivityMessageProcessor
             if (true === $this->heartbeatSender->isCancellationRequested()) {
                 $duration = self::secondsSince($t0);
                 $this->workflowExecutionObserver?->onActivityExecuted(
-                    $message->executionId,
+                    $id,
                     $message->activityId,
                     $message->activityName,
                     $duration,
@@ -181,7 +183,7 @@ final class ActivityMessageProcessor
             }
             $duration = self::secondsSince($t0);
             $this->workflowExecutionObserver?->onActivityExecuted(
-                $message->executionId,
+                $id,
                 $message->activityId,
                 $message->activityName,
                 $duration,
@@ -208,7 +210,7 @@ final class ActivityMessageProcessor
             if (isset($t0)) {
                 $duration = self::secondsSince($t0);
                 $this->workflowExecutionObserver?->onActivityExecuted(
-                    $message->executionId,
+                    $id,
                     $message->activityId,
                     $message->activityName,
                     $duration,

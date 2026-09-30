@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Debug;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Optional observation of workflow / activity executions (Symfony toolbar, logs, etc.).
  */
@@ -12,7 +14,7 @@ interface WorkflowExecutionObserverInterface
     /**
      * @param string $workflowType Type registered in the WorkflowRegistry (or fallback label)
      */
-    public function onWorkflowRun(string $executionId, string $workflowType, bool $isResume): void;
+    public function onWorkflowRun(ExecutionId $executionId, string $workflowType, bool $isResume): void;
 
     /**
      * One activity execution attempt (includes the retries when there are several calls).
@@ -20,7 +22,7 @@ interface WorkflowExecutionObserverInterface
      * @param class-string<\Throwable>|null $errorClass
      */
     public function onActivityExecuted(
-        string $executionId,
+        ExecutionId $executionId,
         string $activityId,
         string $activityName,
         float $durationSeconds,

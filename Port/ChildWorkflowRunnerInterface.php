@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Port: ability to start a child workflow (inline or deferred).
  *
@@ -25,5 +27,5 @@ interface ChildWorkflowRunnerInterface
      *
      * @throws \Gplanchat\Durable\Exception\ChildWorkflowStartDeferred when deferred
      */
-    public function runChild(string $childExecutionId, string $workflowType, array $input, ?string $parentExecutionId = null): mixed;
+    public function runChild(ExecutionId $childExecutionId, string $workflowType, array $input, ?ExecutionId $parentExecutionId = null): mixed;
 }

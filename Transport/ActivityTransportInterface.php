@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Transport;
 
+use Gplanchat\Durable\ExecutionId;
+
 /**
  * Transport port for activity messages.
  *
@@ -31,5 +33,5 @@ interface ActivityTransportInterface
      * Removes a message still queued for this execution and this activityId (not a dequeue).
      * Best effort: Messenger, or a queue already consumed → false.
      */
-    public function removePendingFor(string $executionId, string $activityId): bool;
+    public function removePendingFor(ExecutionId $executionId, string $activityId): bool;
 }
