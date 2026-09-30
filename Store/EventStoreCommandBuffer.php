@@ -129,7 +129,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         // already giving it, including the two keys the core used to add by hand.
         $this->append(new ChildWorkflowScheduled(
             $this->id,
-            $childExecutionId->toString(),
+            $childExecutionId,
             $childWorkflowType,
             $input,
             $options->parentClosePolicy,
@@ -153,7 +153,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
     {
         $this->append(new ChildWorkflowCompleted(
             $this->id,
-            $childExecutionId->toString(),
+            $childExecutionId,
             $result,
         ));
     }
@@ -164,8 +164,8 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         // child's own WorkflowExecutionFailed, so the replay reads back what the pass saw (#318).
         $this->append(AsyncChildWorkflowFailureProjector::toParentJournalEvent(
             $this->eventStore,
-            $this->id->toString(),
-            $childExecutionId->toString(),
+            $this->id,
+            $childExecutionId,
             $reason,
         ));
     }

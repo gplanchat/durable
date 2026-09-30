@@ -156,7 +156,7 @@ final readonly class ResumeWorkflowHandler
         if (null === $parent) {
             return;
         }
-        // The events and the awaited fact still carry strings (#638 follow-up).
+        // The awaited fact still carries strings (#638 follow-up).
         $childExecutionId = $childId->toString();
         $parentId = $parent->toString();
 
@@ -167,8 +167,8 @@ final readonly class ResumeWorkflowHandler
         if (!$child->isJournalledIn($this->eventStore, $parentId)) {
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
             $this->eventStore->append(null !== $failure
-                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
-                : new ChildWorkflowCompleted(ExecutionId::fromString($parentId), $childExecutionId, $result));
+                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parent, $childId, $failure)
+                : new ChildWorkflowCompleted($parent, $childId, $result));
         }
 
         $this->resumeDispatcher->dispatchResume($parent);
