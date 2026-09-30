@@ -18,7 +18,7 @@ final class JournalAssertions
     private function __construct() {}
 
     /**
-     * @param string $expectedFailureClass the failure's class name, or '' for any failure
+     * @param class-string<\Throwable>|'' $expectedFailureClass the failure's class name, or '' for any failure
      */
     public static function assertWorkflowFailed(EventStoreInterface $eventStore, string $executionId, string $expectedFailureClass = ''): void
     {

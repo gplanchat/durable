@@ -344,6 +344,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
         // after the fact. A mutation that distorts the payload must fail here.
         $nested = [
             'deep' => ['ratio' => 0.125, 'flags' => [true, false], 'label' => 'é✓ "quoted" \\ backslash'],
+            // A float with no fractional part: plain `json_encode()` writes 30.0 as 30, and it comes
+            // back as an int (#759).
+            'integralFloat' => 30.0,
             'n' => 3,
             'sku' => '0042',
             'beyondIntMax' => '9223372036854775808',
