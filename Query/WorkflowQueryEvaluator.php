@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Query;
 
 use Gplanchat\Durable\Event\ExecutionCompleted;
-use Gplanchat\Durable\Event\TimerCompleted;
-use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Timer\PendingTimers;
 
 /**
  * Client-side "query" reads: without running the workflow code, from the journal alone.
@@ -34,20 +33,11 @@ final class WorkflowQueryEvaluator
     }
 
     /**
-     * Returns true if the execution has at least one TimerScheduled without a corresponding
-     * TimerCompleted (i.e., the workflow is suspended waiting for a timer to fire).
+     * Returns true if the execution has at least one timer that neither fired nor was cancelled,
+     * i.e. the workflow is suspended waiting for a timer. `PendingTimers` is the one reading of that.
      */
     public static function hasPendingTimer(EventStoreInterface $store, string $executionId): bool
     {
-        $scheduled = [];
-        foreach ($store->readStream(ExecutionId::fromString($executionId)) as $event) {
-            if ($event instanceof TimerScheduled) {
-                $scheduled[$event->timerId()] = true;
-            } elseif ($event instanceof TimerCompleted) {
-                unset($scheduled[$event->timerId()]);
-            }
-        }
-
-        return [] !== $scheduled;
+        return [] !== PendingTimers::of($store, $executionId);
     }
 }
