@@ -113,11 +113,10 @@ final readonly class ResumeWorkflowHandler
             // Superseded, not deleted (#322): the row is what the old run was started with.
             $this->metadataStore->markCompleted($id);
             $newId = null !== $e->nextExecutionId ? ExecutionId::fromString($e->nextExecutionId) : ExecutionId::generate();
-            $newExecutionId = $newId->toString();
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
             $this->metadataStore->save($newId, $nextAlias, $e->payload);
             // resume() never writes a start: this one is the only place the new run names its predecessor.
-            $this->eventStore->append(new ExecutionStarted(ExecutionId::fromString($newExecutionId), [
+            $this->eventStore->append(new ExecutionStarted($newId, [
                 'workflowType' => $nextAlias,
                 'continuedFromExecutionId' => $executionId,
             ]));

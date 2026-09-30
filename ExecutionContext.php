@@ -601,9 +601,7 @@ final class ExecutionContext
         }
 
         $scheduledId = $this->historySource->findScheduledChildExecutionId($slotIndex);
-        $childExecutionId = $scheduledId?->toString() ?? ($options->workflowId ?? $this->uuid());
-
-        $childId = $scheduledId ?? ExecutionId::fromString($childExecutionId);
+        $childId = $scheduledId ?? ExecutionId::fromString($options->workflowId ?? $this->uuid());
 
         if (null === $scheduledId && null !== $options->workflowId) {
             $this->assertChildWorkflowIdAllowed($options, $childId);
@@ -636,7 +634,7 @@ final class ExecutionContext
             // Read back from the journal when it holds the failure already, so the pass rejects
             // with the exception the replay will build: same kind, class, and no previous (#318).
             $deferred->reject($this->historySource->findChildWorkflowForSlot($slotIndex)->failed ?? new DurableChildWorkflowFailedException(
-                $childExecutionId,
+                $childId->toString(),
                 $e->getMessage(),
                 (int) $e->getCode(),
                 $e,
