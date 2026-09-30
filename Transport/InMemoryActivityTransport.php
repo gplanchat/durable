@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Transport;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\SystemClock;
 use Psr\Clock\ClockInterface;
 
@@ -87,12 +88,12 @@ final class InMemoryActivityTransport implements ActivityTransportInterface
         return $next;
     }
 
-    public function removePendingFor(string $executionId, string $activityId): bool
+    public function removePendingFor(ExecutionId $executionId, string $activityId): bool
     {
         $removed = false;
         $next = [];
         foreach ($this->pending as $row) {
-            if (!$removed && $row['message']->executionId === $executionId && $row['message']->activityId === $activityId) {
+            if (!$removed && $row['message']->executionId === $executionId->toString() && $row['message']->activityId === $activityId) {
                 $removed = true;
 
                 continue;

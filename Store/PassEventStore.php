@@ -27,8 +27,11 @@ final class PassEventStore implements EventStoreInterface
      */
     public static function open(EventStoreInterface $store, string $executionId): EventStoreInterface
     {
+        // Converted first: an empty id is refused over any store, not only over one that fences.
+        $id = ExecutionId::fromString($executionId);
+
         return $store instanceof FencedEventStoreInterface
-            ? new self($store, $store->claimPass($executionId))
+            ? new self($store, $store->claimPass($id))
             : $store;
     }
 

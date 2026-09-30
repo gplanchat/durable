@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Port;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ParentClosureReason;
 
 /**
@@ -11,5 +12,5 @@ use Gplanchat\Durable\ParentClosureReason;
  */
 interface ParentChildWorkflowCoordinatorInterface
 {
-    public function onParentClosed(string $parentExecutionId, ParentClosureReason $reason): void;
+    public function onParentClosed(ExecutionId $parentExecutionId, ParentClosureReason $reason): void;
 }

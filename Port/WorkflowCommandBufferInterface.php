@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Port;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\ChildWorkflowOptions;
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 
 /**
@@ -85,7 +86,7 @@ interface WorkflowCommandBufferInterface
      * @param array<string, mixed> $input
      */
     public function scheduleChildWorkflow(
-        string $childExecutionId,
+        ExecutionId $childExecutionId,
         string $childWorkflowType,
         array $input,
         ChildWorkflowOptions $options,
@@ -107,14 +108,14 @@ interface WorkflowCommandBufferInterface
      *
      * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
-    public function completeChildWorkflow(string $childExecutionId, mixed $result): void;
+    public function completeChildWorkflow(ExecutionId $childExecutionId, mixed $result): void;
 
     /**
      * The failure counterpart of {@see completeChildWorkflow()}, honoured and refused alike.
      *
      * @throws \Gplanchat\Durable\Exception\UnsupportedByBackendException if the backend has no inline child
      */
-    public function failChildWorkflow(string $childExecutionId, \Throwable $reason): void;
+    public function failChildWorkflow(ExecutionId $childExecutionId, \Throwable $reason): void;
 
     /**
      * Records the version an execution resolved for a declared change point.
