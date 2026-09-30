@@ -62,14 +62,14 @@ final readonly class AwaitedFact
         return new self(AwaitedFactKind::Timer, $timerIds);
     }
 
-    public function isJournalledIn(EventStoreInterface $journal, string $executionId): bool
+    public function isJournalledIn(EventStoreInterface $journal, ExecutionId $executionId): bool
     {
         if (AwaitedFactKind::Activity === $this->kind) {
-            return ActivityEventJournal::hasTerminalOutcomeForActivity($journal, $executionId, $this->ids[0]);
+            return ActivityEventJournal::hasTerminalOutcomeForActivity($journal, $executionId->toString(), $this->ids[0]);
         }
 
         $missing = array_fill_keys($this->ids, true);
-        foreach ($journal->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($journal->readStream($executionId) as $event) {
             $id = match (true) {
                 AwaitedFactKind::Child === $this->kind && ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) => $event->childExecutionId()->toString(),
                 AwaitedFactKind::Signal === $this->kind && $event instanceof WorkflowSignalReceived => $event->requestId(),

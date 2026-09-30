@@ -65,7 +65,7 @@ final readonly class ResumeWorkflowHandler
 
         // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this
         // resume concludes nothing, and the transport's retry is the wait.
-        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $executionId)) {
+        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $id)) {
             throw new ResumeArrivedBeforeItsOutcome($executionId, $message->awaited);
         }
 
@@ -156,15 +156,12 @@ final readonly class ResumeWorkflowHandler
         if (null === $parent) {
             return;
         }
-        // The awaited fact still carries strings (#638 follow-up).
-        $childExecutionId = $childId->toString();
-        $parentId = $parent->toString();
-
         // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
         // redelivered after a crash still finds the link, and resumes the parent without a second
         // outcome.
-        $child = AwaitedFact::child($childExecutionId);
-        if (!$child->isJournalledIn($this->eventStore, $parentId)) {
+        // The fact is wire: it carries the child id as a string.
+        $child = AwaitedFact::child($childId->toString());
+        if (!$child->isJournalledIn($this->eventStore, $parent)) {
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
             $this->eventStore->append(null !== $failure
                 ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parent, $childId, $failure)
