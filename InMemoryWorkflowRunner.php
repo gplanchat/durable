@@ -65,10 +65,13 @@ final readonly class InMemoryWorkflowRunner
         /**
          * How many times a chain may continue as new before the run fails. The budget does not
          * bound a chain, since each run gets its own: a workflow that always continues as new
-         * would run forever (#888).
+         * would run forever (#888). `0` allows no continuation; a negative value throws.
          */
         private readonly int $maxContinuations = self::DEFAULT_MAX_CONTINUATIONS,
     ) {
+        if ($maxContinuations < 0) {
+            throw new \InvalidArgumentException(\sprintf('maxContinuations must be 0 or more, %d given.', $maxContinuations));
+        }
         $this->clock = $clock ?? new SystemClock();
     }
 
