@@ -80,8 +80,9 @@ final readonly class InMemoryWorkflowRunner
      *
      * @return mixed the handler's result
      */
-    public function run(string $executionId, callable $handler, ?string $workflowType = null): mixed
+    public function run(ExecutionId|string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
+        $executionId = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
         $startedExtras = [];
         $firstExecutionId = $executionId;
         $continuations = 0;
@@ -96,9 +97,9 @@ final readonly class InMemoryWorkflowRunner
                     throw $e;
                 }
                 if (++$continuations > $this->maxContinuations) {
-                    throw new ContinuationCapReachedException($firstExecutionId, $this->maxContinuations);
+                    throw new ContinuationCapReachedException($firstExecutionId->toString(), $this->maxContinuations);
                 }
-                $startedExtras = ['continuedFromExecutionId' => $executionId];
+                $startedExtras = ['continuedFromExecutionId' => $executionId->toString()];
                 $executionId = $e->nextExecutionId;
                 // The alias, as ResumeWorkflowHandler journals it; the registry knows both keys.
                 $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($e->workflowType);
@@ -110,7 +111,7 @@ final readonly class InMemoryWorkflowRunner
     /**
      * @param array<string, mixed> $startedExtras merged into the run's ExecutionStarted
      */
-    private function runOnce(string $executionId, callable $handler, ?string $workflowType, array $startedExtras): mixed
+    private function runOnce(ExecutionId $id, callable $handler, ?string $workflowType, array $startedExtras): mixed
     {
         // Virtual clock: an inline harness has nobody to deliver a timer wake-up, and waiting
         // out a due time for real would make every workflow that sleeps untestable. It only
@@ -148,8 +149,6 @@ final readonly class InMemoryWorkflowRunner
 
         // What the last suspension was waiting on, when that has a name: it is all that
         // separates "stuck" from "stuck on that particular condition" in the diagnosis.
-        $id = ExecutionId::fromString($executionId);
-
         try {
             return $engine->start($id, $handler, $workflowType, $startedExtras);
         } catch (WorkflowSuspendedException $e) {
@@ -162,7 +161,7 @@ final readonly class InMemoryWorkflowRunner
 
         while (true) {
             if (hrtime(true) >= $deadline) {
-                throw WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds);
+                throw WorkflowStuckException::budgetExhausted($id->toString(), $this->budgetSeconds);
             }
 
             $before = $this->eventStore->countEventsInStream($id);
@@ -194,8 +193,8 @@ final readonly class InMemoryWorkflowRunner
                 // An attempt still queued tells the two causes apart: the workflow is still
                 // retrying (budget exhausted), rather than waiting for an event that will not come.
                 throw null !== $this->activityTransport->nextDueAt()
-                    ? WorkflowStuckException::budgetExhausted($executionId, $this->budgetSeconds)
-                    : WorkflowStuckException::noProgress($executionId, $waitingOn);
+                    ? WorkflowStuckException::budgetExhausted($id->toString(), $this->budgetSeconds)
+                    : WorkflowStuckException::noProgress($id->toString(), $waitingOn);
             }
         }
     }

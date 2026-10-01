@@ -129,12 +129,12 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         // the second id may then stay linked to a parent, with no run behind it.
         foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowContinuedAsNew && null !== $event->newExecutionId()) {
-                throw $request->withNextExecutionId($event->newExecutionId()->toString());
+                throw $request->withNextExecutionId($event->newExecutionId());
             }
         }
 
         $next = ExecutionId::generate();
-        $request = $request->withNextExecutionId($next->toString());
+        $request = $request->withNextExecutionId($next);
         $this->eventStore->append(new WorkflowContinuedAsNew(
             $executionId,
             $request->workflowType,

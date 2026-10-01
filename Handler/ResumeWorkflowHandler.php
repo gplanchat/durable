@@ -123,7 +123,7 @@ final readonly class ResumeWorkflowHandler
 
             return;
         } catch (ContinueAsNewRequested $e) {
-            $newId = null !== $e->nextExecutionId ? ExecutionId::fromString($e->nextExecutionId) : ExecutionId::generate();
+            $newId = $e->nextExecutionId ?? ExecutionId::generate();
             $this->continueAsNew($id, $newId, $e->workflowType, $e->payload);
 
             return;
