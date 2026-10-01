@@ -45,14 +45,10 @@ use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
  */
 final class EventStoreHistorySource implements WorkflowHistorySourceInterface
 {
-    private readonly ExecutionId $executionId;
-
     public function __construct(
         private readonly EventStoreInterface $eventStore,
-        ExecutionId|string $executionId,
-    ) {
-        $this->executionId = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
-    }
+        private readonly ExecutionId $executionId,
+    ) {}
 
     /** @var list<Event>|null */
     private ?array $events = null;
