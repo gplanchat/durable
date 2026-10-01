@@ -9,10 +9,11 @@ namespace Gplanchat\Durable\Exception;
  * budget, or a client's polls of a cluster.
  *
  * Signalled rather than looped on empty: a test harness must fail, not freeze.
+ * {@see ContinuationCapReachedException} extends it for a continue-as-new chain past the cap.
  */
-final class WorkflowStuckException extends \RuntimeException implements ExceptionInterface
+class WorkflowStuckException extends \RuntimeException implements ExceptionInterface
 {
-    private function __construct(
+    protected function __construct(
         public readonly string $executionId,
         string $message,
     ) {
