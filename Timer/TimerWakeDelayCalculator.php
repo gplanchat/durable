@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Timer;
 
 use Gplanchat\Durable\Event\TimerScheduled;
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
@@ -24,7 +25,7 @@ final class TimerWakeDelayCalculator
      * @return int milliseconds until {@see TimerScheduled::scheduledAt()} of the next pending timer
      *             (neither completed nor cancelled), or null if there is none
      */
-    public static function millisecondsUntilNextTimerDue(EventStoreInterface $store, string $executionId, float $nowSeconds): ?int
+    public static function millisecondsUntilNextTimerDue(EventStoreInterface $store, ExecutionId $executionId, float $nowSeconds): ?int
     {
         $pending = PendingTimers::of($store, $executionId);
 

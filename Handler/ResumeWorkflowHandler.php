@@ -111,7 +111,7 @@ final readonly class ResumeWorkflowHandler
                 } else {
                     $ms = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue(
                         $this->eventStore,
-                        $executionId,
+                        $id,
                         $this->engine->getRuntime()->nowSeconds(),
                     );
                     if (null === $ms) {

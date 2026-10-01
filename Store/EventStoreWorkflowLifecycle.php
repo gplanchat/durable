@@ -118,7 +118,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             null,
             $waitingOnTimer,
             $waitingOnTimer,
-            WaitReason::describe($pending, $this->eventStore, $executionId->toString()),
+            WaitReason::describe($pending, $this->eventStore, $executionId),
         );
     }
 

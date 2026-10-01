@@ -34,7 +34,7 @@ final class WaitReason
     /**
      * @param Awaitable<mixed> $awaitable
      */
-    public static function describe(Awaitable $awaitable, EventStoreInterface $events, string $executionId): ?string
+    public static function describe(Awaitable $awaitable, EventStoreInterface $events, ExecutionId $executionId): ?string
     {
         $condition = AwaitableInspector::describeCondition($awaitable);
         if (null !== $condition) {
@@ -47,7 +47,7 @@ final class WaitReason
         }
 
         $reason = null;
-        foreach ($events->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($events->readStream($executionId) as $event) {
             if ($leaf instanceof TimerAwaitable && $event instanceof TimerScheduled && $event->timerId() === $leaf->timerId()) {
                 $reason = \sprintf(
                     'timer %sdue at %s',

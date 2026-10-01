@@ -40,6 +40,6 @@ final class WorkflowQueryEvaluator
      */
     public static function hasPendingTimer(EventStoreInterface $store, string $executionId): bool
     {
-        return [] !== PendingTimers::of($store, $executionId);
+        return [] !== PendingTimers::of($store, ExecutionId::fromString($executionId));
     }
 }

@@ -24,10 +24,10 @@ final class PendingTimers
     /**
      * @return array<string, float> timer id => when it is due, in the order they were scheduled
      */
-    public static function of(EventStoreInterface $journal, string $executionId): array
+    public static function of(EventStoreInterface $journal, ExecutionId $executionId): array
     {
         $pending = [];
-        foreach ($journal->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($journal->readStream($executionId) as $event) {
             if ($event instanceof TimerScheduled) {
                 $pending[$event->timerId()] = $event->scheduledAt();
             }
@@ -42,7 +42,7 @@ final class PendingTimers
     /**
      * @return list<string> the pending timers due at `$now`, in the order they were scheduled
      */
-    public static function dueAt(EventStoreInterface $journal, string $executionId, float $now): array
+    public static function dueAt(EventStoreInterface $journal, ExecutionId $executionId, float $now): array
     {
         return array_keys(array_filter(self::of($journal, $executionId), static fn(float $at): bool => $now >= $at));
     }

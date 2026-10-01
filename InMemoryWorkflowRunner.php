@@ -212,7 +212,7 @@ final readonly class InMemoryWorkflowRunner
      */
     private function skipToNextTimer(ExecutionId $id, ExecutionRuntime $runtime, VirtualClock $clock): bool
     {
-        $dueInMs = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue($this->eventStore, $id->toString(), $clock->seconds());
+        $dueInMs = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue($this->eventStore, $id, $clock->seconds());
         if (null === $dueInMs) {
             return false;
         }
