@@ -24,6 +24,6 @@ final readonly class LocalWorkflowBackend implements WorkflowBackendInterface
 
     public function start(ExecutionId $executionId, callable $handler, ?string $workflowType = null): mixed
     {
-        return $this->engine->start($executionId->toString(), $handler, $workflowType);
+        return $this->engine->start($executionId, $handler, $workflowType);
     }
 }

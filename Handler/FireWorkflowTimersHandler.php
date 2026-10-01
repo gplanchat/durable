@@ -41,10 +41,10 @@ final readonly class FireWorkflowTimersHandler
     {
         // Firing timers is a pass: it claims the execution, and a newer pass supersedes it (DUR053).
         $id = ExecutionId::fromString($message->executionId);
-        $journal = PassEventStore::open($this->eventStore, $message->executionId);
+        $journal = PassEventStore::open($this->eventStore, $id);
         $context = new ExecutionContext(
             $id,
-            $history = new EventStoreHistorySource($journal, $message->executionId),
+            $history = new EventStoreHistorySource($journal, $id),
             new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $id, $this->runtime->clock(), $history),
             null,
         );

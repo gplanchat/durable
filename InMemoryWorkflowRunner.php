@@ -148,14 +148,14 @@ final readonly class InMemoryWorkflowRunner
 
         // What the last suspension was waiting on, when that has a name: it is all that
         // separates "stuck" from "stuck on that particular condition" in the diagnosis.
+        $id = ExecutionId::fromString($executionId);
+
         try {
-            return $engine->start($executionId, $handler, $workflowType, $startedExtras);
+            return $engine->start($id, $handler, $workflowType, $startedExtras);
         } catch (WorkflowSuspendedException $e) {
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
             $waitingOn = $e->waitingOn();
         }
-
-        $id = ExecutionId::fromString($executionId);
 
         // A length of real work, not an instant: the monotonic timer, which the virtual clock is not.
         $deadline = hrtime(true) + (int) ($this->budgetSeconds * 1e9);
@@ -168,10 +168,10 @@ final readonly class InMemoryWorkflowRunner
             $before = $this->eventStore->countEventsInStream($id);
             $this->runActivityWorker($id, $runtime, $clock, max(0.0, ((float) ($deadline - hrtime(true))) / 1e9));
             // Timers already due fire on every round; time itself does not move yet.
-            $runtime->checkTimers($this->timerContext($id, $runtime), PassEventStore::open($this->eventStore, $executionId));
+            $runtime->checkTimers($this->timerContext($id, $runtime), PassEventStore::open($this->eventStore, $id));
 
             try {
-                return $engine->resume($executionId, $handler);
+                return $engine->resume($id, $handler);
             } catch (WorkflowSuspendedException $e) {
                 // DUR003: same — suspension until activities have produced the events needed for replay.
                 $waitingOn = $e->waitingOn();
@@ -220,7 +220,7 @@ final readonly class InMemoryWorkflowRunner
         }
 
         $clock->advance((float) $dueInMs / 1000.0);
-        $runtime->checkTimers($this->timerContext($id, $runtime), PassEventStore::open($this->eventStore, $id->toString()));
+        $runtime->checkTimers($this->timerContext($id, $runtime), PassEventStore::open($this->eventStore, $id));
 
         return true;
     }
@@ -229,7 +229,7 @@ final readonly class InMemoryWorkflowRunner
     {
         return new ExecutionContext(
             $id,
-            $history = new EventStoreHistorySource($this->eventStore, $id->toString()),
+            $history = new EventStoreHistorySource($this->eventStore, $id),
             new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $id, $runtime->clock(), $history),
         );
     }
@@ -238,7 +238,7 @@ final readonly class InMemoryWorkflowRunner
     {
         $context = new ExecutionContext(
             $id,
-            $history = new EventStoreHistorySource($this->eventStore, $id->toString()),
+            $history = new EventStoreHistorySource($this->eventStore, $id),
             new EventStoreCommandBuffer($this->eventStore, $this->activityTransport, $id, $runtime->clock(), $history),
             null,
         );
