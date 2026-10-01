@@ -32,9 +32,9 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
             }
 
             match ($row['policy']) {
-                ParentClosePolicy::Terminate => $this->terminateChild($row['childExecutionId'], $parentExecutionId->toString()),
+                ParentClosePolicy::Terminate => $this->terminateChild($row['childExecutionId'], $parentExecutionId),
                 ParentClosePolicy::Abandon => null,
-                ParentClosePolicy::RequestCancel => $this->requestCancelChild($row['childExecutionId'], $parentExecutionId->toString()),
+                ParentClosePolicy::RequestCancel => $this->requestCancelChild($row['childExecutionId'], $parentExecutionId),
             };
         }
     }
@@ -66,7 +66,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         foreach ($this->eventStore->readStream($parentExecutionId) as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 $out[] = [
-                    'childExecutionId' => ExecutionId::fromString($event->childExecutionId()),
+                    'childExecutionId' => $event->childExecutionId(),
                     'policy' => $event->parentClosePolicy(),
                 ];
             }
@@ -75,7 +75,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         return $out;
     }
 
-    private function terminateChild(ExecutionId $childExecutionId, string $parentExecutionId): void
+    private function terminateChild(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void
     {
         $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(
             $childExecutionId,
@@ -84,7 +84,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         $this->resumeDispatcher?->dispatchResume($childExecutionId);
     }
 
-    private function requestCancelChild(ExecutionId $childExecutionId, string $parentExecutionId): void
+    private function requestCancelChild(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void
     {
         $this->eventStore->append(new WorkflowCancellationRequested(
             $childExecutionId,
