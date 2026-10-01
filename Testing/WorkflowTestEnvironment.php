@@ -66,7 +66,7 @@ final readonly class WorkflowTestEnvironment
      * @param float $budgetSeconds      Max duration of an execution: activity attempts being
      *                                  unlimited by default, an inline harness needs a bound
      * @param int   $maxContinuations   How many times a chain may continue as new before the run
-     *                                  fails with WorkflowStuckException
+     *                                  throws ContinuationCapReachedException
      */
     public static function inMemory(
         array $activityHandlers = [],
