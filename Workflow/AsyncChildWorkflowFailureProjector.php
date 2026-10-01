@@ -24,8 +24,10 @@ final class AsyncChildWorkflowFailureProjector
         ExecutionId $parentExecutionId,
         ExecutionId $childExecutionId,
         \Throwable $failure,
+        // The run that failed, when it is not the one the parent scheduled: the last of a chain (#859).
+        ?ExecutionId $failedRun = null,
     ): ChildWorkflowFailed {
-        $wf = self::lastWorkflowExecutionFailed($store, $childExecutionId);
+        $wf = self::lastWorkflowExecutionFailed($store, $failedRun ?? $childExecutionId);
         if (null !== $wf) {
             return new ChildWorkflowFailed(
                 $parentExecutionId,
