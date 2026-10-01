@@ -263,7 +263,7 @@ abstract class EventStoreReplayConformanceTestCase extends EventStoreConformance
             $registry,
         );
 
-        return $runner->run($executionId, ConformanceWorkflow::run(...));
+        return $runner->run(ExecutionId::fromString($executionId), ConformanceWorkflow::run(...));
     }
 
     /**

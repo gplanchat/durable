@@ -82,6 +82,6 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 
-        return $runner->run($childExecutionId->toString(), $handler, $workflowType);
+        return $runner->run($childExecutionId, $handler, $workflowType);
     }
 }
