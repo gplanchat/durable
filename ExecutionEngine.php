@@ -35,15 +35,15 @@ final readonly class ExecutionEngine
      * @param array<string, mixed>                          $executionStartedPayloadExtras Merged into the {@see ExecutionStarted} payload (e.g. Temporal interpreter bootstrap).
      * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
-    public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
+    public function start(ExecutionId|string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
         // The message and the runner hand a string; it is converted here, once.
-        $id = ExecutionId::fromString($executionId);
+        $id = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
         $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', false);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
-        $journal = PassEventStore::open($this->eventStore, $executionId);
-        $history = new EventStoreHistorySource($journal, $executionId);
+        $journal = PassEventStore::open($this->eventStore, $id);
+        $history = new EventStoreHistorySource($journal, $id);
         $context = new ExecutionContext(
             $id,
             $history,
@@ -79,15 +79,15 @@ final readonly class ExecutionEngine
      *
      * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
-    public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
+    public function resume(ExecutionId|string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {
         // The message and the runner hand a string; it is converted here, once.
-        $id = ExecutionId::fromString($executionId);
+        $id = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
         $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', true);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
-        $journal = PassEventStore::open($this->eventStore, $executionId);
-        $history = new EventStoreHistorySource($journal, $executionId);
+        $journal = PassEventStore::open($this->eventStore, $id);
+        $history = new EventStoreHistorySource($journal, $id);
         $context = new ExecutionContext(
             $id,
             $history,

@@ -45,10 +45,14 @@ use Gplanchat\Durable\Port\WorkflowHistorySourceInterface;
  */
 final class EventStoreHistorySource implements WorkflowHistorySourceInterface
 {
+    private readonly ExecutionId $executionId;
+
     public function __construct(
         private readonly EventStoreInterface $eventStore,
-        private readonly string $executionId,
-    ) {}
+        ExecutionId|string $executionId,
+    ) {
+        $this->executionId = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
+    }
 
     /** @var list<Event>|null */
     private ?array $events = null;
@@ -74,7 +78,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
      */
     private function events(): array
     {
-        return $this->events ??= iterator_to_array($this->eventStore->readStream(ExecutionId::fromString($this->executionId)), false);
+        return $this->events ??= iterator_to_array($this->eventStore->readStream($this->executionId), false);
     }
 
     public function findActivitySlotResult(int $slot): ?SlotOutcome
@@ -128,7 +132,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
             $reason = $cancelledReasonByActivityId[$activityId];
 
             return new SlotOutcome(null, ActivityCancellationReason::WORKFLOW_CANCELLED === $reason
-                ? new WorkflowCancelledFailure($this->executionId, $reason)
+                ? new WorkflowCancelledFailure($this->executionId->toString(), $reason)
                 : new ActivitySupersededException($activityId, $reason));
         }
         if (\array_key_exists($activityId, $completedResults)) {
@@ -280,7 +284,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         if (ActivityCancellationReason::WORKFLOW_CANCELLED === ($cancelledReasons[$timerId] ?? null)) {
-            return new TimerOutcome($timerId, new WorkflowCancelledFailure($this->executionId, ActivityCancellationReason::WORKFLOW_CANCELLED));
+            return new TimerOutcome($timerId, new WorkflowCancelledFailure($this->executionId->toString(), ActivityCancellationReason::WORKFLOW_CANCELLED));
         }
 
         // A race loser simply stays unsettled: it never had a winner to announce.
