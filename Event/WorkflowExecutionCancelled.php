@@ -21,7 +21,7 @@ final readonly class WorkflowExecutionCancelled implements Event
     public function __construct(
         private ExecutionId $executionId,
         private string $reason,
-        private ?string $sourceParentExecutionId = null,
+        private ?ExecutionId $sourceParentExecutionId = null,
     ) {}
 
     public function executionId(): ExecutionId
@@ -34,7 +34,7 @@ final readonly class WorkflowExecutionCancelled implements Event
         return $this->reason;
     }
 
-    public function sourceParentExecutionId(): ?string
+    public function sourceParentExecutionId(): ?ExecutionId
     {
         return $this->sourceParentExecutionId;
     }
@@ -43,7 +43,7 @@ final readonly class WorkflowExecutionCancelled implements Event
     {
         return [
             'reason' => $this->reason,
-            'sourceParentExecutionId' => $this->sourceParentExecutionId,
+            'sourceParentExecutionId' => $this->sourceParentExecutionId?->toString(),
         ];
     }
 }

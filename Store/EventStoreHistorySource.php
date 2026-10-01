@@ -351,12 +351,12 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         }
 
         foreach ($this->events() as $event) {
-            if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId() === $childId) {
-                return new ChildWorkflowOutcome($childId, $event->result());
+            if ($event instanceof ChildWorkflowCompleted && $event->childExecutionId()->equals($childId)) {
+                return new ChildWorkflowOutcome($childId->toString(), $event->result());
             }
-            if ($event instanceof ChildWorkflowFailed && $event->childExecutionId() === $childId) {
-                return new ChildWorkflowOutcome($childId, null, new DurableChildWorkflowFailedException(
-                    $childId,
+            if ($event instanceof ChildWorkflowFailed && $event->childExecutionId()->equals($childId)) {
+                return new ChildWorkflowOutcome($childId->toString(), null, new DurableChildWorkflowFailedException(
+                    $childId->toString(),
                     $event->failureMessage(),
                     $event->failureCode(),
                     null,
@@ -376,7 +376,7 @@ final class EventStoreHistorySource implements WorkflowHistorySourceInterface
         foreach ($this->events() as $event) {
             if ($event instanceof ChildWorkflowScheduled) {
                 if ($index === $slot) {
-                    return ExecutionId::fromString($event->childExecutionId());
+                    return $event->childExecutionId();
                 }
                 ++$index;
             }
