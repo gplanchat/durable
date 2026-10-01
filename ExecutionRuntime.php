@@ -90,8 +90,8 @@ final class ExecutionRuntime
     public function checkTimers(ExecutionContext $context, ?EventStoreInterface $journal = null): void
     {
         $journal ??= $this->eventStore;
-        foreach (PendingTimers::dueAt($journal, $context->executionId(), $this->nowSeconds()) as $timerId) {
-            $journal->append(new TimerCompleted(ExecutionId::fromString($context->executionId()), $timerId));
+        foreach (PendingTimers::dueAt($journal, $context->executionId()->toString(), $this->nowSeconds()) as $timerId) {
+            $journal->append(new TimerCompleted($context->executionId(), $timerId));
             $context->resolveTimer($timerId);
         }
     }
@@ -234,7 +234,7 @@ final class ExecutionRuntime
      */
     private function secondsUntilNextTimer(ExecutionContext $context, VirtualClock $clock): ?float
     {
-        $pending = PendingTimers::of($this->eventStore, $context->executionId());
+        $pending = PendingTimers::of($this->eventStore, $context->executionId()->toString());
 
         return [] === $pending ? null : max(0.0, min($pending) - $clock->seconds());
     }

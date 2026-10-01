@@ -37,18 +37,20 @@ final readonly class ExecutionEngine
      */
     public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
-        $this->workflowExecutionObserver?->onWorkflowRun(ExecutionId::fromString($executionId), $workflowType ?? '(unknown)', false);
+        // The message and the runner hand a string; it is converted here, once.
+        $id = ExecutionId::fromString($executionId);
+        $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', false);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);
         $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
-            $executionId,
+            $id,
             $history,
             new EventStoreCommandBuffer(
                 $journal,
                 $this->runtime->getActivityTransport(),
-                $executionId,
+                $id,
                 $this->runtime->clock(),
                 $history,
             ),
@@ -57,7 +59,7 @@ final readonly class ExecutionEngine
             $pendingUpdates,
         );
 
-        if (0 === $journal->countEventsInStream(ExecutionId::fromString($executionId))) {
+        if (0 === $journal->countEventsInStream($id)) {
             $startedPayload = [];
             if (null !== $workflowType && '' !== $workflowType) {
                 $startedPayload['workflowType'] = $workflowType;
@@ -65,7 +67,7 @@ final readonly class ExecutionEngine
             if ($executionStartedPayloadExtras !== []) {
                 $startedPayload = array_merge($startedPayload, $executionStartedPayloadExtras);
             }
-            $journal->append(new ExecutionStarted(ExecutionId::fromString($executionId), $startedPayload));
+            $journal->append(new ExecutionStarted($id, $startedPayload));
         }
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
@@ -79,18 +81,20 @@ final readonly class ExecutionEngine
      */
     public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {
-        $this->workflowExecutionObserver?->onWorkflowRun(ExecutionId::fromString($executionId), $workflowType ?? '(unknown)', true);
+        // The message and the runner hand a string; it is converted here, once.
+        $id = ExecutionId::fromString($executionId);
+        $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', true);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);
         $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
-            $executionId,
+            $id,
             $history,
             new EventStoreCommandBuffer(
                 $journal,
                 $this->runtime->getActivityTransport(),
-                $executionId,
+                $id,
                 $this->runtime->clock(),
                 $history,
             ),
@@ -119,7 +123,7 @@ final readonly class ExecutionEngine
             $this->parentChildCoordinator,
         ));
 
-        return $driver->run($context->executionId(), $context, $environment, $handler);
+        return $driver->run($context->executionId()->toString(), $context, $environment, $handler);
     }
 
     public function getRuntime(): ExecutionRuntime

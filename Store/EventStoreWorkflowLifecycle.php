@@ -124,13 +124,14 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
 
     public function onContinuedAsNew(ExecutionId $executionId, ContinueAsNewRequested $request): void
     {
-        $request = $request->withNextExecutionId(ExecutionId::generate()->toString());
+        $next = ExecutionId::generate();
+        $request = $request->withNextExecutionId($next->toString());
         $this->eventStore->append(new WorkflowContinuedAsNew(
             $executionId,
             $request->workflowType,
             $request->payload,
             null !== $request->options ? $request->options->toMetadata() : [],
-            $request->nextExecutionId,
+            $next,
         ));
 
         throw $request;
