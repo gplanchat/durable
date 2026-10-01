@@ -45,13 +45,18 @@ abstract class DurableTestCase extends TestCase
     /**
      * Creates an in-memory test environment and keeps it for the assertions to read.
      *
+     * `$budgetSeconds` and `$maxContinuations` go to the runner unchanged: see
+     * {@see WorkflowTestEnvironment::inMemory()}.
+     *
      * @param array<string, callable(array<string, mixed>): mixed> $activityHandlers
      */
     protected function createWorkflowTestEnvironment(
         array $activityHandlers = [],
         int $maxActivityRetries = 0,
+        float $budgetSeconds = InMemoryWorkflowRunner::DEFAULT_BUDGET_SECONDS,
+        int $maxContinuations = InMemoryWorkflowRunner::DEFAULT_MAX_CONTINUATIONS,
     ): WorkflowTestEnvironment {
-        $env = WorkflowTestEnvironment::inMemory($activityHandlers, $maxActivityRetries);
+        $env = WorkflowTestEnvironment::inMemory($activityHandlers, $maxActivityRetries, $budgetSeconds, $maxContinuations);
         $this->currentEnvironment = $env;
 
         return $env;
@@ -67,8 +72,10 @@ abstract class DurableTestCase extends TestCase
     protected function createWorkflowRunner(
         array $activityHandlers = [],
         int $maxActivityRetries = 0,
+        float $budgetSeconds = InMemoryWorkflowRunner::DEFAULT_BUDGET_SECONDS,
+        int $maxContinuations = InMemoryWorkflowRunner::DEFAULT_MAX_CONTINUATIONS,
     ): InMemoryWorkflowRunner {
-        return $this->createWorkflowTestEnvironment($activityHandlers, $maxActivityRetries)->getRunner();
+        return $this->createWorkflowTestEnvironment($activityHandlers, $maxActivityRetries, $budgetSeconds, $maxContinuations)->getRunner();
     }
 
     /**
