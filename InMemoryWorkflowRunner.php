@@ -80,9 +80,8 @@ final readonly class InMemoryWorkflowRunner
      *
      * @return mixed the handler's result
      */
-    public function run(ExecutionId|string $executionId, callable $handler, ?string $workflowType = null): mixed
+    public function run(ExecutionId $executionId, callable $handler, ?string $workflowType = null): mixed
     {
-        $executionId = \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId;
         $startedExtras = [];
         $firstExecutionId = $executionId;
         $continuations = 0;
