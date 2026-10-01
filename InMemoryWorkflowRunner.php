@@ -28,6 +28,7 @@ use Psr\Clock\ClockInterface;
 final readonly class InMemoryWorkflowRunner
 {
     public const DEFAULT_BUDGET_SECONDS = 10.0;
+    public const DEFAULT_MAX_CONTINUATIONS = 10;
 
     private readonly ClockInterface $clock;
 
@@ -60,6 +61,12 @@ final readonly class InMemoryWorkflowRunner
          * at its parent's virtual now, while its queue keeps the transport's clock (#652).
          */
         private readonly ?ClockInterface $virtualTimeStartsAt = null,
+        /**
+         * How many times a chain may continue as new before the run fails. The budget does not
+         * bound a chain, since each run gets its own: a workflow that always continues as new
+         * would run forever (#888).
+         */
+        private readonly int $maxContinuations = self::DEFAULT_MAX_CONTINUATIONS,
     ) {
         $this->clock = $clock ?? new SystemClock();
     }
@@ -72,6 +79,8 @@ final readonly class InMemoryWorkflowRunner
     public function run(string $executionId, callable $handler, ?string $workflowType = null): mixed
     {
         $startedExtras = [];
+        $firstExecutionId = $executionId;
+        $continuations = 0;
 
         // A continue-as-new chain is followed to its last run, as ResumeWorkflowHandler does on the
         // journal backends (#802); each run gets its own budget.
@@ -81,6 +90,9 @@ final readonly class InMemoryWorkflowRunner
             } catch (ContinueAsNewRequested $e) {
                 if (null === $this->workflowRegistry || null === $e->nextExecutionId) {
                     throw $e;
+                }
+                if (++$continuations > $this->maxContinuations) {
+                    throw WorkflowStuckException::continuationCapReached($firstExecutionId, $this->maxContinuations);
                 }
                 $startedExtras = ['continuedFromExecutionId' => $executionId];
                 $executionId = $e->nextExecutionId;

@@ -46,4 +46,18 @@ final class WorkflowStuckException extends \RuntimeException implements Exceptio
             $budgetSeconds,
         ));
     }
+
+    /**
+     * The execution's continue-as-new chain is longer than the runner's cap: each run gets its own
+     * budget, so only the cap stops a workflow that always continues as new.
+     */
+    public static function continuationCapReached(string $executionId, int $maxContinuations): self
+    {
+        return new self($executionId, \sprintf(
+            'Workflow %s continued as new more often than maxContinuations (%d) allows. '
+            . 'Give the workflow a run that returns, or raise the runner\'s maxContinuations.',
+            $executionId,
+            $maxContinuations,
+        ));
+    }
 }
