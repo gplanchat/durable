@@ -87,7 +87,7 @@ final readonly class JournalRunHistoryReader
             }
 
             if ($event instanceof ChildWorkflowScheduled) {
-                $childNames[$event->childExecutionId()] = $event->childWorkflowType();
+                $childNames[$event->childExecutionId()->toString()] = $event->childWorkflowType();
             }
 
             if ($event instanceof TimerScheduled) {
@@ -198,7 +198,7 @@ final readonly class JournalRunHistoryReader
             || $event instanceof ChildWorkflowCompleted
             || $event instanceof ChildWorkflowFailed
         ) {
-            return 'child:' . $event->childExecutionId();
+            return 'child:' . $event->childExecutionId()->toString();
         }
 
         $activityId = self::activityIdOf($event);
@@ -312,7 +312,7 @@ final readonly class JournalRunHistoryReader
         }
 
         if ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) {
-            return $childNames[$event->childExecutionId()] ?? ('child ' . $event->childExecutionId());
+            return $childNames[$event->childExecutionId()->toString()] ?? ('child ' . $event->childExecutionId()->toString());
         }
 
         if ($event instanceof NexusOperationScheduled) {

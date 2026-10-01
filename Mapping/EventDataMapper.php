@@ -149,14 +149,14 @@ final class EventDataMapper
             TimerCancelled::class => new TimerCancelled($id, (string) $payload['timerId'], (string) ($payload['reason'] ?? '')),
             SideEffectRecorded::class => new SideEffectRecorded($id, (string) $payload['sideEffectId'], $payload['result'] ?? null),
             ChildWorkflowScheduled::class => self::toDomainEventChildWorkflowScheduled($id, $payload),
-            ChildWorkflowCompleted::class => new ChildWorkflowCompleted($id, (string) $payload['childExecutionId'], $payload['result'] ?? null),
+            ChildWorkflowCompleted::class => new ChildWorkflowCompleted($id, ExecutionId::fromString((string) $payload['childExecutionId']), $payload['result'] ?? null),
             ChildWorkflowFailed::class => self::toDomainEventChildWorkflowFailed($id, $payload),
             WorkflowContinuedAsNew::class => new WorkflowContinuedAsNew(
                 $id,
                 (string) $payload['nextWorkflowType'],
                 \is_array($payload['nextPayload'] ?? null) ? $payload['nextPayload'] : [],
                 \is_array($payload['continuationMetadata'] ?? null) ? $payload['continuationMetadata'] : [],
-                isset($payload['newExecutionId']) ? (string) $payload['newExecutionId'] : null,
+                isset($payload['newExecutionId']) ? ExecutionId::fromString((string) $payload['newExecutionId']) : null,
             ),
             WorkflowSignalReceived::class => new WorkflowSignalReceived(
                 $id,
@@ -183,7 +183,7 @@ final class EventDataMapper
             WorkflowExecutionCancelled::class => new WorkflowExecutionCancelled(
                 $id,
                 (string) ($payload['reason'] ?? ''),
-                isset($payload['sourceParentExecutionId']) ? (string) $payload['sourceParentExecutionId'] : null,
+                isset($payload['sourceParentExecutionId']) && '' !== $payload['sourceParentExecutionId'] ? ExecutionId::fromString((string) $payload['sourceParentExecutionId']) : null,
             ),
             default => throw new \InvalidArgumentException(\sprintf('Unknown event type: %s', $eventType)),
         };
@@ -209,7 +209,7 @@ final class EventDataMapper
 
         return new ChildWorkflowScheduled(
             $executionId,
-            (string) $p['childExecutionId'],
+            ExecutionId::fromString((string) $p['childExecutionId']),
             (string) $p['childWorkflowType'],
             \is_array($p['input'] ?? null) ? $p['input'] : [],
             $policy,
@@ -230,7 +230,7 @@ final class EventDataMapper
 
         return new ChildWorkflowFailed(
             $executionId,
-            (string) $p['childExecutionId'],
+            ExecutionId::fromString((string) $p['childExecutionId']),
             (string) $p['failureMessage'],
             (int) ($p['failureCode'] ?? 0),
             isset($p['workflowFailureKind']) ? (string) $p['workflowFailureKind'] : null,
@@ -252,7 +252,7 @@ final class EventDataMapper
         return new WorkflowCancellationRequested(
             $executionId,
             (string) $p['reason'],
-            \is_string($source) ? $source : null,
+            \is_string($source) ? ExecutionId::fromString($source) : null,
         );
     }
 }
