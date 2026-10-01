@@ -156,8 +156,9 @@ final readonly class ResumeWorkflowHandler
     /**
      * The old run is marked completed last (#881): until then, a redelivery replays it under the
      * same next id (#878) and does again whatever a crash left undone. Each step is skipped once
-     * done. A next run that already finished is not touched at all: save() and the dispatchers
-     * set `completed` back to false, which would reopen it.
+     * done. A next run that already finished is not touched at all: save() sets `completed` back
+     * to false, which would reopen it. A run that finishes after this read stays finished too: the
+     * dispatchers write its row only when it has none (#918).
      *
      * @param array<string, mixed> $payload
      */
