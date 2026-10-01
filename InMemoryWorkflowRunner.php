@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\ContinuationCapReachedException;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowStuckException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
@@ -92,7 +93,7 @@ final readonly class InMemoryWorkflowRunner
                     throw $e;
                 }
                 if (++$continuations > $this->maxContinuations) {
-                    throw WorkflowStuckException::continuationCapReached($firstExecutionId, $this->maxContinuations);
+                    throw new ContinuationCapReachedException($firstExecutionId, $this->maxContinuations);
                 }
                 $startedExtras = ['continuedFromExecutionId' => $executionId];
                 $executionId = $e->nextExecutionId;

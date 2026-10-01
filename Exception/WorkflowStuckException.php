@@ -8,10 +8,11 @@ namespace Gplanchat\Durable\Exception;
  * The in-memory runner cannot carry the execution through to the end.
  *
  * Signalled rather than looped on empty: a test harness must fail, not freeze.
+ * {@see ContinuationCapReachedException} extends it for a continue-as-new chain past the cap.
  */
-final class WorkflowStuckException extends \RuntimeException implements ExceptionInterface
+class WorkflowStuckException extends \RuntimeException implements ExceptionInterface
 {
-    private function __construct(
+    protected function __construct(
         public readonly string $executionId,
         string $message,
     ) {
@@ -44,20 +45,6 @@ final class WorkflowStuckException extends \RuntimeException implements Exceptio
             . 'RetryLimit::once(), declare the exception non-retryable, or raise the runner budget.',
             $executionId,
             $budgetSeconds,
-        ));
-    }
-
-    /**
-     * The execution's continue-as-new chain is longer than the runner's cap: each run gets its own
-     * budget, so only the cap stops a workflow that always continues as new.
-     */
-    public static function continuationCapReached(string $executionId, int $maxContinuations): self
-    {
-        return new self($executionId, \sprintf(
-            'Workflow %s continued as new more often than maxContinuations (%d) allows. '
-            . 'Give the workflow a run that returns, or raise the runner\'s maxContinuations.',
-            $executionId,
-            $maxContinuations,
         ));
     }
 }
