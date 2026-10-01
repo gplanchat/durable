@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
+
 /**
  * Options for {@see ExecutionContext::executeChildWorkflow()} (the equivalent of {@see \Temporal\Workflow\ChildWorkflowOptions}).
  *
@@ -12,6 +14,12 @@ namespace Gplanchat\Durable;
  */
 final readonly class ChildWorkflowOptions
 {
+    /** The memo key a child's journal reads its execution id from; Durable writes it (#889). */
+    public const MEMO_KEY_DURABLE_EXECUTION_ID = 'durableExecutionId';
+
+    /** The memo key that says what a suspended run waits on; Durable overwrites it (#514, #889). */
+    public const MEMO_KEY_DURABLE_WAITING_ON = 'durableWaitingOn';
+
     /** The time bounds of the child, taken together. */
     public WorkflowTimeouts $timeouts;
 
@@ -35,6 +43,11 @@ final readonly class ChildWorkflowOptions
         public ?string $staticSummary = null,
         public ?string $staticDetails = null,
     ) {
+        foreach ([self::MEMO_KEY_DURABLE_EXECUTION_ID, self::MEMO_KEY_DURABLE_WAITING_ON] as $reserved) {
+            if (null !== $memo && \array_key_exists($reserved, $memo)) {
+                throw new UnsupportedByBackendException(\sprintf('The key "%s" in ChildWorkflowOptions::$memo is reserved: Durable writes this key itself; choose another key.', $reserved));
+            }
+        }
         $this->timeouts = $timeouts ?? WorkflowTimeouts::none();
         $this->searchAttributes = $searchAttributes ?? SearchAttributes::none();
     }
