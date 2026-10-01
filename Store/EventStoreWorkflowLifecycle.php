@@ -125,7 +125,8 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     public function onContinuedAsNew(ExecutionId $executionId, ContinueAsNewRequested $request): void
     {
         // A replay reaches the same continuation: the next id is the one the first pass recorded,
-        // and the journal already says so (#878). The first one, should an older bug have left two.
+        // and the journal already says so (#878). The first one, should an older bug have left two;
+        // the second id may then stay linked to a parent, with no run behind it.
         foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowContinuedAsNew && null !== $event->newExecutionId()) {
                 throw $request->withNextExecutionId($event->newExecutionId()->toString());

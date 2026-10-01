@@ -34,6 +34,9 @@ interface WorkflowResumeDispatcher
     /**
      * Starts a new run (blank history) after a continue-as-new or equivalent.
      *
+     * After a continue-as-new, a redelivered resume of the old run calls it again for the same
+     * run (#881): the second call sends a second resume of that run, which replays it.
+     *
      * @param array<string, mixed> $payload
      */
     public function dispatchNewWorkflowRun(ExecutionId $executionId, string $workflowType, array $payload): void;
