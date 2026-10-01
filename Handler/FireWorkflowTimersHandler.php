@@ -40,15 +40,14 @@ final readonly class FireWorkflowTimersHandler
     public function __invoke(FireWorkflowTimersMessage $message): void
     {
         // Firing timers is a pass: it claims the execution, and a newer pass supersedes it (DUR053).
+        $id = ExecutionId::fromString($message->executionId);
         $journal = PassEventStore::open($this->eventStore, $message->executionId);
         $context = new ExecutionContext(
-            $message->executionId,
+            $id,
             $history = new EventStoreHistorySource($journal, $message->executionId),
-            new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $message->executionId, $this->runtime->clock(), $history),
+            new EventStoreCommandBuffer($journal, $this->runtime->getActivityTransport(), $id, $this->runtime->clock(), $history),
             null,
         );
-
-        $id = ExecutionId::fromString($message->executionId);
 
         // DUR052 §5: the due timers are named before they fire. None due, nothing is announced.
         $due = PendingTimers::dueAt($this->eventStore, $message->executionId, $this->runtime->nowSeconds());

@@ -65,7 +65,7 @@ final readonly class ResumeWorkflowHandler
 
         // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this
         // resume concludes nothing, and the transport's retry is the wait.
-        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $executionId)) {
+        if (null !== $message->awaited && !$message->awaited->isJournalledIn($this->eventStore, $id)) {
             throw new ResumeArrivedBeforeItsOutcome($executionId, $message->awaited);
         }
 
@@ -113,11 +113,10 @@ final readonly class ResumeWorkflowHandler
             // Superseded, not deleted (#322): the row is what the old run was started with.
             $this->metadataStore->markCompleted($id);
             $newId = null !== $e->nextExecutionId ? ExecutionId::fromString($e->nextExecutionId) : ExecutionId::generate();
-            $newExecutionId = $newId->toString();
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($e->workflowType);
             $this->metadataStore->save($newId, $nextAlias, $e->payload);
             // resume() never writes a start: this one is the only place the new run names its predecessor.
-            $this->eventStore->append(new ExecutionStarted(ExecutionId::fromString($newExecutionId), [
+            $this->eventStore->append(new ExecutionStarted($newId, [
                 'workflowType' => $nextAlias,
                 'continuedFromExecutionId' => $executionId,
             ]));
@@ -156,19 +155,16 @@ final readonly class ResumeWorkflowHandler
         if (null === $parent) {
             return;
         }
-        // The events and the awaited fact still carry strings (#638 follow-up).
-        $childExecutionId = $childId->toString();
-        $parentId = $parent->toString();
-
         // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
         // redelivered after a crash still finds the link, and resumes the parent without a second
         // outcome.
-        $child = AwaitedFact::child($childExecutionId);
-        if (!$child->isJournalledIn($this->eventStore, $parentId)) {
+        // The fact is wire: it carries the child id as a string.
+        $child = AwaitedFact::child($childId->toString());
+        if (!$child->isJournalledIn($this->eventStore, $parent)) {
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
             $this->eventStore->append(null !== $failure
-                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parentId, $childExecutionId, $failure)
-                : new ChildWorkflowCompleted(ExecutionId::fromString($parentId), $childExecutionId, $result));
+                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parent, $childId, $failure)
+                : new ChildWorkflowCompleted($parent, $childId, $result));
         }
 
         $this->resumeDispatcher->dispatchResume($parent);

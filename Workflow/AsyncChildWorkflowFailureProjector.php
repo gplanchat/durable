@@ -21,14 +21,14 @@ final class AsyncChildWorkflowFailureProjector
 
     public static function toParentJournalEvent(
         EventStoreInterface $store,
-        string $parentExecutionId,
-        string $childExecutionId,
+        ExecutionId $parentExecutionId,
+        ExecutionId $childExecutionId,
         \Throwable $failure,
     ): ChildWorkflowFailed {
-        $wf = self::lastWorkflowExecutionFailed($store, ExecutionId::fromString($childExecutionId));
+        $wf = self::lastWorkflowExecutionFailed($store, $childExecutionId);
         if (null !== $wf) {
             return new ChildWorkflowFailed(
-                ExecutionId::fromString($parentExecutionId),
+                $parentExecutionId,
                 $childExecutionId,
                 $wf->failureMessage(),
                 $wf->failureCode(),
@@ -39,7 +39,7 @@ final class AsyncChildWorkflowFailureProjector
         }
 
         return new ChildWorkflowFailed(
-            ExecutionId::fromString($parentExecutionId),
+            $parentExecutionId,
             $childExecutionId,
             $failure->getMessage(),
             (int) $failure->getCode(),

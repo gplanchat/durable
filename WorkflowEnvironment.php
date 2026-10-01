@@ -607,7 +607,7 @@ final class WorkflowEnvironment
         $this->context->continueAsNew($workflowType, $payload, $options);
     }
 
-    public function executionId(): string
+    public function executionId(): ExecutionId
     {
         return $this->context->executionId();
     }
