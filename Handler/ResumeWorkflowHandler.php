@@ -64,6 +64,8 @@ final readonly class ResumeWorkflowHandler
             // The run continued as new, and the send of its next run may have been lost after the
             // run was marked completed: a send held until the handler returns (Messenger), or a
             // chain broken before #881. The journal names that run; it is sent again if not done.
+            // Any later resume of the old run, a timer it never awaited for instance, takes this path
+            // too: one more send of a next run still active, which replays it.
             foreach ($this->eventStore->readStream($id) as $event) {
                 if ($event instanceof WorkflowContinuedAsNew && null !== $event->newExecutionId()) {
                     $this->continueAsNew($id, $event->newExecutionId(), $event->nextWorkflowType(), $event->nextPayload());
