@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowStuckException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
@@ -13,6 +14,7 @@ use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Timer\VirtualClock;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
+use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -37,6 +39,7 @@ final readonly class InMemoryWorkflowRunner
         /**
          * Required to run child workflows: without a registry no child type can be resolved
          * and {@see \Gplanchat\Durable\ExecutionContext::executeChildWorkflow()} throws.
+         * Without one, a continue-as-new still reaches the caller as ContinueAsNewRequested.
          */
         private readonly ?WorkflowRegistry $workflowRegistry = null,
         /**
@@ -67,6 +70,31 @@ final readonly class InMemoryWorkflowRunner
      * @return mixed the handler's result
      */
     public function run(string $executionId, callable $handler, ?string $workflowType = null): mixed
+    {
+        $startedExtras = [];
+
+        // A continue-as-new chain is followed to its last run, as ResumeWorkflowHandler does on the
+        // journal backends (#802); each run gets its own budget.
+        while (true) {
+            try {
+                return $this->runOnce($executionId, $handler, $workflowType, $startedExtras);
+            } catch (ContinueAsNewRequested $e) {
+                if (null === $this->workflowRegistry || null === $e->nextExecutionId) {
+                    throw $e;
+                }
+                $startedExtras = ['continuedFromExecutionId' => $executionId];
+                $executionId = $e->nextExecutionId;
+                // The alias, as ResumeWorkflowHandler journals it; the registry knows both keys.
+                $workflowType = (new WorkflowDefinitionLoader())->aliasForTemporalInterop($e->workflowType);
+                $handler = $this->workflowRegistry->getHandler($e->workflowType, $e->payload);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $startedExtras merged into the run's ExecutionStarted
+     */
+    private function runOnce(string $executionId, callable $handler, ?string $workflowType, array $startedExtras): mixed
     {
         // Virtual clock: an inline harness has nobody to deliver a timer wake-up, and waiting
         // out a due time for real would make every workflow that sleeps untestable. It only
@@ -105,7 +133,7 @@ final readonly class InMemoryWorkflowRunner
         // What the last suspension was waiting on, when that has a name: it is all that
         // separates "stuck" from "stuck on that particular condition" in the diagnosis.
         try {
-            return $engine->start($executionId, $handler, $workflowType);
+            return $engine->start($executionId, $handler, $workflowType, $startedExtras);
         } catch (WorkflowSuspendedException $e) {
             // DUR003: expected suspension (control flow), not an error — the while loop runs the worker then resumes.
             $waitingOn = $e->waitingOn();
