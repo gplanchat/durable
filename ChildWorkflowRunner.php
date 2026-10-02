@@ -9,6 +9,7 @@ use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -37,6 +38,11 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
          * in-memory runner's runtime runs on a virtual clock, its queue does not.
          */
         private readonly ?ClockInterface $queueClock = null,
+        /**
+         * Async mode: the row of a child id the reuse policy let through is cleared before the
+         * start, since the dispatcher keeps an existing row as it is (#918).
+         */
+        private readonly ?WorkflowMetadataStore $metadataStore = null,
     ) {
         $this->asyncMessengerStart = $asyncMessengerStart;
         if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore)) {
@@ -64,6 +70,13 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
                 throw new \InvalidArgumentException('parentExecutionId is required for async Messenger child workflow start.');
             }
             $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
+            // A start reaches here once per scheduled child, after assertChildWorkflowIdAllowed():
+            // a completed row is that of a child whose id the policy lets this parent reuse
+            // (AllowDuplicateFailedOnly by default). Left completed, the new start would never run.
+            // Only a completed row goes: a running child keeps its row, so no race reopens it.
+            if (true === ($this->metadataStore?->get($childExecutionId)['completed'] ?? false)) {
+                $this->metadataStore->delete($childExecutionId);
+            }
             $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
 
             throw new ChildWorkflowStartDeferred();
