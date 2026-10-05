@@ -30,6 +30,9 @@ use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowTaskCompleted;
+use Gplanchat\Durable\Event\WorkflowTaskScheduled;
+use Gplanchat\Durable\Event\WorkflowTaskStarted;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\ExecutionId;
@@ -412,6 +415,9 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 new FailureEnvelope(\LogicException::class, 'rejected', 9, ['ctx' => $nested], '#0 {main}', []),
             ),
             new WorkflowCancellationRequested(ExecutionId::fromString($executionId), 'user asked', ExecutionId::fromString('parent-1')),
+            new WorkflowTaskScheduled(ExecutionId::fromString($executionId)),
+            new WorkflowTaskStarted(ExecutionId::fromString($executionId)),
+            new WorkflowTaskCompleted(ExecutionId::fromString($executionId)),
             new WorkflowCancellationDelivered(ExecutionId::fromString($executionId), ['act-1', 'timer-1']),
             new WorkflowCancellationDelivered(ExecutionId::fromString($executionId), []),
             new WorkflowExecutionCancelled(ExecutionId::fromString($executionId), 'user asked', ExecutionId::fromString('parent-1')),

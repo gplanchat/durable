@@ -7,6 +7,8 @@ namespace Gplanchat\Durable\Handler;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowTaskCompleted;
+use Gplanchat\Durable\Event\WorkflowTaskStarted;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\ResumeArrivedBeforeItsOutcome;
 use Gplanchat\Durable\Exception\SupersededPassException;
@@ -85,6 +87,8 @@ final readonly class ResumeWorkflowHandler
         // A worker has the run now (#447). Recorded here rather than on ExecutionStarted: resume()
         // never appends it, and a run that waits on a signal appends nothing at all.
         $this->pickups?->recordPickup($id);
+        // The queue ends here: what lies between the dispatch and this append is the wait for a worker.
+        $this->eventStore->append(new WorkflowTaskStarted($id));
 
         $lookupKey = $metadata['workflowType'];
         $payload = $metadata['payload'];
@@ -100,6 +104,8 @@ final readonly class ResumeWorkflowHandler
 
             $result = $this->engine->resume($id, $handler, $workflowTypeForJournal, $pendingUpdates);
         } catch (WorkflowSuspendedException $e) {
+            // Closed before anything is dispatched, so the next task is scheduled after this one ends.
+            $this->eventStore->append(new WorkflowTaskCompleted($id));
             // The catalog that records pickups usually records waits too (#324): one projection, two facts.
             // Recorded even without words, so that it clears the previous wait instead of leaving it stale.
             if ($this->pickups instanceof WorkflowRunWaitProjectionInterface) {
@@ -123,11 +129,13 @@ final readonly class ResumeWorkflowHandler
 
             return;
         } catch (ContinueAsNewRequested $e) {
+            $this->eventStore->append(new WorkflowTaskCompleted($id));
             $newId = $e->nextExecutionId ?? ExecutionId::generate();
             $this->continueAsNew($id, $newId, $e->workflowType, $e->payload);
 
             return;
         } catch (WorkflowCancelledException $e) {
+            $this->eventStore->append(new WorkflowTaskCompleted($id));
             // Normal termination: do not dispatch the resume again, otherwise the cancellation
             // would be redelivered indefinitely. The parent is notified as for a failure.
             $this->finalizeAsyncChildOnParentIfLinked($id, null, $e);
@@ -141,6 +149,7 @@ final readonly class ResumeWorkflowHandler
             // A newer pass has claimed the execution (DUR053): it owns the run, this one only stops.
             return;
         } catch (\Throwable $e) {
+            $this->eventStore->append(new WorkflowTaskCompleted($id));
             $this->finalizeAsyncChildOnParentIfLinked($id, null, $e);
             // An execution that failed is the one an operator most wants to look at: keeping what
             // it was started with costs a row and answers "given what?".
@@ -149,6 +158,7 @@ final readonly class ResumeWorkflowHandler
             throw $e;
         }
 
+        $this->eventStore->append(new WorkflowTaskCompleted($id));
         $this->finalizeAsyncChildOnParentIfLinked($id, $result, null);
         $this->metadataStore->markCompleted($id);
     }
