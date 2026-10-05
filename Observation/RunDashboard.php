@@ -165,6 +165,7 @@ final readonly class RunDashboard
             return [[
                 'available' => false,
                 'message' => 'No readable durable backend is configured for this application.',
+                'localizedMessage' => new Message('backend.not_configured'),
             ], null];
         }
 
@@ -178,7 +179,7 @@ final readonly class RunDashboard
                 'message' => $health->message,
                 'name' => $health->backend,
                 'checkedAt' => $health->checkedAt,
-            ], null];
+            ] + self::localizedMessage($health), null];
         }
 
         return [[
@@ -190,7 +191,15 @@ final readonly class RunDashboard
             'message' => $health->message,
             'name' => $health->backend,
             'checkedAt' => $health->checkedAt,
-        ], $this->catalog];
+        ] + self::localizedMessage($health), $this->catalog];
+    }
+
+    /**
+     * @return array{}|array{localizedMessage: Message}
+     */
+    private static function localizedMessage(BackendHealth $health): array
+    {
+        return null === $health->localized ? [] : ['localizedMessage' => $health->localized];
     }
 
     /**
@@ -238,11 +247,16 @@ final readonly class RunDashboard
             // Dispatched, and no worker has taken it yet (#447). The wording is decided here, once,
             // for every surface (DUR049).
             $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
-            $described['waitingForWorker'] = 'waiting for a worker · ' . self::elapsed($run->waitingForWorkerSince, ($this->clock ?? new SystemClock())->now());
+            $elapsed = self::elapsed($run->waitingForWorkerSince, ($this->clock ?? new SystemClock())->now());
+            $described['waitingForWorker'] = 'waiting for a worker · ' . $elapsed;
+            $described['localizedWaitingForWorker'] = new Message('run.waiting_for_worker', ['elapsed' => $elapsed]);
         }
         if (null !== $run->waitingOn) {
             // What the run last suspended on (#324), worded once for every surface, as above.
             $described['waitingOn'] = 'waiting on ' . $run->waitingOn;
+            // The reason is English prose written at suspension and stored: it travels as a parameter
+            // until the stored wait carries a code (#850).
+            $described['localizedWaitingOn'] = new Message('run.waiting_on', ['reason' => $run->waitingOn]);
         }
 
         return $described;
