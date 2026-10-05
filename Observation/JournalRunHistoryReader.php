@@ -32,6 +32,9 @@ use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowTaskCompleted;
+use Gplanchat\Durable\Event\WorkflowTaskScheduled;
+use Gplanchat\Durable\Event\WorkflowTaskStarted;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -128,9 +131,9 @@ final readonly class JournalRunHistoryReader
                 $event->payload(),
                 self::actionKeyOf($event),
                 // Same rule as the Temporal bridge: the event by which the work begins for real.
-                // Here there are only two of them, and `ExecutionStarted` is inert — it opens the
-                // execution, so no interval precedes it.
-                $event instanceof ActivityTaskStarted || $event instanceof ExecutionStarted,
+                // `ExecutionStarted` is inert when it opens the stream, since no interval precedes
+                // it; after a `WorkflowTaskScheduled` it is not a pickup, the task start is.
+                $event instanceof ActivityTaskStarted || $event instanceof WorkflowTaskStarted || ($event instanceof ExecutionStarted && 1 === $sequence),
                 self::isFailure($event),
                 self::phaseOf($event),
                 $event instanceof ActivityTaskStarted || $event instanceof ActivityTaskFailed ? $event->attempt() : null,
@@ -203,6 +206,9 @@ final readonly class JournalRunHistoryReader
             || $event instanceof WorkflowExecutionCancelled
             || $event instanceof WorkflowCancellationRequested
             || $event instanceof WorkflowContinuedAsNew
+            || $event instanceof WorkflowTaskScheduled
+            || $event instanceof WorkflowTaskStarted
+            || $event instanceof WorkflowTaskCompleted
         ) {
             return self::RUN_ACTION;
         }
@@ -244,11 +250,13 @@ final readonly class JournalRunHistoryReader
         return match (true) {
             self::isFailure($event) => WorkflowRunEventPhase::Failed,
             $event instanceof ActivityTaskStarted,
+            $event instanceof WorkflowTaskStarted,
             $event instanceof ExecutionStarted => WorkflowRunEventPhase::Started,
             $event instanceof ActivityScheduled,
             $event instanceof TimerScheduled,
             $event instanceof ChildWorkflowScheduled,
             $event instanceof NexusOperationScheduled,
+            $event instanceof WorkflowTaskScheduled,
             $event instanceof WorkflowCancellationRequested => WorkflowRunEventPhase::Requested,
             $event instanceof ActivityCompleted,
             $event instanceof ActivityTaskCompleted,
@@ -259,6 +267,7 @@ final readonly class JournalRunHistoryReader
             $event instanceof NexusOperationCompleted,
             $event instanceof NexusOperationCancelled,
             $event instanceof ExecutionCompleted,
+            $event instanceof WorkflowTaskCompleted,
             $event instanceof WorkflowExecutionCancelled,
             $event instanceof WorkflowContinuedAsNew => WorkflowRunEventPhase::Settled,
             default => null,
@@ -273,6 +282,9 @@ final readonly class JournalRunHistoryReader
             $event instanceof WorkflowExecutionFailed,
             $event instanceof WorkflowExecutionCancelled,
             $event instanceof WorkflowCancellationRequested,
+            $event instanceof WorkflowTaskScheduled,
+            $event instanceof WorkflowTaskStarted,
+            $event instanceof WorkflowTaskCompleted,
             $event instanceof WorkflowContinuedAsNew => WorkflowRunEventKind::Execution,
 
             $event instanceof ActivityScheduled,
