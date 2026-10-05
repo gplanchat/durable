@@ -26,6 +26,16 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
         ];
     }
 
+    public function insertIfAbsent(ExecutionId $executionId, string $workflowType, array $payload): bool
+    {
+        if (isset($this->metadata[$executionId->toString()])) {
+            return false;
+        }
+        $this->save($executionId, $workflowType, $payload);
+
+        return true;
+    }
+
     public function markCompleted(ExecutionId $executionId): void
     {
         if (!isset($this->metadata[$executionId->toString()])) {
