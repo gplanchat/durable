@@ -23,6 +23,7 @@ use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
@@ -113,6 +114,7 @@ final readonly class ResumeWorkflowHandler
             }
             if ($e->shouldDispatchResume()) {
                 if (!$e->waitingOnTimer()) {
+                    WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $id);
                     $this->resumeDispatcher->dispatchResume($id);
                 } else {
                     $ms = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue(
@@ -194,6 +196,7 @@ final readonly class ResumeWorkflowHandler
                 ]));
             }
             // A second dispatch is a second resume of the same run, which replays.
+            WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $newId);
             $this->resumeDispatcher->dispatchNewWorkflowRun($newId, $nextAlias, $payload);
         }
         // Superseded, not deleted (#322): the row is what the old run was started with.
@@ -224,6 +227,7 @@ final readonly class ResumeWorkflowHandler
                 : new ChildWorkflowCompleted($parent, $scheduledId, $result));
         }
 
+        WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $parent);
         $this->resumeDispatcher->dispatchResume($parent);
         $this->childWorkflowParentLinkStore->unlink($childId);
     }

@@ -15,6 +15,7 @@ use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\PassEventStore;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Gplanchat\Durable\Timer\PendingTimers;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\AwaitedFact;
@@ -65,6 +66,7 @@ final readonly class FireWorkflowTimersHandler
         $after = $this->countTimerCompleted($id);
 
         if ($after > $before) {
+            WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $id);
             $this->resumeDispatcher->dispatchResume($id);
 
             return;
