@@ -13,6 +13,7 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 
 /**
  * Applies {@see ParentClosePolicy} to the children still active when the parent closes.
@@ -81,7 +82,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
             $childExecutionId,
             $parentExecutionId,
         ));
-        $this->resumeDispatcher?->dispatchResume($childExecutionId);
+        $this->scheduleResume($childExecutionId);
     }
 
     private function requestCancelChild(ExecutionId $childExecutionId, ExecutionId $parentExecutionId): void
@@ -91,6 +92,15 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
             'parent_request_cancel',
             $parentExecutionId,
         ));
-        $this->resumeDispatcher?->dispatchResume($childExecutionId);
+        $this->scheduleResume($childExecutionId);
+    }
+
+    private function scheduleResume(ExecutionId $childExecutionId): void
+    {
+        if (null === $this->resumeDispatcher) {
+            return;
+        }
+        WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $childExecutionId);
+        $this->resumeDispatcher->dispatchResume($childExecutionId);
     }
 }

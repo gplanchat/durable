@@ -10,6 +10,7 @@ use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -77,6 +78,7 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             if (true === ($this->metadataStore?->get($childExecutionId)['completed'] ?? false)) {
                 $this->metadataStore->delete($childExecutionId);
             }
+            WorkflowTaskJournal::schedule($this->eventStore, $this->workflowResumeDispatcher, $childExecutionId);
             $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
 
             throw new ChildWorkflowStartDeferred();
