@@ -19,6 +19,7 @@ use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
@@ -63,6 +64,10 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
     {
+        // Only Temporal routes by task queue; no journal backend reads the name (#977).
+        if (null !== $options?->taskQueue) {
+            throw new UnsupportedByBackendException(\sprintf('ActivityOptions::$taskQueue ("%s") is not supported on the InMemory, DBAL and Illuminate backends: no worker is bound to a queue by name there. Remove the option, or run on Temporal.', $options->taskQueue->name()));
+        }
         // It is here, in the adapter, that the options take their wire form — and that the
         // enqueuing is timestamped, with this backend's clock.
         $queuedAt = $this->nowSeconds();
