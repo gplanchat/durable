@@ -129,7 +129,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         // The journal records these three and applies none of them: refused by name (#977).
         foreach (['namespace' => $options->namespace, 'taskQueue' => $options->taskQueue, 'cronSchedule' => $options->cronSchedule] as $name => $value) {
             if (null !== $value) {
-                throw new UnsupportedByBackendException(\sprintf('The journal backend (in-memory, DBAL, Illuminate) cannot apply ChildWorkflowOptions::$%s: it only records it. Remove the option, or run on the Temporal backend.', $name));
+                throw new UnsupportedByBackendException(\sprintf('The journal backend (in-memory, DBAL, Illuminate, Magento Database) cannot apply ChildWorkflowOptions::$%s: it only records it. Remove the option, or run on the Temporal backend.', $name));
             }
         }
 
