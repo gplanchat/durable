@@ -8,8 +8,10 @@ use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\RetryLimit;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
@@ -145,6 +147,38 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         $store->append(new WorkflowSignalReceived($id, 'approve', ['by' => 'alice']));
 
         self::assertSame([['by' => 'alice']], $engine->resume($id, $handler));
+    }
+
+    public function testAChildWorkflowReturnsItsResultToItsParent(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceChildWorkflow::class);
+
+        $result = $this->runner($store, null, $registry)->run(
+            ExecutionId::fromString('scenario-child'),
+            static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class)->run('hello')),
+        );
+
+        self::assertSame(['echo' => 'hello'], $result);
+        self::assertCount(1, $this->eventsOf($store, 'scenario-child', ChildWorkflowCompleted::class));
+    }
+
+    public function testContinueAsNewFollowsTheChainToItsLastRun(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceCountdownWorkflow::class);
+
+        $result = $this->runner($store, null, $registry)->run(
+            ExecutionId::fromString('scenario-chain'),
+            $registry->getHandler(ConformanceCountdownWorkflow::class, ['n' => 0]),
+        );
+
+        self::assertSame(['runs' => 3], $result);
+        self::assertCount(1, $this->eventsOf($store, 'scenario-chain', WorkflowContinuedAsNew::class), 'the first run hands over to its successor');
     }
 
     protected function runner(
