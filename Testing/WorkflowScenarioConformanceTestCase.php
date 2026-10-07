@@ -4,9 +4,17 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Activity\ActivityOptions;
+use Gplanchat\Durable\Activity\RetryLimit;
+use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -78,6 +86,65 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
 
         self::assertSame('woke', $result);
         self::assertCount(1, $this->eventsOf($store, 'scenario-timer', TimerCompleted::class));
+    }
+
+    public function testAnActivityThatFailsOnceIsRetriedAndSucceeds(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $attempts = 0;
+        $activities = new RegistryActivityExecutor();
+        $activities->register('durable.conformance.quote', static function () use (&$attempts): array {
+            if (1 === ++$attempts) {
+                throw new \RuntimeException('first attempt fails');
+            }
+
+            return ['total' => 7];
+        });
+
+        $result = $this->runner($store, $activities)->run(
+            ExecutionId::fromString('scenario-retry'),
+            static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->activityStub(ConformanceActivities::class, new ActivityOptions(
+                retryLimit: RetryLimit::ofAttempts(3),
+                initialInterval: Duration::seconds(0.001),
+                backoffCoefficient: 1.0,
+            ))->quote([])),
+        );
+
+        self::assertSame(['total' => 7], $result);
+        self::assertSame(2, $attempts, 'one failure, one success');
+        self::assertCount(1, $this->eventsOf($store, 'scenario-retry', ActivityCompleted::class));
+    }
+
+    public function testASignalReachesTheHandlerTheWorkflowDeclares(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $engine = new ExecutionEngine(
+            $store,
+            new ExecutionRuntime($store, new InMemoryActivityTransport(), new RegistryActivityExecutor(), 0, null, true),
+        );
+        $id = ExecutionId::fromString('scenario-signal');
+        $handler = static function (WorkflowEnvironment $wf): array {
+            $received = [];
+            $wf->onSignal('approve', static function (array $payload) use (&$received): void {
+                $received[] = $payload;
+            });
+            $wf->await(static function () use (&$received): bool {
+                return [] !== $received;
+            });
+
+            return $received;
+        };
+
+        try {
+            $engine->start($id, $handler);
+            self::fail('the workflow must wait for its signal');
+        } catch (WorkflowSuspendedException) {
+        }
+        $store->append(new WorkflowSignalReceived($id, 'approve', ['by' => 'alice']));
+
+        self::assertSame([['by' => 'alice']], $engine->resume($id, $handler));
     }
 
     protected function runner(
