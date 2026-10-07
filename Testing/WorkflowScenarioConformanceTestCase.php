@@ -50,6 +50,8 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
 
     /**
      * The scenarios this backend cannot hold, as `testName => reason (with an issue number)`.
+     * A key must be a `test*` method of this class and a reason must cite an issue as `#123`;
+     * otherwise every scenario fails, so that a typo or an untracked exception cannot pass.
      *
      * @return array<string, string>
      */
@@ -90,6 +92,11 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         self::assertCount(1, $this->eventsOf($store, 'scenario-timer', TimerCompleted::class));
     }
 
+    /**
+     * The retry decision lives in the shared in-memory activity transport, not in the journal: on a
+     * backend, this scenario exercises the journal through the replay and the ActivityCompleted it
+     * records, not through its own retry bookkeeping.
+     */
     public function testAnActivityThatFailsOnceIsRetriedAndSucceeds(): void
     {
         $this->assertHolds(__FUNCTION__);
@@ -178,7 +185,22 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         );
 
         self::assertSame(['runs' => 3], $result);
-        self::assertCount(1, $this->eventsOf($store, 'scenario-chain', WorkflowContinuedAsNew::class), 'the first run hands over to its successor');
+
+        // Follow the journal's own links: each run names its successor, the last one completes.
+        $id = 'scenario-chain';
+        $runs = 1;
+        while ([] !== ($continued = $this->eventsOf($store, $id, WorkflowContinuedAsNew::class))) {
+            self::assertCount(1, $continued, 'a run hands over to one successor');
+            $successor = $continued[0]->newExecutionId();
+            self::assertNotNull($successor, 'the journal names the successor');
+            self::assertNotSame($id, $successor->toString());
+            $id = $successor->toString();
+            ++$runs;
+        }
+        self::assertSame(3, $runs, 'three runs in the chain');
+        $completed = $this->eventsOf($store, $id, ExecutionCompleted::class);
+        self::assertCount(1, $completed, 'the last run completes');
+        self::assertSame(['runs' => 3], $completed[0]->result());
     }
 
     protected function runner(
@@ -219,7 +241,15 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
      */
     protected function assertHolds(string $scenario): void
     {
-        $reason = $this->namedExceptions()[$scenario] ?? null;
+        $exceptions = $this->namedExceptions();
+        foreach ($exceptions as $name => $why) {
+            self::assertTrue(
+                str_starts_with($name, 'test') && method_exists($this, $name),
+                \sprintf('Named exception "%s" matches no test method of %s.', $name, static::class),
+            );
+            self::assertMatchesRegularExpression('/#\d+/', $why, \sprintf('Named exception "%s" must cite an issue number such as #123.', $name));
+        }
+        $reason = $exceptions[$scenario] ?? null;
         if (null !== $reason) {
             self::markTestIncomplete(\sprintf('Named exception, %s: %s', $scenario, $reason));
         }
