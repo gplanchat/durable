@@ -67,7 +67,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         // No journal backend reads the heartbeat timeout (#977): refuse it instead of journaling
         // an option nothing enforces. Temporal sends it to the server.
         if (null !== $options?->timeouts->heartbeat) {
-            throw new UnsupportedByBackendException('The ActivityOptions heartbeat timeout is not supported by the journal backends (InMemory, DBAL, Illuminate, Magento Database): nothing enforces it there. Remove the option, or run the deployment on Temporal.');
+            throw new UnsupportedByBackendException('ActivityTimeouts::$heartbeat is not supported by the journal backends (InMemory, DBAL, Illuminate, Magento Database): nothing enforces it there. Remove the option, or run the deployment on Temporal.');
         }
 
         // It is here, in the adapter, that the options take their wire form — and that the
