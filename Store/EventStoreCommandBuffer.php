@@ -70,6 +70,11 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             throw new UnsupportedByBackendException('ActivityTimeouts::$heartbeat is not supported by the journal backends (InMemory, DBAL, Illuminate, Magento Database): nothing enforces it there. Remove the option, or run the deployment on Temporal.');
         }
 
+        // Only Temporal routes by task queue; no journal backend reads the name (#977).
+        if (null !== $options?->taskQueue) {
+            throw new UnsupportedByBackendException(\sprintf('The activity task queue "%s", set on ActivityOptions::$taskQueue, #[Activities(taskQueue:)] or activityStub(), is not supported on the InMemory, DBAL, Illuminate and Magento Database backends: no worker is bound to a queue by name there. Remove the option, or run on Temporal.', $options->taskQueue->name()));
+        }
+
         // It is here, in the adapter, that the options take their wire form — and that the
         // enqueuing is timestamped, with this backend's clock.
         $queuedAt = $this->nowSeconds();
