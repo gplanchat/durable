@@ -19,6 +19,7 @@ use Gplanchat\Durable\Event\TimerScheduled;
 use Gplanchat\Durable\Event\VersionMarked;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Nexus\NexusEndpoint;
@@ -63,6 +64,12 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
 
     public function scheduleActivity(string $activityId, string $activityName, array $payload, ?ActivityOptions $options): void
     {
+        // No journal backend reads the heartbeat timeout (#977): refuse it instead of journaling
+        // an option nothing enforces. Temporal sends it to the server.
+        if (null !== $options?->timeouts->heartbeat) {
+            throw new UnsupportedByBackendException('ActivityTimeouts::$heartbeat is not supported by the journal backends (InMemory, DBAL, Illuminate, Magento Database): nothing enforces it there. Remove the option, or run the deployment on Temporal.');
+        }
+
         // It is here, in the adapter, that the options take their wire form — and that the
         // enqueuing is timestamped, with this backend's clock.
         $queuedAt = $this->nowSeconds();
@@ -125,6 +132,13 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         array $input,
         ChildWorkflowOptions $options,
     ): void {
+        // The journal records these three and applies none of them: refused by name (#977).
+        foreach (['namespace' => $options->namespace, 'taskQueue' => $options->taskQueue, 'cronSchedule' => $options->cronSchedule] as $name => $value) {
+            if (null !== $value) {
+                throw new UnsupportedByBackendException(\sprintf('The journal backend (in-memory, DBAL, Illuminate, Magento Database) cannot apply ChildWorkflowOptions::$%s: it only records it. Remove the option, or run on the Temporal backend.', $name));
+            }
+        }
+
         // The wire form is built here: the journal records the flat metadata the old code was
         // already giving it, including the two keys the core used to add by hand.
         $this->append(new ChildWorkflowScheduled(
