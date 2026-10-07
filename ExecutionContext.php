@@ -10,6 +10,7 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\NexusOperationAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdInUseException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
@@ -892,6 +893,12 @@ final class ExecutionContext
 
     private function assertChildWorkflowIdAllowed(ChildWorkflowOptions $options, ExecutionId $childExecutionId): void
     {
+        // Before the policy, which only judges a finished run, and on the runner, which sees every
+        // parent's children: the parent's own journal does not (#950).
+        if ($this->childWorkflowRunner?->isChildRunning($childExecutionId)) {
+            throw ChildWorkflowIdInUseException::forId($childExecutionId->toString());
+        }
+
         if (WorkflowIdReusePolicy::AllowDuplicate === $options->workflowIdReusePolicy) {
             return;
         }
