@@ -20,6 +20,7 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
@@ -130,6 +131,18 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowContinuedAsNew && null !== $event->newExecutionId()) {
                 throw $request->withNextExecutionId($event->newExecutionId());
+            }
+        }
+
+        // After the replay scan: a continuation journaled before this check still replays. The
+        // options are refused here, not applied: no task queue to move to, no timer for the run bounds (#977).
+        foreach ([
+            'taskQueue' => null !== $request->options?->taskQueue,
+            'timeouts->run' => null !== $request->options?->timeouts->run,
+            'timeouts->task' => null !== $request->options?->timeouts->task,
+        ] as $option => $given) {
+            if ($given) {
+                throw UnsupportedByBackendException::forMethod('journal', 'continueAsNew', \sprintf('ContinueAsNewOptions::$%s is applied by Temporal only; the journal backends (InMemory, Doctrine DBAL, Illuminate, Magento) would record it and ignore it. Remove it, or run on Temporal.', $option));
             }
         }
 
