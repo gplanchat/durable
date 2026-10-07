@@ -142,7 +142,8 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             'timeouts->task' => null !== $request->options?->timeouts->task,
         ] as $option => $given) {
             if ($given) {
-                throw UnsupportedByBackendException::forMethod('journal', 'continueAsNew', \sprintf('ContinueAsNewOptions::$%s is applied by Temporal only; the journal backends (InMemory, Doctrine DBAL, Illuminate, Magento) would record it and ignore it. Remove it, or run on Temporal.', $option));
+                // Journaled as any other failure of the workflow, so the run does not end completed with no terminal event.
+                $this->onFailed($executionId, UnsupportedByBackendException::forMethod('journal', 'continueAsNew', \sprintf('ContinueAsNewOptions::$%s is applied by Temporal only; the journal backends (InMemory, Doctrine DBAL, Illuminate, Magento) record this option without applying it. Remove it, or run on Temporal.', $option)));
             }
         }
 
