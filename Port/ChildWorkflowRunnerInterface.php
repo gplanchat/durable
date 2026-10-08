@@ -21,6 +21,12 @@ interface ChildWorkflowRunnerInterface
     public function defersChildStart(): bool;
 
     /**
+     * Whether a run under this id has started and not finished, whichever parent started it.
+     * The reuse policy never applies to such an id.
+     */
+    public function isChildRunning(ExecutionId $childExecutionId): bool;
+
+    /**
      * Run (or defer) a child workflow and return its result.
      *
      * @param array<string, mixed> $input

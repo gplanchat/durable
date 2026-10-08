@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Store;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\BackendHealth;
 use Gplanchat\Durable\Observation\JournalRunHistoryReader;
+use Gplanchat\Durable\Observation\Message;
 use Gplanchat\Durable\Observation\WorkflowRunDescription;
 use Gplanchat\Durable\Observation\WorkflowRunFilter;
 use Gplanchat\Durable\Observation\WorkflowRunPage;
@@ -178,6 +179,7 @@ final class InMemoryWorkflowRunCatalog implements WorkflowRunCatalogInterface, W
             // to read that to decide what to display; saying it in the message was not enough,
             // and that is why two hosts out of three did not say it.
             ephemeral: true,
+            localized: new Message('backend.memory.ephemeral'),
         );
     }
 

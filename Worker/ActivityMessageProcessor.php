@@ -229,6 +229,11 @@ final readonly class ActivityMessageProcessor
             $nonRetryable = !$timedOut && null !== $options && $options->isNonRetryable($e);
             $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt + 1);
 
+            // As on Temporal, schedule-to-close is the budget across retries: a retry whose backoff
+            // would end past it is not queued, the attempt's own failure is final (#978).
+            $outOfBudget = $shouldRetry && $this->retryOutlastsScheduleToClose($message);
+            $shouldRetry = $shouldRetry && !$outOfBudget;
+
             // The transport does not retry on the PHP side (native Temporal worker): authority
             // over retries belongs entirely to the server, so the PHP attempt count means nothing
             // there — only non-retryability, on which the server aligns via nonRetryableErrorTypes,
@@ -240,7 +245,7 @@ final readonly class ActivityMessageProcessor
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
                 // (order matters: `InProgress` wins over the local count)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
-                $timedOut => ActivityRetryState::Timeout,
+                $timedOut, $outOfBudget => ActivityRetryState::Timeout,
                 default => ActivityRetryState::MaximumAttemptsReached,
             };
 
@@ -269,6 +274,20 @@ final readonly class ActivityMessageProcessor
         }
 
         return null;
+    }
+
+    private function retryOutlastsScheduleToClose(ActivityMessage $message): bool
+    {
+        $budget = $message->options?->timeouts->scheduleToClose;
+        if (null === $budget || null === $message->firstQueuedAt) {
+            return false;
+        }
+        $delay = $message->options->retryDelayBeforeAttempt($message->attempt + 1);
+
+        return $budget->hasElapsedSince(
+            $message->firstQueuedAt,
+            (float) $this->clock->now()->format('U.u') + $delay->toSeconds(),
+        );
     }
 
     private function enqueueNextAttempt(ActivityMessage $message): void

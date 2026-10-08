@@ -35,7 +35,8 @@ use Gplanchat\Durable\WorkflowRegistry;
  * the server's history back through it. Both replay checks are hand-written: a case added here
  * does not reach Temporal until it is added there too.
  *
- * The reference, for its part, does not extend this class: a store is not diffed against itself.
+ * The reference, for its part, replays the tier in `InMemoryEventStoreConformanceTest` against a
+ * second run of itself: a determinism check, not a comparison with another backend (#1011).
  *
  * @see DUR041
  */

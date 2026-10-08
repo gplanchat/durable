@@ -46,8 +46,8 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
         private readonly ?WorkflowMetadataStore $metadataStore = null,
     ) {
         $this->asyncMessengerStart = $asyncMessengerStart;
-        if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore)) {
-            throw new \InvalidArgumentException('Async child workflow requires WorkflowResumeDispatcher and ChildWorkflowParentLinkStoreInterface.');
+        if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore || null === $this->metadataStore)) {
+            throw new \InvalidArgumentException('Async child workflow requires WorkflowResumeDispatcher, ChildWorkflowParentLinkStoreInterface and WorkflowMetadataStore.');
         }
     }
 
@@ -57,6 +57,13 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     public function defersChildStart(): bool
     {
         return $this->asyncMessengerStart;
+    }
+
+    public function isChildRunning(ExecutionId $childExecutionId): bool
+    {
+        // The row exists from the dispatch, before the child writes its first event.
+        return ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childExecutionId->toString())
+            || true === $this->metadataStore?->hasActiveWorkflowMetadata($childExecutionId);
     }
 
     /**
@@ -71,10 +78,10 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
                 throw new \InvalidArgumentException('parentExecutionId is required for async Messenger child workflow start.');
             }
             $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
-            // A start reaches here once per scheduled child, after assertChildWorkflowIdAllowed():
-            // a completed row is that of a child whose id the policy lets this parent reuse
-            // (AllowDuplicateFailedOnly by default). Left completed, the new start would never run.
-            // Only a completed row goes: a running child keeps its row, so no race reopens it.
+            // A start reaches here once per scheduled child, after ExecutionContext refused a child id
+            // that is still running (isChildRunning(), every policy). A row left here is therefore
+            // a finished run's: its id is free under AllowDuplicate, or under AllowDuplicateFailedOnly
+            // when it failed. Left completed, the new start would never run.
             if (true === ($this->metadataStore?->get($childExecutionId)['completed'] ?? false)) {
                 $this->metadataStore->delete($childExecutionId);
             }
