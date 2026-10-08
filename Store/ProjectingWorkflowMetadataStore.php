@@ -30,6 +30,16 @@ final readonly class ProjectingWorkflowMetadataStore implements WorkflowMetadata
         $this->projection->recordStart($executionId, $workflowType);
     }
 
+    public function insertIfAbsent(ExecutionId $executionId, string $workflowType, array $payload): bool
+    {
+        $inserted = $this->inner->insertIfAbsent($executionId, $workflowType, $payload);
+        if ($inserted) {
+            $this->projection->recordStart($executionId, $workflowType);
+        }
+
+        return $inserted;
+    }
+
     public function markCompleted(ExecutionId $executionId): void
     {
         $this->inner->markCompleted($executionId);

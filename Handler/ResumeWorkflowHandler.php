@@ -185,8 +185,10 @@ final readonly class ResumeWorkflowHandler
                 $this->childWorkflowParentLinkStore->link($newId, $parent);
             }
             $nextAlias = $this->workflowDefinitionLoader->aliasForTemporalInterop($workflowType);
+            // Atomic (#946): a concurrent pass may have written the row, and the run may have
+            // completed since the read above. A plain save() would reopen it.
             if (null === $next) {
-                $this->metadataStore->save($newId, $nextAlias, $payload);
+                $this->metadataStore->insertIfAbsent($newId, $nextAlias, $payload);
             }
             // resume() never writes a start: this one is the only place the new run names its predecessor.
             if (0 === $this->eventStore->countEventsInStream($newId)) {

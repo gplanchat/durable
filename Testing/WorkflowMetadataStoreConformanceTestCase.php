@@ -109,6 +109,35 @@ abstract class WorkflowMetadataStoreConformanceTestCase extends TestCase
         );
     }
 
+    public function testInsertingIfAbsentWritesOnlyTheFirstTime(): void
+    {
+        $store = $this->createMetadataStore();
+
+        self::assertTrue($store->insertIfAbsent(ExecutionId::fromString('exec-1'), 'App\\One', ['v' => 1]));
+        self::assertFalse($store->insertIfAbsent(ExecutionId::fromString('exec-1'), 'App\\Two', ['v' => 2]));
+
+        $stored = $store->get(ExecutionId::fromString('exec-1'));
+        self::assertNotNull($stored);
+        self::assertSame('App\\One', $stored['workflowType'], 'the second call leaves the row as it is');
+        self::assertSame(['v' => 1], $stored['payload']);
+        self::assertTrue($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')));
+    }
+
+    /**
+     * Two passes both found no row; the first one's run completes before the second writes.
+     */
+    public function testInsertingIfAbsentNeverReopensACompletedExecution(): void
+    {
+        $store = $this->createMetadataStore();
+        $store->insertIfAbsent(ExecutionId::fromString('exec-1'), 'App\\One', ['v' => 1]);
+        $store->markCompleted(ExecutionId::fromString('exec-1'));
+
+        self::assertFalse($store->insertIfAbsent(ExecutionId::fromString('exec-1'), 'App\\One', ['v' => 1]));
+
+        self::assertFalse($store->hasActiveWorkflowMetadata(ExecutionId::fromString('exec-1')), 'save() reopens, insertIfAbsent() does not');
+        self::assertNotNull($store->get(ExecutionId::fromString('exec-1')));
+    }
+
     public function testDeletingRemovesTheRowEntirely(): void
     {
         $store = $this->createMetadataStore();

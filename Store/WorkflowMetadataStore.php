@@ -22,6 +22,15 @@ interface WorkflowMetadataStore
     public function save(ExecutionId $executionId, string $workflowType, array $payload): void;
 
     /**
+     * Writes the row only if the execution has none, in one atomic step, and returns whether it did.
+     * An existing row is left as it is, a completed one included: unlike {@see save}, this never
+     * reopens an execution. Use it where two passes may both find the row missing (continue-as-new).
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function insertIfAbsent(ExecutionId $executionId, string $workflowType, array $payload): bool;
+
+    /**
      * Marks the execution as successfully finished without deleting the type or the initial payload.
      */
     public function markCompleted(ExecutionId $executionId): void;
