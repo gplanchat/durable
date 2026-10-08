@@ -22,6 +22,9 @@ namespace Gplanchat\Durable\Observation;
  * under "reachable", this case teaches the operator that no workflow has ever run, which is false;
  * filed under "unreachable", it sends them to switch back on a server that does not exist.
  *
+ * `localized` is `message` as a key and its parameters (#850), for a host that translates; `message`
+ * stays the English fallback. `null` for a catalog that does not provide one.
+ *
  * The default is `false`: the three catalogs that write outside the process — SQL, Illuminate,
  * Temporal — have no need to declare what is true of them by construction.
  */
@@ -33,5 +36,6 @@ final readonly class BackendHealth
         public string $message,
         public \DateTimeImmutable $checkedAt,
         public bool $ephemeral = false,
+        public ?Message $localized = null,
     ) {}
 }
