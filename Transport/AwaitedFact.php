@@ -65,7 +65,7 @@ final readonly class AwaitedFact
     public function isJournalledIn(EventStoreInterface $journal, ExecutionId $executionId): bool
     {
         if (AwaitedFactKind::Activity === $this->kind) {
-            return ActivityEventJournal::hasTerminalOutcomeForActivity($journal, $executionId->toString(), $this->ids[0]);
+            return ActivityEventJournal::hasTerminalOutcomeForActivity($journal, $executionId, $this->ids[0]);
         }
 
         $missing = array_fill_keys($this->ids, true);
