@@ -12,7 +12,7 @@ use Gplanchat\Durable\Awaitable\Awaitable;
  * A compensation is a closure that does its own waiting, such as
  * `fn () => $env->await($payments->refund($charge))`: `await()` stays the only call that waits.
  * One that returns an `Awaitable` instead forgot its `await()` and is refused. The closures live in
- * workflow memory: on replay the workflow rebuilds the saga as it goes, and the journal answers the
+ * workflow memory: on replay the workflow rebuilds them as it goes, and the journal answers the
  * compensations that already ran.
  *
  * The first compensation that throws stops the run, and its exception replaces the one being
@@ -22,7 +22,7 @@ use Gplanchat\Durable\Awaitable\Awaitable;
  *
  * ponytail: sequential, stop on first error; parallel or continue-with-error when a workflow needs it.
  */
-final class Saga
+final class Compensation
 {
     /** @var list<\Closure(): mixed> */
     private array $compensations = [];
