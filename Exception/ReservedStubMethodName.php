@@ -17,6 +17,6 @@ final class ReservedStubMethodName extends \LogicException implements ExceptionI
         public readonly string $workflowClass,
         public readonly string $method,
     ) {
-        parent::__construct('A signal, query or update method uses a name the workflow stub keeps.');
+        parent::__construct('A signal, query or update method uses a name the workflow stub reserves; rename the method.');
     }
 }

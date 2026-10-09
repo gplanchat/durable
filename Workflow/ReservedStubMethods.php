@@ -8,6 +8,7 @@ use Gplanchat\Durable\Attribute\AsQueryMethod;
 use Gplanchat\Durable\Attribute\AsSignalMethod;
 use Gplanchat\Durable\Attribute\AsUpdateMethod;
 use Gplanchat\Durable\Exception\ReservedStubMethodName;
+use Gplanchat\Durable\Exception\WorkflowClassNotFound;
 
 /**
  * The names the workflow stub keeps for its own verbs. Hosts call {@see assertFreeFor()} when they
@@ -24,10 +25,17 @@ final class ReservedStubMethods
      * @param class-string $workflowClass
      *
      * @throws ReservedStubMethodName
+     * @throws WorkflowClassNotFound
      */
     public static function assertFreeFor(string $workflowClass): void
     {
-        foreach ((new \ReflectionClass($workflowClass))->getMethods() as $method) {
+        try {
+            $methods = (new \ReflectionClass($workflowClass))->getMethods();
+        } catch (\ReflectionException $e) {
+            throw WorkflowClassNotFound::fromReflection($workflowClass, $e);
+        }
+
+        foreach ($methods as $method) {
             if (!\in_array(strtolower($method->getName()), self::NAMES, true)) {
                 continue;
             }
