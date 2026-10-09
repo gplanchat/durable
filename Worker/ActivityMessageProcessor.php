@@ -22,6 +22,7 @@ use Gplanchat\Durable\Port\NoActivityAttemptClaim;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ActivityEventJournal;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Gplanchat\Durable\SystemClock;
 use Gplanchat\Durable\Transport\ActivityMessage;
 use Gplanchat\Durable\Transport\ActivityTransportInterface;
@@ -88,6 +89,7 @@ final readonly class ActivityMessageProcessor
             $message->activityId,
             $message->attempt,
         )) {
+            WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $id);
             $this->resumeDispatcher->dispatchResume($id);
 
             return null;
@@ -202,6 +204,7 @@ final readonly class ActivityMessageProcessor
                 $message->activityId,
                 $result,
             ));
+            WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $id);
             $this->resumeDispatcher->dispatchResume($id);
         } catch (\Throwable $e) {
             if ($settled) {
@@ -226,6 +229,11 @@ final readonly class ActivityMessageProcessor
             $nonRetryable = !$timedOut && null !== $options && $options->isNonRetryable($e);
             $shouldRetry = !$nonRetryable && $retryLimit->allowsAttempt($message->attempt + 1);
 
+            // As on Temporal, schedule-to-close is the budget across retries: a retry whose backoff
+            // would end past it is not queued, the attempt's own failure is final (#978).
+            $outOfBudget = $shouldRetry && $this->retryOutlastsScheduleToClose($message);
+            $shouldRetry = $shouldRetry && !$outOfBudget;
+
             // The transport does not retry on the PHP side (native Temporal worker): authority
             // over retries belongs entirely to the server, so the PHP attempt count means nothing
             // there — only non-retryability, on which the server aligns via nonRetryableErrorTypes,
@@ -237,7 +245,7 @@ final readonly class ActivityMessageProcessor
                 $delegatedToTransport, $shouldRetry => ActivityRetryState::InProgress,
                 // (order matters: `InProgress` wins over the local count)
                 $nonRetryable => ActivityRetryState::NonRetryableFailure,
-                $timedOut => ActivityRetryState::Timeout,
+                $timedOut, $outOfBudget => ActivityRetryState::Timeout,
                 default => ActivityRetryState::MaximumAttemptsReached,
             };
 
@@ -268,6 +276,20 @@ final readonly class ActivityMessageProcessor
         return null;
     }
 
+    private function retryOutlastsScheduleToClose(ActivityMessage $message): bool
+    {
+        $budget = $message->options?->timeouts->scheduleToClose;
+        if (null === $budget || null === $message->firstQueuedAt) {
+            return false;
+        }
+        $delay = $message->options->retryDelayBeforeAttempt($message->attempt + 1);
+
+        return $budget->hasElapsedSince(
+            $message->firstQueuedAt,
+            (float) $this->clock->now()->format('U.u') + $delay->toSeconds(),
+        );
+    }
+
     private function enqueueNextAttempt(ActivityMessage $message): void
     {
         $delay = $message->options?->retryDelayBeforeAttempt($message->attempt + 1);
@@ -288,6 +310,7 @@ final readonly class ActivityMessageProcessor
             $e,
             $retryState,
         ));
+        WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, ExecutionId::fromString($message->executionId));
         $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
     }
 
@@ -299,6 +322,7 @@ final readonly class ActivityMessageProcessor
             $message->activityId,
             $reason,
         ));
+        WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, ExecutionId::fromString($message->executionId));
         $this->resumeDispatcher->dispatchResume(ExecutionId::fromString($message->executionId));
     }
 

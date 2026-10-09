@@ -506,6 +506,7 @@ abstract class WorkflowRunCatalogConformanceTestCase extends TestCase
         self::assertNotSame('', $health->backend, 'a health report must say which backend it speaks of');
         self::assertNotSame('', $health->message);
         self::assertTrue($health->reachable, 'the test storage is reachable by construction');
+        self::assertNotNull($health->localized, 'the English message travels with a key a host can translate (#850)');
     }
 
     // -----------------------------------------------------------------------------------------

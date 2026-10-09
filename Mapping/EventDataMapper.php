@@ -30,6 +30,9 @@ use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowTaskCompleted;
+use Gplanchat\Durable\Event\WorkflowTaskScheduled;
+use Gplanchat\Durable\Event\WorkflowTaskStarted;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\ActivityRetryState;
@@ -145,6 +148,9 @@ final class EventDataMapper
                 (float) $payload['scheduledAt'],
                 isset($payload['summary']) ? (string) $payload['summary'] : '',
             ),
+            WorkflowTaskScheduled::class => new WorkflowTaskScheduled($id),
+            WorkflowTaskStarted::class => new WorkflowTaskStarted($id),
+            WorkflowTaskCompleted::class => new WorkflowTaskCompleted($id),
             TimerCompleted::class => new TimerCompleted($id, (string) $payload['timerId']),
             TimerCancelled::class => new TimerCancelled($id, (string) $payload['timerId'], (string) ($payload['reason'] ?? '')),
             SideEffectRecorded::class => new SideEffectRecorded($id, (string) $payload['sideEffectId'], $payload['result'] ?? null),

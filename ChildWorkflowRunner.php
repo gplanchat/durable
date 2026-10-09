@@ -9,6 +9,8 @@ use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
+use Gplanchat\Durable\Store\WorkflowMetadataStore;
+use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -37,10 +39,15 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
          * in-memory runner's runtime runs on a virtual clock, its queue does not.
          */
         private readonly ?ClockInterface $queueClock = null,
+        /**
+         * Async mode: the row of a child id the reuse policy let through is cleared before the
+         * start, since the dispatcher keeps an existing row as it is (#918).
+         */
+        private readonly ?WorkflowMetadataStore $metadataStore = null,
     ) {
         $this->asyncMessengerStart = $asyncMessengerStart;
-        if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore)) {
-            throw new \InvalidArgumentException('Async child workflow requires WorkflowResumeDispatcher and ChildWorkflowParentLinkStoreInterface.');
+        if ($this->asyncMessengerStart && (null === $this->workflowResumeDispatcher || null === $this->parentLinkStore || null === $this->metadataStore)) {
+            throw new \InvalidArgumentException('Async child workflow requires WorkflowResumeDispatcher, ChildWorkflowParentLinkStoreInterface and WorkflowMetadataStore.');
         }
     }
 
@@ -50,6 +57,13 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     public function defersChildStart(): bool
     {
         return $this->asyncMessengerStart;
+    }
+
+    public function isChildRunning(ExecutionId $childExecutionId): bool
+    {
+        // The row exists from the dispatch, before the child writes its first event.
+        return ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childExecutionId->toString())
+            || true === $this->metadataStore?->hasActiveWorkflowMetadata($childExecutionId);
     }
 
     /**
@@ -64,6 +78,14 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
                 throw new \InvalidArgumentException('parentExecutionId is required for async Messenger child workflow start.');
             }
             $this->parentLinkStore->link($childExecutionId, $parentExecutionId);
+            // A start reaches here once per scheduled child, after ExecutionContext refused a child id
+            // that is still running (isChildRunning(), every policy). A row left here is therefore
+            // a finished run's: its id is free under AllowDuplicate, or under AllowDuplicateFailedOnly
+            // when it failed. Left completed, the new start would never run.
+            if (true === ($this->metadataStore?->get($childExecutionId)['completed'] ?? false)) {
+                $this->metadataStore->delete($childExecutionId);
+            }
+            WorkflowTaskJournal::schedule($this->eventStore, $this->workflowResumeDispatcher, $childExecutionId);
             $this->workflowResumeDispatcher->dispatchNewWorkflowRun($childExecutionId, $workflowType, $input);
 
             throw new ChildWorkflowStartDeferred();
@@ -82,6 +104,6 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 
-        return $runner->run($childExecutionId->toString(), $handler, $workflowType);
+        return $runner->run($childExecutionId, $handler, $workflowType);
     }
 }

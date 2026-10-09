@@ -20,6 +20,7 @@ use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableCatastrophicActivityFailureException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowCancelledFailure;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
@@ -118,7 +119,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
             null,
             $waitingOnTimer,
             $waitingOnTimer,
-            WaitReason::describe($pending, $this->eventStore, $executionId->toString()),
+            WaitReason::describe($pending, $this->eventStore, $executionId),
         );
     }
 
@@ -129,12 +130,25 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         // the second id may then stay linked to a parent, with no run behind it.
         foreach ($this->eventStore->readStream($executionId) as $event) {
             if ($event instanceof WorkflowContinuedAsNew && null !== $event->newExecutionId()) {
-                throw $request->withNextExecutionId($event->newExecutionId()->toString());
+                throw $request->withNextExecutionId($event->newExecutionId());
+            }
+        }
+
+        // After the replay scan: a continuation journaled before this check still replays. The
+        // options are refused here, not applied: no task queue to move to, no timer for the run bounds (#977).
+        foreach ([
+            'taskQueue' => null !== $request->options?->taskQueue,
+            'timeouts->run' => null !== $request->options?->timeouts->run,
+            'timeouts->task' => null !== $request->options?->timeouts->task,
+        ] as $option => $given) {
+            if ($given) {
+                // Journaled as any other failure of the workflow, so the run does not end completed with no terminal event.
+                $this->onFailed($executionId, UnsupportedByBackendException::forMethod('journal', 'continueAsNew', \sprintf('ContinueAsNewOptions::$%s is applied by Temporal only; the journal backends (InMemory, Doctrine DBAL, Illuminate, Magento) record this option without applying it. Remove it, or run on Temporal.', $option)));
             }
         }
 
         $next = ExecutionId::generate();
-        $request = $request->withNextExecutionId($next->toString());
+        $request = $request->withNextExecutionId($next);
         $this->eventStore->append(new WorkflowContinuedAsNew(
             $executionId,
             $request->workflowType,

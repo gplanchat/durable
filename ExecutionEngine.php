@@ -35,22 +35,20 @@ final readonly class ExecutionEngine
      * @param array<string, mixed>                          $executionStartedPayloadExtras Merged into the {@see ExecutionStarted} payload (e.g. Temporal interpreter bootstrap).
      * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
-    public function start(string $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
+    public function start(ExecutionId $executionId, callable $handler, ?string $workflowType = null, array $executionStartedPayloadExtras = [], array $pendingUpdates = []): mixed
     {
-        // The message and the runner hand a string; it is converted here, once.
-        $id = ExecutionId::fromString($executionId);
-        $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', false);
+        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', false);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);
         $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
-            $id,
+            $executionId,
             $history,
             new EventStoreCommandBuffer(
                 $journal,
                 $this->runtime->getActivityTransport(),
-                $id,
+                $executionId,
                 $this->runtime->clock(),
                 $history,
             ),
@@ -59,7 +57,7 @@ final readonly class ExecutionEngine
             $pendingUpdates,
         );
 
-        if (0 === $journal->countEventsInStream($id)) {
+        if (0 === $journal->countEventsInStream($executionId)) {
             $startedPayload = [];
             if (null !== $workflowType && '' !== $workflowType) {
                 $startedPayload['workflowType'] = $workflowType;
@@ -67,7 +65,7 @@ final readonly class ExecutionEngine
             if ($executionStartedPayloadExtras !== []) {
                 $startedPayload = array_merge($startedPayload, $executionStartedPayloadExtras);
             }
-            $journal->append(new ExecutionStarted($id, $startedPayload));
+            $journal->append(new ExecutionStarted($executionId, $startedPayload));
         }
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
@@ -79,22 +77,20 @@ final readonly class ExecutionEngine
      *
      * @param list<\Gplanchat\Durable\Workflow\PendingUpdate> $pendingUpdates
      */
-    public function resume(string $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
+    public function resume(ExecutionId $executionId, callable $handler, ?string $workflowType = null, array $pendingUpdates = []): mixed
     {
-        // The message and the runner hand a string; it is converted here, once.
-        $id = ExecutionId::fromString($executionId);
-        $this->workflowExecutionObserver?->onWorkflowRun($id, $workflowType ?? '(unknown)', true);
+        $this->workflowExecutionObserver?->onWorkflowRun($executionId, $workflowType ?? '(unknown)', true);
 
         // Claimed before the history is read: a pass started after this one supersedes it (DUR053).
         $journal = PassEventStore::open($this->eventStore, $executionId);
         $history = new EventStoreHistorySource($journal, $executionId);
         $context = new ExecutionContext(
-            $id,
+            $executionId,
             $history,
             new EventStoreCommandBuffer(
                 $journal,
                 $this->runtime->getActivityTransport(),
-                $id,
+                $executionId,
                 $this->runtime->clock(),
                 $history,
             ),
@@ -123,7 +119,7 @@ final readonly class ExecutionEngine
             $this->parentChildCoordinator,
         ));
 
-        return $driver->run($context->executionId()->toString(), $context, $environment, $handler);
+        return $driver->run($context, $environment, $handler);
     }
 
     public function getRuntime(): ExecutionRuntime

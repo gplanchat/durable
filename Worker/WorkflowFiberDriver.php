@@ -34,12 +34,12 @@ final readonly class WorkflowFiberDriver
      *               outcome raised by the port)
      */
     public function run(
-        string $executionId,
         ExecutionContext $context,
         WorkflowEnvironment $environment,
         callable $handler,
     ): mixed {
-        $id = ExecutionId::fromString($executionId);
+        // The context names the execution: a second argument for it could only disagree (#682).
+        $id = $context->executionId();
         $this->lifecycle->onBeforeRun($id);
 
         // Second argument deliberately not declared by most handlers: PHP accepts extra
@@ -89,7 +89,7 @@ final readonly class WorkflowFiberDriver
                 if (!$cancellationDelivered && ($replayedOnCondition || $this->lifecycle->isCancellationPending($id))) {
                     $cancellationDelivered = true;
                     $context->markCancellationRaised();
-                    $failure = new WorkflowCancelledFailure($executionId, ActivityCancellationReason::WORKFLOW_CANCELLED);
+                    $failure = new WorkflowCancelledFailure($id->toString(), ActivityCancellationReason::WORKFLOW_CANCELLED);
                     if (!$replayedOnCondition) {
                         $this->lifecycle->onCancellationDelivered($id, self::cancelPending($context, $suspended));
                     }

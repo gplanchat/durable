@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\InMemoryEventStore;
@@ -110,7 +111,7 @@ final readonly class WorkflowTestEnvironment
     {
         $id = $executionId ?? $this->generateExecutionId();
 
-        return $this->runner->run($id, $handler);
+        return $this->runner->run(ExecutionId::fromString($id), $handler);
     }
 
     /**

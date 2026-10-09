@@ -25,13 +25,10 @@ final readonly class PassEventStore implements EventStoreInterface
      * Claims a pass on `$executionId` when the store can fence; otherwise hands the store back as
      * it is, which appends as it always did.
      */
-    public static function open(EventStoreInterface $store, string $executionId): EventStoreInterface
+    public static function open(EventStoreInterface $store, ExecutionId $executionId): EventStoreInterface
     {
-        // Converted first: an empty id is refused over any store, not only over one that fences.
-        $id = ExecutionId::fromString($executionId);
-
         return $store instanceof FencedEventStoreInterface
-            ? new self($store, $store->claimPass($id))
+            ? new self($store, $store->claimPass($executionId))
             : $store;
     }
 

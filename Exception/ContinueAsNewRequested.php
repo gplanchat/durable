@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 use Gplanchat\Durable\ContinueAsNewOptions;
+use Gplanchat\Durable\ExecutionId;
 
 /**
  * Thrown by {@see \Gplanchat\Durable\ExecutionContext::continueAsNew()} to end the current run
@@ -21,7 +22,7 @@ final class ContinueAsNewRequested extends \RuntimeException
         public readonly string $workflowType,
         public readonly array $payload,
         public readonly ?ContinueAsNewOptions $options = null,
-        public readonly ?string $nextExecutionId = null,
+        public readonly ?ExecutionId $nextExecutionId = null,
     ) {
         parent::__construct(\sprintf('Continue as new: workflow type %s', $workflowType));
     }
@@ -29,7 +30,7 @@ final class ContinueAsNewRequested extends \RuntimeException
     /**
      * The id is chosen when the old journal is written, so that the journal can name it (#322).
      */
-    public function withNextExecutionId(string $nextExecutionId): self
+    public function withNextExecutionId(ExecutionId $nextExecutionId): self
     {
         return new self($this->workflowType, $this->payload, $this->options, $nextExecutionId);
     }
