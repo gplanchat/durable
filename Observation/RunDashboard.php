@@ -247,9 +247,7 @@ final readonly class RunDashboard
             // Dispatched, and no worker has taken it yet (#447). The wording is decided here, once,
             // for every surface (DUR049).
             $described['waitingForWorkerSince'] = $run->waitingForWorkerSince;
-            $elapsed = self::elapsed($run->waitingForWorkerSince, ($this->clock ?? new SystemClock())->now());
-            $described['waitingForWorker'] = 'waiting for a worker · ' . $elapsed;
-            $described['localizedWaitingForWorker'] = new Message('run.waiting_for_worker', ['elapsed' => $elapsed]);
+            $described += self::waitingForWorker($run->waitingForWorkerSince, ($this->clock ?? new SystemClock())->now());
         }
         if (null !== $run->waitingOn) {
             // What the run last suspended on (#324), worded once for every surface, as above.
@@ -260,6 +258,22 @@ final readonly class RunDashboard
         }
 
         return $described;
+    }
+
+    /**
+     * The wording of a run nobody picked up, in English and as a key with its parameter, for a host
+     * that lists runs by its own means (Magento's grid pages by offset) and still words it once.
+     *
+     * @return array{waitingForWorker: string, localizedWaitingForWorker: Message}
+     */
+    public static function waitingForWorker(\DateTimeImmutable $since, \DateTimeImmutable $now): array
+    {
+        $elapsed = self::elapsed($since, $now);
+
+        return [
+            'waitingForWorker' => 'waiting for a worker · ' . $elapsed,
+            'localizedWaitingForWorker' => new Message('run.waiting_for_worker', ['elapsed' => $elapsed]),
+        ];
     }
 
     /**
