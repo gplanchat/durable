@@ -28,7 +28,7 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
     public function onParentClosed(ExecutionId $parentExecutionId, ParentClosureReason $reason): void
     {
         foreach ($this->collectScheduledChildren($parentExecutionId) as $row) {
-            if (!self::isChildRunActive($this->eventStore, $row['childExecutionId']->toString())) {
+            if (!self::isChildRunActive($this->eventStore, $row['childExecutionId'])) {
                 continue;
             }
 
@@ -40,10 +40,10 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         }
     }
 
-    public static function isChildRunActive(EventStoreInterface $store, string $childExecutionId): bool
+    public static function isChildRunActive(EventStoreInterface $store, ExecutionId|string $childExecutionId): bool
     {
         $started = false;
-        foreach ($store->readStream(ExecutionId::fromString($childExecutionId)) as $event) {
+        foreach ($store->readStream(\is_string($childExecutionId) ? ExecutionId::fromString($childExecutionId) : $childExecutionId) as $event) {
             if ($event instanceof ExecutionStarted) {
                 $started = true;
             }

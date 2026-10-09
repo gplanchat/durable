@@ -62,7 +62,7 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
     public function isChildRunning(ExecutionId $childExecutionId): bool
     {
         // The row exists from the dispatch, before the child writes its first event.
-        return ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childExecutionId->toString())
+        return ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childExecutionId)
             || true === $this->metadataStore?->hasActiveWorkflowMetadata($childExecutionId);
     }
 
