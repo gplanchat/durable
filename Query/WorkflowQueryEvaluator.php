@@ -22,10 +22,10 @@ final class WorkflowQueryEvaluator
     /**
      * Last {@see ExecutionCompleted} result present in the stream (null if there is none).
      */
-    public static function lastExecutionResult(EventStoreInterface $store, string $executionId): mixed
+    public static function lastExecutionResult(EventStoreInterface $store, ExecutionId|string $executionId): mixed
     {
         $last = null;
-        foreach ($store->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($store->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if ($event instanceof ExecutionCompleted) {
                 $last = $event->result();
             }
@@ -38,8 +38,8 @@ final class WorkflowQueryEvaluator
      * Returns true if the execution has at least one timer that neither fired nor was cancelled,
      * i.e. the workflow is suspended waiting for a timer. `PendingTimers` is the one reading of that.
      */
-    public static function hasPendingTimer(EventStoreInterface $store, string $executionId): bool
+    public static function hasPendingTimer(EventStoreInterface $store, ExecutionId|string $executionId): bool
     {
-        return [] !== PendingTimers::of($store, ExecutionId::fromString($executionId));
+        return [] !== PendingTimers::of($store, \is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId);
     }
 }

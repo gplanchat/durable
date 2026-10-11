@@ -28,10 +28,10 @@ final class ActivityEventJournal
 
     public static function hasTerminalOutcomeForActivity(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
     ): bool {
-        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($eventStore->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if ($event instanceof ActivityCompleted && $event->activityId() === $activityId) {
                 return true;
             }
@@ -64,11 +64,11 @@ final class ActivityEventJournal
      */
     public static function lastTerminalOutcome(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
     ): ActivityCompleted|ActivityFailed|ActivityCatastrophicFailure|ActivityCancelled|null {
         $last = null;
-        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($eventStore->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if (!$event instanceof ActivityCompleted
                 && !$event instanceof ActivityFailed
                 && !$event instanceof ActivityCatastrophicFailure
@@ -108,7 +108,7 @@ final class ActivityEventJournal
      */
     public static function settledOutcomeForDelivery(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         int $attempt,
     ): ActivityCompleted|ActivityFailed|ActivityCatastrophicFailure|ActivityCancelled|null {
@@ -131,11 +131,11 @@ final class ActivityEventJournal
      */
     public static function hasActivityTaskFailedForAttempt(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         int $attempt,
     ): bool {
-        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($eventStore->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if ($event instanceof ActivityTaskFailed
                 && $event->activityId() === $activityId
                 && $event->attempt() === $attempt
@@ -154,12 +154,12 @@ final class ActivityEventJournal
      */
     public static function nextAttemptIsDue(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         int $attempt,
     ): bool {
         $willRetry = false;
-        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($eventStore->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if ($event instanceof ActivityRetryQueued && $event->activityId() === $activityId && $event->attempt() === $attempt + 1) {
                 return false;
             }
@@ -178,11 +178,11 @@ final class ActivityEventJournal
      */
     public static function hasActivityTaskStartedForAttempt(
         EventStoreInterface $eventStore,
-        string $executionId,
+        ExecutionId|string $executionId,
         string $activityId,
         int $attempt,
     ): bool {
-        foreach ($eventStore->readStream(ExecutionId::fromString($executionId)) as $event) {
+        foreach ($eventStore->readStream(\is_string($executionId) ? ExecutionId::fromString($executionId) : $executionId) as $event) {
             if ($event instanceof ActivityTaskStarted
                 && $event->activityId() === $activityId
                 && $event->attempt() === $attempt
