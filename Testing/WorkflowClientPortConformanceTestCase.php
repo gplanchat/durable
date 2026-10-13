@@ -202,6 +202,22 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertGreaterThan($before, $this->historyLengthOf($id));
     }
 
+    /**
+     * Needs {@see ConformanceCompensatingClientWorkflow} registered by the backend.
+     */
+    public function testACancelledRunStaysRunningWhileItsWorkflowCompensatesAndASecondCancelAddsNothing(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceCompensatingClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->cancel($id);
+        $written = $this->historyLengthOf($id);
+        $this->clientUnderTest()->cancel($id);
+
+        self::assertSame(WorkflowRunStatus::Running, $this->catalogUnderTest()->findRun($id)?->status, 'The workflow compensates in its own code before the run ends.');
+        self::assertSame($written, $this->historyLengthOf($id), 'A second cancel of a run that already has one pending is a no-op.');
+    }
+
     public function testTerminatingAWaitingRunEndsItFailedAndRunsNothingMore(): void
     {
         $id = ExecutionId::fromString('exec-1');

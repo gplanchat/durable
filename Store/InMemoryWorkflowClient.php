@@ -12,8 +12,12 @@ use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Handler\LinkedChildFinalizer;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
+use Gplanchat\Durable\ParentClosureReason;
+use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
@@ -33,6 +37,8 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
         private readonly EventStoreInterface $events,
+        private readonly LinkedChildFinalizer $linkedChildren,
+        private readonly ?ParentChildWorkflowCoordinatorInterface $coordinator = null,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -79,7 +85,13 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
     {
-        $this->assertNotEnded($executionId);
+        $this->assertOnTheLiveRun($executionId, 'cancel');
+        // Idempotent, as on Temporal: a request already journalled for this run is not repeated.
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof WorkflowCancellationRequested) {
+                return;
+            }
+        }
         $this->events->append(new WorkflowCancellationRequested($executionId, 'client_request_cancel'));
         WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
         $this->dispatcher->dispatchResume($executionId);
@@ -87,11 +99,15 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
-        $this->assertNotEnded($executionId);
+        $this->assertOnTheLiveRun($executionId, 'terminate');
+        // A pass that was running no longer writes (DUR053): it cannot complete a terminated run.
+        PassEventStore::open($this->events, $executionId)->append(WorkflowExecutionFailed::terminated($executionId, $reason));
         // Marked completed after the failure: a resume already queued then takes the handler's
         // "completed" path and runs no workflow code.
-        $this->events->append(WorkflowExecutionFailed::terminated($executionId, $reason));
         $this->metadata->markCompleted($executionId);
+        // What every ending runs: the run's own children, then the parent that waits for it.
+        $this->coordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
+        $this->linkedChildren->finalize($executionId, null, new WorkflowTerminatedException($executionId->toString(), $reason));
     }
 
     /**
@@ -124,6 +140,18 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
             throw new WorkflowExecutionAlreadyEnded($executionId->toString());
+        }
+    }
+
+    /**
+     * Cancel and terminate act on the live run of a chain. Until task 1.7 follows it, a run that
+     * continued as new is refused: the call would land on the dead run.
+     */
+    private function assertOnTheLiveRun(ExecutionId $executionId, string $method): void
+    {
+        $this->assertNotEnded($executionId);
+        if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
+            throw UnsupportedByBackendException::forMethod('in-memory', $method, 'the execution continued as new and the chain is not followed yet, see the workflow-repository change');
         }
     }
 
