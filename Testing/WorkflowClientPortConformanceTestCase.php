@@ -78,7 +78,8 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     abstract public static function refusedStartOptions(): iterable;
 
     /**
-     * Brings an execution started through the client to the given outcome.
+     * Brings an execution started through the client to the given outcome, as a run that ended:
+     * the catalogue says so, and the backend no longer holds it as active.
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
 
@@ -188,6 +189,36 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertNull($this->catalogUnderTest()->findRun($id));
         self::assertNull($this->startedInputOf($id));
         self::assertSame(0, $this->historyLengthOf($id));
+    }
+
+    /**
+     * @return iterable<string, array{WorkflowRunStatus}>
+     */
+    public static function endedOutcomes(): iterable
+    {
+        foreach ([WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled, WorkflowRunStatus::Completed, WorkflowRunStatus::ContinuedAsNew] as $outcome) {
+            yield $outcome->value => [$outcome];
+        }
+    }
+
+    /**
+     * Until the owner settles what separates two runs of one id (#1083), every second start fails.
+     */
+    #[DataProvider('endedOutcomes')]
+    public function testAStartOfAnIdWhoseExecutionEndedFails(WorkflowRunStatus $outcome): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
+        $this->endRun($id, $outcome);
+
+        try {
+            $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second']);
+            self::fail('A second start must fail.');
+        } catch (WorkflowExecutionAlreadyStarted $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
+        self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+        self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     public function testARepositoryRefusesAnExecutionOfAnotherWorkflowType(): void
