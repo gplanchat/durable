@@ -256,7 +256,7 @@ final class WorkflowEnvironment
         // Recorded here, and not by the caller of the pass: the record has to precede what the
         // workflow does in response, or a replay would apply them the other way round. It is the
         // order Temporal produces — the acceptance before the workflow's commands.
-        $this->context->recordUpdateHandled($message['name'], $message['payload'], $pending->result, $pending->failure);
+        $this->context->recordUpdateHandled($message['name'], $message['payload'], $pending->result, $pending->failure, $pending->updateId);
     }
 
     /**

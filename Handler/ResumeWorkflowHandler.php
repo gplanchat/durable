@@ -99,7 +99,7 @@ final readonly class ResumeWorkflowHandler
 
         try {
             $pendingUpdates = array_map(
-                static fn(array $update): PendingUpdate => new PendingUpdate($update['name'], $update['arguments']),
+                static fn(array $update): PendingUpdate => new PendingUpdate($update['name'], $update['arguments'], $update['updateId'] ?? null),
                 $message->pendingUpdates,
             );
 

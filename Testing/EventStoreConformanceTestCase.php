@@ -415,6 +415,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 ['delta' => $nested],
                 $nested,
                 new FailureEnvelope(\LogicException::class, 'rejected', 9, ['ctx' => $nested], '#0 {main}', []),
+                'update-1',
             ),
             new WorkflowCancellationRequested(ExecutionId::fromString($executionId), 'user asked', ExecutionId::fromString('parent-1')),
             new WorkflowTaskScheduled(ExecutionId::fromString($executionId)),

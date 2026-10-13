@@ -33,7 +33,18 @@ final readonly class WorkflowUpdateHandled implements Event
          * failure (ADR DUR035, probe 1.3).
          */
         private ?FailureEnvelope $failure = null,
+        /**
+         * The id the client gave the update when it sent it, so that a caller reads its own
+         * outcome when two identical updates run at once. Null on an event written before the
+         * field existed, and on one a backend writes without knowing it: no client matches it.
+         */
+        private ?string $updateId = null,
     ) {}
+
+    public function updateId(): ?string
+    {
+        return $this->updateId;
+    }
 
     public function failure(): ?FailureEnvelope
     {
@@ -77,6 +88,7 @@ final readonly class WorkflowUpdateHandled implements Event
                 'message' => $this->failure->message,
                 'code' => $this->failure->code,
             ] : null,
+            ...(null !== $this->updateId ? ['updateId' => $this->updateId] : []),
         ];
     }
 }

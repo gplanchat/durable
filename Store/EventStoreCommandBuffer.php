@@ -121,7 +121,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         ));
     }
 
-    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure, ?string $updateId = null): void
     {
         $this->append(new WorkflowUpdateHandled(
             $this->id,
@@ -129,6 +129,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             $arguments,
             $result,
             $failure,
+            $updateId,
         ));
     }
 
