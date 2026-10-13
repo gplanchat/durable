@@ -14,6 +14,7 @@ use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\Event;
@@ -405,6 +406,7 @@ abstract class EventStoreConformanceTestCase extends TestCase
                 ['queue' => 'children'],
             ),
             new ChildWorkflowCompleted(ExecutionId::fromString($executionId), ExecutionId::fromString('child-1'), $nested),
+            new ChildWorkflowDeadline(ExecutionId::fromString($executionId), ExecutionId::fromString('child-1'), 1735689605.5),
             new ChildWorkflowFailed(ExecutionId::fromString($executionId), ExecutionId::fromString('child-2'), 'child blew up', 7, 'workflow_handler_failure', \LogicException::class, ['ctx' => $nested]),
             new WorkflowSignalReceived(ExecutionId::fromString($executionId), 'approve', ['by' => 'someone', 'payload' => $nested], 'request-1'),
             new WorkflowUpdateHandled(
