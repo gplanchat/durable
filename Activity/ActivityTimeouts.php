@@ -22,6 +22,9 @@ use Gplanchat\Durable\Duration;
  */
 final readonly class ActivityTimeouts
 {
+    /** Bound of one attempt when the activity fixes none: Temporal's default, applied on every backend. */
+    public const DEFAULT_ATTEMPT_BOUND_SECONDS = 30.0;
+
     public function __construct(
         /** From scheduling to the actual start: how long to accept waiting in the queue. */
         public ?Duration $scheduleToStart = null,
@@ -87,6 +90,14 @@ final readonly class ActivityTimeouts
     public function executionBoundOr(Duration $fallback): Duration
     {
         return $this->startToClose ?? $this->scheduleToClose ?? $fallback;
+    }
+
+    /**
+     * The bound one attempt is held to: `startToClose`, else `scheduleToClose`, else 30 s.
+     */
+    public function attemptBound(): Duration
+    {
+        return $this->executionBoundOr(Duration::seconds(self::DEFAULT_ATTEMPT_BOUND_SECONDS));
     }
 
     /**
