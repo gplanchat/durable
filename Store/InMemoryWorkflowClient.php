@@ -13,7 +13,6 @@ use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
-use Gplanchat\Durable\Exception\WorkflowUpdateNotHandled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
@@ -72,6 +71,12 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         throw $this->notYet('query');
     }
 
+    /**
+     * A pass applies a pending update only inside a condition await. An update the workflow does not
+     * declare, or one sent while it waits on a timer or an activity, is applied by no pass: the
+     * caller receives a {@see DurableUpdateFailedException} whose reason is
+     * {@see UpdateFailureReason::NotHandled}, and the update is not queued for later.
+     */
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
         $this->assertAcceptsMessages($executionId, 'update');
@@ -81,7 +86,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         if (null === $handled) {
             WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
             $this->dispatcher->dispatchResume($executionId, [['name' => $name, 'arguments' => $arguments, 'updateId' => $updateId]]);
-            $handled = $this->handledUpdate($executionId, $updateId) ?? throw new WorkflowUpdateNotHandled($executionId->toString(), $name);
+            $handled = $this->handledUpdate($executionId, $updateId) ?? throw DurableUpdateFailedException::notHandled($name);
         }
         if (null !== $handled->failure()) {
             throw new DurableUpdateFailedException($name, $handled->failure()->message);

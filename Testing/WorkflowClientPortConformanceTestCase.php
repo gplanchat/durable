@@ -8,13 +8,14 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\DurableUpdateFailedException;
+use Gplanchat\Durable\Exception\UpdateFailureReason;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
-use Gplanchat\Durable\Exception\WorkflowUpdateNotHandled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
@@ -226,6 +227,14 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         $second = $this->clientUnderTest()->update($id, 'change', ['n' => 1], 'upd-b');
 
         self::assertSame([1, 2], [$first, $second]);
+        // Each outcome is journalled under the id of the call that asked for it.
+        $outcomes = [];
+        foreach ($this->journalOf($id) as $event) {
+            if ($event instanceof WorkflowUpdateHandled) {
+                $outcomes[(string) $event->updateId()] = $event->result();
+            }
+        }
+        self::assertSame(['upd-a' => 1, 'upd-b' => 2], $outcomes);
     }
 
     public function testAnUpdateSentAgainUnderTheSameIdReturnsTheFirstResultAndRunsNothing(): void
@@ -270,9 +279,22 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         try {
             $this->clientUnderTest()->update($id, 'nobody-declares-this');
             self::fail('An update nothing handles must throw.');
-        } catch (WorkflowUpdateNotHandled $e) {
-            self::assertSame('exec-1', $e->executionId);
-            self::assertSame('nobody-declares-this', $e->updateName);
+        } catch (DurableUpdateFailedException $e) {
+            self::assertSame('nobody-declares-this', $e->updateName());
+            self::assertSame(UpdateFailureReason::NotHandled, $e->reason);
+        }
+    }
+
+    public function testAnUpdateSentWhileTheWorkflowWaitsOnATimerIsNotHandled(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        try {
+            $this->clientUnderTest()->update($id, 'change');
+            self::fail('A pass applies updates only inside a condition await.');
+        } catch (DurableUpdateFailedException $e) {
+            self::assertSame(UpdateFailureReason::NotHandled, $e->reason);
         }
     }
 
