@@ -51,6 +51,9 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         return $executionId;
     }
 
+    /**
+     * @throws UnsupportedByBackendException the run continued as new
+     */
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
         $this->assertAcceptsMessages($executionId, 'signal');
@@ -76,6 +79,9 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
      * declare, or one sent while it waits on a timer or an activity, is applied by no pass: the
      * caller receives a {@see DurableUpdateFailedException} whose reason is
      * {@see UpdateFailureReason::NotHandled}, and the update is not queued for later.
+     *
+     * @throws UnsupportedByBackendException   the run continued as new
+     * @throws DurableUpdateFailedException
      */
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
