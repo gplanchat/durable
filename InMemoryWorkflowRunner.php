@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Exception\ChildWorkflowTimedOutException;
 use Gplanchat\Durable\Exception\ContinuationCapReachedException;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
 use Gplanchat\Durable\Exception\WorkflowStuckException;
@@ -68,6 +69,14 @@ final readonly class InMemoryWorkflowRunner
          * would run forever (#888). `0` allows no continuation; a negative value throws.
          */
         private readonly int $maxContinuations = self::DEFAULT_MAX_CONTINUATIONS,
+        /**
+         * An inline child's execution deadline, on the same virtual time as its start: the runner
+         * stops where it falls instead of skipping past it (#979).
+         *
+         * ponytail: measured on each run's clock, which restarts at the child's start; a chain of
+         * continue-as-new runs is bounded run by run here, the execution as a whole on Temporal.
+         */
+        private readonly ?float $childDeadlineAt = null,
     ) {
         if ($maxContinuations < 0) {
             throw new \InvalidArgumentException(\sprintf('maxContinuations must be 0 or more, %d given.', $maxContinuations));
@@ -215,6 +224,10 @@ final readonly class InMemoryWorkflowRunner
         $dueInMs = TimerWakeDelayCalculator::millisecondsUntilNextTimerDue($this->eventStore, $id, $clock->seconds());
         if (null === $dueInMs) {
             return false;
+        }
+
+        if (null !== $this->childDeadlineAt && $clock->seconds() + (float) $dueInMs / 1000.0 > $this->childDeadlineAt) {
+            throw new ChildWorkflowTimedOutException($id->toString(), $this->childDeadlineAt);
         }
 
         $clock->advance((float) $dueInMs / 1000.0);
