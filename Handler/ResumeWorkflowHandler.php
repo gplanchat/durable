@@ -24,7 +24,6 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
-use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
 use Gplanchat\Durable\Workflow\PendingUpdate;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
