@@ -9,6 +9,8 @@ use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
+use Gplanchat\Durable\Query\DroppingCommandBuffer;
+use Gplanchat\Durable\Query\InertLifecycle;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -100,6 +102,26 @@ final readonly class ExecutionEngine
         );
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
+    }
+
+    /**
+     * Replays an execution up to its current suspension point, as {@see resume()} does, but writes
+     * nothing: the command buffer drops every command, a child is not started, no outcome is
+     * recorded. The returned context holds the workflow's query handlers, bound to the instance
+     * the replay built, which holds the state the live execution holds.
+     */
+    public function replayWithoutWriting(ExecutionId $executionId, callable $handler): ExecutionContext
+    {
+        $context = new ExecutionContext(
+            $executionId,
+            new EventStoreHistorySource($this->eventStore, $executionId),
+            new DroppingCommandBuffer(),
+            null,
+            $this->uuidGenerator,
+        );
+        (new WorkflowFiberDriver(new InertLifecycle()))->run($context, $this->createEnvironment($context), $handler);
+
+        return $context;
     }
 
     private function createEnvironment(ExecutionContext $context): WorkflowEnvironment
