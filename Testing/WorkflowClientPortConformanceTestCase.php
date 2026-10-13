@@ -14,7 +14,6 @@ use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
-use Gplanchat\Durable\WorkflowIdReusePolicy;
 use Gplanchat\Durable\WorkflowStartOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -120,56 +119,33 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     }
 
     /**
-     * @return iterable<string, array{WorkflowIdReusePolicy|null, WorkflowRunStatus, bool}>
+     * @return iterable<string, array{WorkflowRunStatus}>
      */
-    public static function idReuse(): iterable
+    public static function endedOutcomes(): iterable
     {
-        foreach ([WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled] as $outcome) {
-            yield 'default policy after ' . $outcome->value => [null, $outcome, true];
-            yield 'allow duplicate after ' . $outcome->value => [WorkflowIdReusePolicy::AllowDuplicate, $outcome, true];
-            yield 'reject duplicate after ' . $outcome->value => [WorkflowIdReusePolicy::RejectDuplicate, $outcome, false];
+        foreach ([WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled, WorkflowRunStatus::Completed, WorkflowRunStatus::ContinuedAsNew] as $outcome) {
+            yield $outcome->value => [$outcome];
         }
-        yield 'default policy after completed' => [null, WorkflowRunStatus::Completed, false];
-        yield 'allow duplicate after completed' => [WorkflowIdReusePolicy::AllowDuplicate, WorkflowRunStatus::Completed, true];
-        yield 'reject duplicate after completed' => [WorkflowIdReusePolicy::RejectDuplicate, WorkflowRunStatus::Completed, false];
-        yield 'allow duplicate after continued as new' => [WorkflowIdReusePolicy::AllowDuplicate, WorkflowRunStatus::ContinuedAsNew, false];
     }
 
-    #[DataProvider('idReuse')]
-    public function testTheIdReusePolicyDecidesAStartAfterAnEndedExecution(?WorkflowIdReusePolicy $policy, WorkflowRunStatus $outcome, bool $restarts): void
+    /**
+     * Until the owner settles what separates two runs of one id (#1083), every second start fails.
+     */
+    #[DataProvider('endedOutcomes')]
+    public function testAStartOfAnIdWhoseExecutionEndedFails(WorkflowRunStatus $outcome): void
     {
         $id = ExecutionId::fromString('exec-1');
         $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
         $this->endRun($id, $outcome);
-        $options = null === $policy ? null : new WorkflowStartOptions(workflowIdReusePolicy: $policy);
 
-        if (!$restarts) {
-            try {
-                $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second'], $options);
-                self::fail('The policy refuses this start.');
-            } catch (WorkflowExecutionAlreadyStarted $e) {
-                self::assertSame('exec-1', $e->executionId);
-            }
-            self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
-            self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
-
-            return;
+        try {
+            $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second']);
+            self::fail('A second start must fail.');
+        } catch (WorkflowExecutionAlreadyStarted $e) {
+            self::assertSame('exec-1', $e->executionId);
         }
-
-        self::assertTrue($id->equals($this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second'], $options)));
-        self::assertSame(['tag' => 'second'], $this->startedInputOf($id));
-        $run = $this->catalogUnderTest()->findRun($id);
-        self::assertSame(ConformanceOtherClientWorkflow::TYPE, $run?->workflowName);
-        self::assertSame(WorkflowRunStatus::Running, $run->status);
-    }
-
-    public function testARunningExecutionRefusesAStartUnderAnyPolicy(): void
-    {
-        $id = ExecutionId::fromString('exec-1');
-        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
-
-        $this->expectException(WorkflowExecutionAlreadyStarted::class);
-        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'second'], new WorkflowStartOptions(workflowIdReusePolicy: WorkflowIdReusePolicy::AllowDuplicate));
+        self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+        self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     public function testARepositoryRefusesAnExecutionOfAnotherWorkflowType(): void
