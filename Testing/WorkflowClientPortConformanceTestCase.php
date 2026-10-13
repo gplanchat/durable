@@ -57,6 +57,18 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
 
+    /**
+     * Whether the suite's executions run the workflow's code: the in-memory, DBAL and Illuminate
+     * backends do. A backend whose hooks play the worker by hand (Temporal's suite) returns false,
+     * and a test that needs the workflow to run starts with
+     * `if (!$this->runsWorkflowCode()) { return; }` after `$this->expectNotToPerformAssertions()`,
+     * so that a suite run with `--fail-on-skipped` does not turn red.
+     */
+    protected function runsWorkflowCode(): bool
+    {
+        return true;
+    }
+
     public function testAStartReturnsTheIdAndTheExecutionIsFoundRunning(): void
     {
         $id = ExecutionId::fromString('exec-1');
