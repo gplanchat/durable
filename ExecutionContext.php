@@ -65,6 +65,7 @@ final class ExecutionContext
      * rule over the same log: that is what makes a condition's verdict reproducible.
      */
     private int $messageCursor = 0;
+    private int $pendingTaken = 0;
 
     /** @var array<string, int> the version each change point resolved to in this pass */
     private array $decidedVersions = [];
@@ -681,25 +682,17 @@ final class ExecutionContext
 
         // The log is exhausted: what is left are the updates that arrived outside the log for
         // this pass.
-        $recorded = $this->countRecordedMessages();
-        $pending = $this->pendingUpdates[$this->messageCursor - $recorded] ?? null;
+        // Counted apart from the cursor: an update journalled during this pass joins the log, so
+        // a difference between the two would hand the same pending update out again.
+        $pending = $this->pendingUpdates[$this->pendingTaken] ?? null;
         if (null === $pending) {
             return null;
         }
 
+        ++$this->pendingTaken;
         ++$this->messageCursor;
 
         return ['kind' => 'update', 'name' => $pending->name, 'payload' => $pending->arguments, 'pending' => $pending];
-    }
-
-    private function countRecordedMessages(): int
-    {
-        $count = 0;
-        while (null !== $this->historySource->messageAt($count)) {
-            ++$count;
-        }
-
-        return $count;
     }
 
     /**

@@ -11,8 +11,12 @@ use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\DurableActivityFailedException;
+use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
+use Gplanchat\Durable\Exception\UpdateFailureReason;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -56,6 +60,13 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * workflow's first pass, and unchanged by a start that fails.
      */
     abstract protected function historyLengthOf(ExecutionId $executionId): int;
+
+    /**
+     * The events the backend holds for the execution, in order.
+     *
+     * @return list<Event>
+     */
+    abstract protected function journalOf(ExecutionId $executionId): array;
 
     /**
      * The start options this backend cannot honour, each with the names the refusal must carry.
@@ -337,6 +348,75 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
             self::assertInstanceOf(DurableActivityFailedException::class, $e->getPrevious());
             self::assertSame('act-1', $e->getPrevious()->activityId());
         }
+    }
+
+    public function testASignalReachesTheWorkflowWhichThenCompletes(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->signal($id, 'pay', ['by' => 'card'], 'req-1');
+
+        $journal = $this->journalOf($id);
+        $signals = array_values(array_filter($journal, static fn(Event $e): bool => $e instanceof WorkflowSignalReceived));
+        self::assertCount(1, $signals);
+        self::assertSame('pay', $signals[0]->signalName());
+        self::assertSame('req-1', $signals[0]->requestId());
+        self::assertNotEmpty(array_filter($journal, static fn(Event $e): bool => $e instanceof ExecutionCompleted), 'The workflow did not receive the signal.');
+    }
+
+    public function testTwoIdenticalUpdatesEachGetTheResultOfTheirOwn(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+
+        $first = $this->clientUnderTest()->update($id, 'change', ['n' => 1], 'upd-a');
+        $second = $this->clientUnderTest()->update($id, 'change', ['n' => 1], 'upd-b');
+
+        self::assertSame([1, 2], [$first, $second]);
+        // Each outcome is journalled under the id of the call that asked for it.
+        $outcomes = [];
+        foreach ($this->journalOf($id) as $event) {
+            if ($event instanceof WorkflowUpdateHandled) {
+                $outcomes[(string) $event->updateId()] = $event->result();
+            }
+        }
+        self::assertSame(['upd-a' => 1, 'upd-b' => 2], $outcomes);
+    }
+
+    public function testAnUpdateSentAgainUnderTheSameIdReturnsTheFirstResultAndRunsNothing(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+        $this->clientUnderTest()->update($id, 'change', [], 'upd-a');
+        $written = $this->historyLengthOf($id);
+
+        self::assertSame(1, $this->clientUnderTest()->update($id, 'change', [], 'upd-a'));
+        self::assertSame($written, $this->historyLengthOf($id));
+    }
+
+    public function testAnUpdateWithoutAnIdReturnsItsResult(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+
+        self::assertSame(1, $this->clientUnderTest()->update($id, 'change'));
+    }
+
+    public function testAFailingUpdateThrowsToItsCallerAndTheExecutionCarriesOn(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+
+        try {
+            $this->clientUnderTest()->update($id, 'explode', [], 'upd-a');
+            self::fail('A failing update must throw.');
+        } catch (DurableUpdateFailedException $e) {
+            self::assertSame('explode', $e->updateName());
+            self::assertSame(UpdateFailureReason::HandlerFailed, $e->reason);
+        }
+        self::assertEmpty(array_filter($this->journalOf($id), static fn(Event $e): bool => $e instanceof ExecutionCompleted));
+        self::assertSame(1, $this->clientUnderTest()->update($id, 'change'));
     }
 
     private function call(string $operation, ExecutionId $id): mixed

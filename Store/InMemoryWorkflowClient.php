@@ -10,6 +10,9 @@ use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
@@ -24,10 +27,11 @@ use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
- * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
+ * The in-memory implementation of {@see WorkflowClientPort}, start, signal and update. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
  * Result reads the journal once (task 2.3): nothing else runs in this process during the call, so an
@@ -60,11 +64,20 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         return $executionId;
     }
 
+    /**
+     * @throws UnsupportedByBackendException the run continued as new
+     */
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
-        $this->assertNotEnded($executionId);
-
-        throw $this->notYet('signal');
+        $this->assertAcceptsMessages($executionId, 'signal');
+        // The order of DUR052, as the Symfony handler keeps it: announce, append, schedule, resume.
+        $signal = AwaitedFact::signal($requestId ??= bin2hex(random_bytes(16)));
+        if (!$signal->isJournalledIn($this->events, $executionId)) {
+            $this->dispatcher->dispatchResumeAwaiting($executionId, $signal);
+            $this->events->append(new WorkflowSignalReceived($executionId, $name, $arguments, $requestId));
+        }
+        WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
+        $this->dispatcher->dispatchResume($executionId);
     }
 
     public function query(ExecutionId $executionId, string $name, array $arguments = []): mixed
@@ -74,11 +87,42 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         throw $this->notYet('query');
     }
 
+    /**
+     * A pass applies a pending update only inside a condition await. An update the workflow does not
+     * declare, or one sent while it waits on a timer or an activity, is applied by no pass: the
+     * caller receives a {@see DurableUpdateFailedException} whose reason is
+     * {@see UpdateFailureReason::NotHandled}, and the update is not queued for later.
+     *
+     * @throws UnsupportedByBackendException   the run continued as new
+     * @throws DurableUpdateFailedException
+     */
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
-        $this->assertNotEnded($executionId);
+        $this->assertAcceptsMessages($executionId, 'update');
+        $updateId ??= bin2hex(random_bytes(16));
+        // The same id again is the same update: the first outcome answers, nothing runs twice.
+        $handled = $this->handledUpdate($executionId, $updateId);
+        if (null === $handled) {
+            WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
+            $this->dispatcher->dispatchResume($executionId, [['name' => $name, 'arguments' => $arguments, 'updateId' => $updateId]]);
+            $handled = $this->handledUpdate($executionId, $updateId) ?? throw DurableUpdateFailedException::notHandled($name);
+        }
+        if (null !== $handled->failure()) {
+            throw new DurableUpdateFailedException($name, $handled->failure()->message);
+        }
 
-        throw $this->notYet('update');
+        return $handled->result();
+    }
+
+    private function handledUpdate(ExecutionId $executionId, string $updateId): ?WorkflowUpdateHandled
+    {
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof WorkflowUpdateHandled && $event->updateId() === $updateId) {
+                return $event;
+            }
+        }
+
+        return null;
     }
 
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
@@ -170,6 +214,18 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         }
 
         return $found;
+    }
+
+    /**
+     * A signal or an update goes to the run that is current. This backend does not follow a
+     * continue-as-new chain yet (task 1.7): delivering to the old run would lose the message.
+     */
+    private function assertAcceptsMessages(ExecutionId $executionId, string $method): void
+    {
+        $this->assertNotEnded($executionId);
+        if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
+            throw UnsupportedByBackendException::forMethod('in-memory', $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
+        }
     }
 
     private function notYet(string $method): UnsupportedByBackendException
