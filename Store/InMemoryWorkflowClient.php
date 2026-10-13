@@ -6,11 +6,15 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
+use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
+use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
+use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
@@ -25,6 +29,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function __construct(
         private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
+        private readonly WorkflowRunCatalogInterface $catalog,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -43,31 +48,43 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
+        $this->assertNotEnded($executionId);
+
         throw $this->notYet('signal');
     }
 
     public function query(ExecutionId $executionId, string $name, array $arguments = []): mixed
     {
+        $this->assertKnown($executionId);
+
         throw $this->notYet('query');
     }
 
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
+        $this->assertNotEnded($executionId);
+
         throw $this->notYet('update');
     }
 
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
     {
+        $this->assertKnown($executionId);
+
         throw $this->notYet('result');
     }
 
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
     {
+        $this->assertNotEnded($executionId);
+
         throw $this->notYet('cancel');
     }
 
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
+        $this->assertNotEnded($executionId);
+
         throw $this->notYet('terminate');
     }
 
@@ -85,6 +102,21 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
             ['cronSchedule', 'taskQueue', 'timeouts', 'workflowIdReusePolicy', 'searchAttributes'],
             static fn(string $name): bool => $options->{$name} != $defaults->{$name},
         ));
+    }
+
+    private function assertKnown(ExecutionId $executionId): WorkflowRunStatus
+    {
+        return ($this->catalog->findRun($executionId) ?? throw new WorkflowExecutionNotFound($executionId->toString()))->status;
+    }
+
+    /**
+     * A run that continued as new is not ended: its chain goes on (design, task 1.7).
+     */
+    private function assertNotEnded(ExecutionId $executionId): void
+    {
+        if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
+            throw new WorkflowExecutionAlreadyEnded($executionId->toString());
+        }
     }
 
     private function notYet(string $method): UnsupportedByBackendException

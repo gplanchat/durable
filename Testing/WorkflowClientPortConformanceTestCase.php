@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Attribute\AsWorkflowRepository;
+use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
+use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
@@ -15,6 +18,7 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\TaskQueue;
 use Gplanchat\Durable\WorkflowRepository;
 use Gplanchat\Durable\WorkflowStartOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -36,6 +40,11 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * @return array<string, mixed>|null
      */
     abstract protected function startedInputOf(ExecutionId $executionId): ?array;
+
+    /**
+     * Brings an execution started through the client to the given outcome.
+     */
+    abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
 
     public function testAStartReturnsTheIdAndTheExecutionIsFoundRunning(): void
     {
@@ -102,6 +111,59 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         $this->clientUnderTest()->start(ExecutionId::fromString('exec-1'), ConformanceClientWorkflow::TYPE);
 
         self::assertSame('exec-1', $this->repository()->get(ExecutionId::fromString('exec-1'))->executionId()->toString());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function operations(): iterable
+    {
+        foreach (['signal', 'query', 'update', 'result', 'cancel', 'terminate'] as $operation) {
+            yield $operation => [$operation];
+        }
+    }
+
+    #[DataProvider('operations')]
+    public function testAnUnknownExecutionFailsAtOnceOnEveryOperation(string $operation): void
+    {
+        $this->expectException(WorkflowExecutionNotFound::class);
+
+        $this->call($operation, ExecutionId::fromString('exec-nobody'));
+    }
+
+    #[DataProvider('operations')]
+    public function testAnEndedExecutionRefusesWhatActsOnIt(string $operation): void
+    {
+        if (!\in_array($operation, ['signal', 'update', 'cancel', 'terminate'], true)) {
+            $this->addToAssertionCount(1); // A query and a result read an ended execution.
+
+            return;
+        }
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->endRun($id, WorkflowRunStatus::Completed);
+
+        try {
+            $this->call($operation, $id);
+            self::fail('An ended execution cannot be acted on.');
+        } catch (WorkflowExecutionAlreadyEnded $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
+        self::assertSame(WorkflowRunStatus::Completed, $this->catalogUnderTest()->findRun($id)?->status);
+    }
+
+    private function call(string $operation, ExecutionId $id): mixed
+    {
+        $client = $this->clientUnderTest();
+
+        return match ($operation) {
+            'signal' => $client->signal($id, 'pay'),
+            'query' => $client->query($id, 'status'),
+            'update' => $client->update($id, 'change'),
+            'result' => $client->result($id, Duration::seconds(0.1)),
+            'cancel' => $client->cancel($id),
+            default => $client->terminate($id),
+        };
     }
 
     /**
