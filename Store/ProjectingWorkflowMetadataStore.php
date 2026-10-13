@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Store;
 
-use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
 
@@ -18,7 +17,7 @@ use Gplanchat\Durable\Observation\WorkflowRunProjectionInterface;
  *
  * @see openspec/changes/backend-neutral-workflow-dashboard/design.md
  */
-final readonly class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore, ReopensCompletedWorkflowMetadata
+final readonly class ProjectingWorkflowMetadataStore implements WorkflowMetadataStore
 {
     public function __construct(
         private readonly WorkflowMetadataStore $inner,
@@ -39,23 +38,6 @@ final readonly class ProjectingWorkflowMetadataStore implements WorkflowMetadata
         }
 
         return $inserted;
-    }
-
-    /**
-     * The inner store must reopen too: a start that the policy allows runs on the SQL and the
-     * in-memory stores, which do.
-     */
-    public function reopenIfCompleted(ExecutionId $executionId, string $workflowType, array $payload): bool
-    {
-        if (!$this->inner instanceof ReopensCompletedWorkflowMetadata) {
-            throw UnsupportedByBackendException::forMethod('metadata store', 'reopenIfCompleted', 'the decorated store does not implement ReopensCompletedWorkflowMetadata');
-        }
-        $reopened = $this->inner->reopenIfCompleted($executionId, $workflowType, $payload);
-        if ($reopened) {
-            $this->projection->recordStart($executionId, $workflowType);
-        }
-
-        return $reopened;
     }
 
     public function markCompleted(ExecutionId $executionId): void

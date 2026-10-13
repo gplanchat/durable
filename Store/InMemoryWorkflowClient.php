@@ -15,7 +15,6 @@ use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
-use Gplanchat\Durable\WorkflowIdReusePolicy;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
@@ -23,13 +22,12 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
  * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
- * with an option other than the id reuse policy throws {@see WorkflowStartOptionsRefused} until
- * task 2.6 is done.
+ * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
 {
     public function __construct(
-        private readonly WorkflowMetadataStore&ReopensCompletedWorkflowMetadata $metadata,
+        private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
     ) {}
@@ -40,37 +38,12 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         if ([] !== $refused) {
             throw new WorkflowStartOptionsRefused('in-memory', $refused);
         }
-        if (!$this->metadata->insertIfAbsent($executionId, $workflowType, $input)
-            && !$this->restarts($executionId, $workflowType, $input, $options->workflowIdReusePolicy ?? WorkflowIdReusePolicy::AllowDuplicateFailedOnly)
-        ) {
+        if (!$this->metadata->insertIfAbsent($executionId, $workflowType, $input)) {
             throw new WorkflowExecutionAlreadyStarted($executionId->toString());
         }
         $this->dispatcher->dispatchNewWorkflowRun($executionId, $workflowType, $input);
 
         return $executionId;
-    }
-
-    /**
-     * The id has a row. The policy judges the execution that ended (a running one, or one that
-     * continued as new, refuses every start), and the store's conditional update arbitrates between
-     * two starts that both pass the judgement.
-     *
-     * ponytail: the journal of the ended run is not cleared, so the new run replays what the old
-     * one journaled (timers, activity results, signals). A run boundary in the journal is the
-     * owner's decision.
-     *
-     * @param array<string, mixed> $input
-     */
-    private function restarts(ExecutionId $executionId, string $workflowType, array $input, WorkflowIdReusePolicy $policy): bool
-    {
-        $allowed = match ($policy) {
-            WorkflowIdReusePolicy::RejectDuplicate => [],
-            WorkflowIdReusePolicy::AllowDuplicate => [WorkflowRunStatus::Completed, WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled],
-            WorkflowIdReusePolicy::AllowDuplicateFailedOnly => [WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled],
-        };
-
-        return \in_array($this->catalog->findRun($executionId)?->status, $allowed, true)
-            && $this->metadata->reopenIfCompleted($executionId, $workflowType, $input);
     }
 
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
@@ -116,20 +89,19 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     }
 
     /**
-     * Only the id reuse policy takes effect on this backend (the timeouts follow, task 2.6): each
-     * other option that differs from the defaults is refused.
+     * Until task 2.6 no option takes effect on this backend: each one that differs from the
+     * defaults is refused.
      *
      * @return list<string>
      */
     private static function refusedOptions(WorkflowStartOptions $options): array
     {
         $defaults = WorkflowStartOptions::defaults();
-        $honoured = ['workflowIdReusePolicy'];
 
         // Every public property: one added to WorkflowStartOptions later is refused, not accepted.
         return array_keys(array_filter(
             get_object_vars($options),
-            static fn(mixed $value, string $name): bool => !\in_array($name, $honoured, true) && $value != $defaults->{$name},
+            static fn(mixed $value, string $name): bool => $value != $defaults->{$name},
             \ARRAY_FILTER_USE_BOTH,
         ));
     }
