@@ -9,7 +9,7 @@ use Gplanchat\Durable\ExecutionId;
 /**
  * In-memory implementation of the WorkflowMetadataStore (tests).
  */
-final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
+final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore, ReopensCompletedWorkflowMetadata
 {
     /** @var array<string, array<string, mixed>> */
     private array $metadata = [];
@@ -29,6 +29,16 @@ final class InMemoryWorkflowMetadataStore implements WorkflowMetadataStore
     public function insertIfAbsent(ExecutionId $executionId, string $workflowType, array $payload): bool
     {
         if (isset($this->metadata[$executionId->toString()])) {
+            return false;
+        }
+        $this->save($executionId, $workflowType, $payload);
+
+        return true;
+    }
+
+    public function reopenIfCompleted(ExecutionId $executionId, string $workflowType, array $payload): bool
+    {
+        if (true !== ($this->metadata[$executionId->toString()]['completed'] ?? false)) {
             return false;
         }
         $this->save($executionId, $workflowType, $payload);
