@@ -7,8 +7,10 @@ namespace Gplanchat\Durable\Handler;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
+use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowTaskCompleted;
 use Gplanchat\Durable\Event\WorkflowTaskStarted;
@@ -226,7 +228,7 @@ final readonly class ResumeWorkflowHandler
 
     /**
      * The run in progress was ended by its parent: the child's last stop names the parent it is
-     * linked to now, and that parent has not scheduled the same child id again since an outcome.
+     * linked to now, and that parent has not scheduled the same child id again since.
      * The stream is shared by every run of a reused id, so a stop written for an earlier run, or for
      * another parent, does not count (#979).
      */
@@ -247,17 +249,25 @@ final readonly class ResumeWorkflowHandler
             return false;
         }
 
-        $outcomeSeen = false;
+        // The last scheduling of this id is the run in progress. It is over when an outcome for the
+        // child follows it, or when the parent itself ended after it (a closed parent, Terminate).
+        $open = false;
+        $closed = false;
         foreach ($this->eventStore->readStream($parent) as $event) {
-            if (($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) && $event->childExecutionId()->equals($childId)) {
-                $outcomeSeen = true;
-            }
-            if ($outcomeSeen && $event instanceof ChildWorkflowScheduled && $event->childExecutionId()->equals($childId)) {
-                return false; // scheduled again after an outcome: a new run
+            if ($event instanceof ChildWorkflowScheduled && $event->childExecutionId()->equals($childId)) {
+                $open = true;
+                $closed = false;
+            } elseif ($open && (
+                (($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) && $event->childExecutionId()->equals($childId))
+                || $event instanceof ExecutionCompleted
+                || $event instanceof WorkflowExecutionFailed
+                || $event instanceof WorkflowExecutionCancelled
+            )) {
+                $closed = true;
             }
         }
 
-        return true;
+        return $closed;
     }
 
     private function finalizeAsyncChildOnParentIfLinked(ExecutionId $childId, mixed $result, ?\Throwable $failure): void

@@ -104,9 +104,16 @@ final readonly class FireWorkflowTimersHandler
             // DUR052 §3: announced before the outcome is appended, as a child's own report is.
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, AwaitedFact::child($childId));
             $message = \sprintf('Child workflow %s timed out.', $childId);
-            $journal->append(new ChildWorkflowFailed($parent, ExecutionId::fromString($childId), $message));
-            // Ended whether it started or not: a start still queued finds the end and runs nothing.
-            $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(ExecutionId::fromString($childId), $parent, $message));
+            $child = ExecutionId::fromString($childId);
+            // The child's end first: a crash between the two appends leaves a deadline still pending,
+            // which fires again, and never a failed parent with a child that runs on. Ended whether
+            // it started or not: a start still queued finds the end and runs nothing.
+            $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent($child, $parent, $message));
+            $journal->append(new ChildWorkflowFailed($parent, $child, $message));
+            // As ParentChildWorkflowCoordinator does for a closed parent: a child that waits on a
+            // signal or a timer replays now, finds its end, and its own children follow their policy.
+            WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $child);
+            $this->resumeDispatcher->dispatchResume($child);
             $failed = true;
         }
 

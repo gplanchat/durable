@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Transport;
 
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
+use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\TimerCancelled;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
@@ -77,6 +78,11 @@ final readonly class AwaitedFact
                 AwaitedFactKind::Timer === $this->kind && ($event instanceof TimerCompleted || $event instanceof TimerCancelled) => $event->timerId(),
                 default => null,
             };
+            // A child id can run again under the same parent (a retry): the outcome that settles the
+            // wait is the one after the latest scheduling.
+            if (AwaitedFactKind::Child === $this->kind && $event instanceof ChildWorkflowScheduled && isset($this->ids[0]) && $event->childExecutionId()->toString() === $this->ids[0]) {
+                $missing[$this->ids[0]] = true;
+            }
             unset($missing[$id ?? '']);
         }
 
