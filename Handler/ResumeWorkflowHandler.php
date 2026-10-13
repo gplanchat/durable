@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Handler;
 
-use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowTaskCompleted;
@@ -27,7 +26,6 @@ use Gplanchat\Durable\Store\WorkflowTaskJournal;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\Transport\ResumeWorkflowMessage;
-use Gplanchat\Durable\Workflow\AsyncChildWorkflowFailureProjector;
 use Gplanchat\Durable\Workflow\PendingUpdate;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
 use Gplanchat\Durable\WorkflowRegistry;
@@ -210,52 +208,6 @@ final readonly class ResumeWorkflowHandler
 
     private function finalizeAsyncChildOnParentIfLinked(ExecutionId $childId, mixed $result, ?\Throwable $failure): void
     {
-        $parent = $this->childWorkflowParentLinkStore->getParentExecutionId($childId);
-        if (null === $parent) {
-            return;
-        }
-        // The parent awaits the id it scheduled: the first run of the chain, whichever run ends it (#859).
-        $scheduledId = $this->firstRunOfTheChain($childId);
-
-        // DUR052 §3: announced first, appended once, resumed, and unlinked last. A child resume
-        // redelivered after a crash still finds the link, and resumes the parent without a second
-        // outcome.
-        // The fact is wire: it carries the child id as a string.
-        $child = AwaitedFact::child($scheduledId->toString());
-        if (!$child->isJournalledIn($this->eventStore, $parent)) {
-            $this->resumeDispatcher->dispatchResumeAwaiting($parent, $child);
-            $this->eventStore->append(null !== $failure
-                ? AsyncChildWorkflowFailureProjector::toParentJournalEvent($this->eventStore, $parent, $scheduledId, $failure, $childId)
-                : new ChildWorkflowCompleted($parent, $scheduledId, $result));
-        }
-
-        WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $parent);
-        $this->resumeDispatcher->dispatchResume($parent);
-        $this->childWorkflowParentLinkStore->unlink($childId);
-    }
-
-    /**
-     * Walks back the `continuedFromExecutionId` each continuation writes into its run's start.
-     *
-     * ponytail: reads the head of every run's stream, at the end of a linked child only; a column on
-     * the parent link would spare the reads if chains of linked children grow long.
-     */
-    private function firstRunOfTheChain(ExecutionId $executionId): ExecutionId
-    {
-        while (true) {
-            $predecessor = null;
-            foreach ($this->eventStore->readStream($executionId) as $event) {
-                // The first start is the run's own: the walk reads no further, and stops at the root.
-                if ($event instanceof ExecutionStarted) {
-                    $from = $event->payload()['continuedFromExecutionId'] ?? null;
-                    $predecessor = \is_string($from) ? ExecutionId::fromString($from) : null;
-                    break;
-                }
-            }
-            if (null === $predecessor) {
-                return $executionId;
-            }
-            $executionId = $predecessor;
-        }
+        (new LinkedChildFinalizer($this->eventStore, $this->resumeDispatcher, $this->childWorkflowParentLinkStore))->finalize($childId, $result, $failure);
     }
 }
