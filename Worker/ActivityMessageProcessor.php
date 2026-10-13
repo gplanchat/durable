@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Worker;
 
+use Gplanchat\Durable\Activity\ActivityTimeouts;
 use Gplanchat\Durable\Activity\RetryLimit;
 use Gplanchat\Durable\ActivityExecutor;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
@@ -178,7 +179,7 @@ final readonly class ActivityMessageProcessor
             // Measured after the fact, not enforced with a PHP time limit: that one counts CPU
             // time only, so a stalled call never trips it, and when it does trip it kills the
             // worker before anything is journalled. Stopping a runaway attempt is the host's job.
-            if ($options?->timeouts->startToClose?->hasElapsedSince(0.0, self::secondsSince($t0))) {
+            if (($options->timeouts ?? new ActivityTimeouts())->attemptBound()->hasElapsedSince(0.0, self::secondsSince($t0))) {
                 $timedOut = true;
 
                 throw new \RuntimeException('Activity start-to-close timeout exceeded.');

@@ -16,6 +16,8 @@ use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Exception\ChildWorkflowIdAlreadyUsedException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdCompletedException;
 use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
@@ -26,6 +28,7 @@ use Gplanchat\Durable\RegistryActivityExecutor;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 use Gplanchat\Durable\WorkflowEnvironment;
+use Gplanchat\Durable\WorkflowIdReusePolicy;
 use Gplanchat\Durable\WorkflowRegistry;
 use Gplanchat\Durable\WorkflowTimeouts;
 use PHPUnit\Framework\TestCase;
@@ -200,6 +203,22 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         self::assertCount(1, $this->eventsOf($store, 'scenario-timeout', ChildWorkflowFailed::class));
     }
 
+    public function testAChildIdThatCompletedIsRefusedUnderRejectDuplicate(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+
+        $this->expectException(ChildWorkflowIdAlreadyUsedException::class);
+        $this->startTwiceUnder(WorkflowIdReusePolicy::RejectDuplicate, 'scenario-reuse-reject');
+    }
+
+    public function testAChildIdThatCompletedIsRefusedUnderAllowDuplicateFailedOnly(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+
+        $this->expectException(ChildWorkflowIdCompletedException::class);
+        $this->startTwiceUnder(WorkflowIdReusePolicy::AllowDuplicateFailedOnly, 'scenario-reuse-failed-only');
+    }
+
     public function testContinueAsNewFollowsTheChainToItsLastRun(): void
     {
         $this->assertHolds(__FUNCTION__);
@@ -229,6 +248,22 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         $completed = $this->eventsOf($store, $id, ExecutionCompleted::class);
         self::assertCount(1, $completed, 'the last run completes');
         self::assertSame(['runs' => 3], $completed[0]->result());
+    }
+
+    private function startTwiceUnder(WorkflowIdReusePolicy $policy, string $parentId): void
+    {
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceChildWorkflow::class);
+
+        $this->runner($this->createEventStore(), null, $registry)->run(
+            ExecutionId::fromString($parentId),
+            static function (WorkflowEnvironment $wf) use ($policy): mixed {
+                $options = new ChildWorkflowOptions(workflowId: 'scenario-reused-child', workflowIdReusePolicy: $policy);
+                $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class, $options)->run('first'));
+
+                return $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class, $options)->run('second'));
+            },
+        );
     }
 
     protected function runner(

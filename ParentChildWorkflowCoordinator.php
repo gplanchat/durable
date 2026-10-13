@@ -40,23 +40,6 @@ final readonly class ParentChildWorkflowCoordinator implements ParentChildWorkfl
         }
     }
 
-    /**
-     * Whether the run holds a terminal event, started or not.
-     */
-    public static function hasEnded(EventStoreInterface $store, ExecutionId $executionId): bool
-    {
-        foreach ($store->readStream($executionId) as $event) {
-            if ($event instanceof ExecutionCompleted
-                || $event instanceof WorkflowExecutionFailed
-                || $event instanceof WorkflowExecutionCancelled
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     public static function isChildRunActive(EventStoreInterface $store, ExecutionId|string $childExecutionId): bool
     {
         $started = false;
