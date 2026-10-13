@@ -11,7 +11,6 @@ use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ExecutionRuntime;
-use Gplanchat\Durable\ParentChildWorkflowCoordinator;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
@@ -107,9 +106,7 @@ final readonly class FireWorkflowTimersHandler
             $message = \sprintf('Child workflow %s timed out.', $childId);
             $journal->append(new ChildWorkflowFailed($parent, ExecutionId::fromString($childId), $message));
             // Ended whether it started or not: a start still queued finds the end and runs nothing.
-            if (!ParentChildWorkflowCoordinator::hasEnded($this->eventStore, ExecutionId::fromString($childId))) {
-                $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(ExecutionId::fromString($childId), $parent, $message));
-            }
+            $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(ExecutionId::fromString($childId), $parent, $message));
             $failed = true;
         }
 

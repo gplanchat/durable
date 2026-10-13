@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Handler;
 
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
+use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
@@ -19,6 +21,8 @@ use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunPickupProjectionInterface;
 use Gplanchat\Durable\Observation\WorkflowRunWaitProjectionInterface;
+use Gplanchat\Durable\ParentChildWorkflowCoordinator;
+use Gplanchat\Durable\ParentClosureReason;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
@@ -80,15 +84,15 @@ final readonly class ResumeWorkflowHandler
             return;
         }
 
-        // A parent that gave up on this child ended it in its journal (a timeout, #979): a timer or a
-        // start still queued must not run it on, and complete it after its failure.
-        foreach ($this->eventStore->readStream($id) as $event) {
-            if ($event instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $event->kind()) {
-                $this->metadataStore->markCompleted($id);
-                $this->childWorkflowParentLinkStore->unlink($id);
+        // A parent that gave up on this child ended it in its journal (a timeout, a closed parent): a
+        // timer or a start still queued must not run it on, and complete it after its failure.
+        if ($this->wasStoppedByItsParent($id)) {
+            $this->metadataStore->markCompleted($id);
+            $this->childWorkflowParentLinkStore->unlink($id);
+            // As for any run that ends: its own children follow their parent-close policy.
+            (new ParentChildWorkflowCoordinator($this->eventStore, $this->resumeDispatcher))->onParentClosed($id, ParentClosureReason::Failed);
 
-                return;
-            }
+            return;
         }
 
         // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this
@@ -218,6 +222,42 @@ final readonly class ResumeWorkflowHandler
         if (null !== $parent) {
             $this->childWorkflowParentLinkStore->unlink($id);
         }
+    }
+
+    /**
+     * The run in progress was ended by its parent: the child's last stop names the parent it is
+     * linked to now, and that parent has not scheduled the same child id again since an outcome.
+     * The stream is shared by every run of a reused id, so a stop written for an earlier run, or for
+     * another parent, does not count (#979).
+     */
+    private function wasStoppedByItsParent(ExecutionId $childId): bool
+    {
+        $parent = $this->childWorkflowParentLinkStore->getParentExecutionId($childId);
+        if (null === $parent) {
+            return false;
+        }
+
+        $stoppedBy = null;
+        foreach ($this->eventStore->readStream($childId) as $event) {
+            if ($event instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $event->kind()) {
+                $stoppedBy = $event->context()['parentExecutionId'] ?? null;
+            }
+        }
+        if ($stoppedBy !== $parent->toString()) {
+            return false;
+        }
+
+        $outcomeSeen = false;
+        foreach ($this->eventStore->readStream($parent) as $event) {
+            if (($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) && $event->childExecutionId()->equals($childId)) {
+                $outcomeSeen = true;
+            }
+            if ($outcomeSeen && $event instanceof ChildWorkflowScheduled && $event->childExecutionId()->equals($childId)) {
+                return false; // scheduled again after an outcome: a new run
+            }
+        }
+
+        return true;
     }
 
     private function finalizeAsyncChildOnParentIfLinked(ExecutionId $childId, mixed $result, ?\Throwable $failure): void
