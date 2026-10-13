@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
-use Gplanchat\Durable\Attribute\AsWorkflow;
 use Gplanchat\Durable\Attribute\AsQueryMethod;
 use Gplanchat\Durable\Attribute\AsSignalMethod;
+use Gplanchat\Durable\Attribute\AsWorkflow;
 use Gplanchat\Durable\Attribute\AsWorkflowMethod;
 use Gplanchat\Durable\WorkflowEnvironment;
 
