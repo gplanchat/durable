@@ -114,10 +114,11 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             if (null === $parentExecutionId) {
                 throw $timedOut; // no parent, no deadline: unreachable, kept for the types
             }
-            // The child's own journal ends here, so that it no longer counts as running. The parent
-            // reads the wording Temporal gives its parent (TemporalEventConverter::childFailed()).
+            // The run that was stopped ends here (after continue-as-new, not the first one), so that
+            // it no longer counts as running. The parent gets the wording Temporal gives its parent
+            // (TemporalEventConverter::childFailed()) from the projector.
             $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(
-                $childExecutionId,
+                ExecutionId::fromString($timedOut->childExecutionId),
                 $parentExecutionId,
                 \sprintf('Child workflow %s timed out.', $childExecutionId->toString()),
             ));

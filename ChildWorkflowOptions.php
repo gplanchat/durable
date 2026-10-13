@@ -10,9 +10,11 @@ use Gplanchat\Durable\Exception\UnsupportedByBackendException;
  * Options for {@see ExecutionContext::executeChildWorkflow()} (the equivalent of {@see \Temporal\Workflow\ChildWorkflowOptions}).
  *
  * On the journal backends (in-memory, DBAL, Illuminate, Magento), `timeouts->execution` is journaled
- * as a {@see Event\ChildWorkflowDeadline}. A child that the engine runs inline and that has not ended
- * by then fails its parent's await with "Child workflow <id> timed out." A child that runs on a
- * worker is not bound yet (#1069). `timeouts->run` and `timeouts->task` are journaled and not
+ * as a {@see Event\ChildWorkflowDeadline}. A child that the engine runs inline, and whose next timer
+ * falls after the deadline, fails its parent's await with "Child workflow <id> timed out." The
+ * deadline is checked when the child's virtual clock jumps to a timer: real activity time and the
+ * time spent in an inline grandchild are not counted. A child that runs on a worker is not bound
+ * yet (#1069). `timeouts->run` and `timeouts->task` are journaled and not
  * applied. The task timeout bounds a worker round trip, which the journal does not have.
  */
 final readonly class ChildWorkflowOptions

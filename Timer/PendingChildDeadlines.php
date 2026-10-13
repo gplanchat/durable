@@ -46,12 +46,4 @@ final class PendingChildDeadlines
 
         return $pending;
     }
-
-    /**
-     * @return list<string> the children whose deadline fell at `$now`, in the order they were scheduled
-     */
-    public static function dueAt(EventStoreInterface $journal, ExecutionId $parentExecutionId, float $now): array
-    {
-        return array_keys(array_filter(self::of($journal, $parentExecutionId), static fn(float $at): bool => $now >= $at));
-    }
 }
