@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\Event;
+use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
@@ -43,6 +46,13 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * workflow's first pass, and unchanged by a start that fails.
      */
     abstract protected function historyLengthOf(ExecutionId $executionId): int;
+
+    /**
+     * The events the backend holds for the execution, in order.
+     *
+     * @return list<Event>
+     */
+    abstract protected function journalOf(ExecutionId $executionId): array;
 
     /**
      * The start options this backend cannot honour, each with the names the refusal must carry.
@@ -188,6 +198,21 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
             self::assertSame('exec-1', $e->executionId);
         }
         self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
+    }
+
+    public function testASignalReachesTheWorkflowWhichThenCompletes(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->signal($id, 'pay', ['by' => 'card'], 'req-1');
+
+        $journal = $this->journalOf($id);
+        $signals = array_values(array_filter($journal, static fn(Event $e): bool => $e instanceof WorkflowSignalReceived));
+        self::assertCount(1, $signals);
+        self::assertSame('pay', $signals[0]->signalName());
+        self::assertSame('req-1', $signals[0]->requestId());
+        self::assertNotEmpty(array_filter($journal, static fn(Event $e): bool => $e instanceof ExecutionCompleted), 'The workflow did not receive the signal.');
     }
 
     private function call(string $operation, ExecutionId $id): mixed

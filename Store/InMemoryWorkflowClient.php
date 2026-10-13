@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -15,10 +16,11 @@ use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
- * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
+ * The in-memory implementation of {@see WorkflowClientPort}, start and signal. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
  * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
@@ -30,6 +32,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
+        private readonly EventStoreInterface $events,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -49,8 +52,14 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
         $this->assertNotEnded($executionId);
-
-        throw $this->notYet('signal');
+        // The order of DUR052, as the Symfony handler keeps it: announce, append, schedule, resume.
+        $signal = AwaitedFact::signal($requestId ??= bin2hex(random_bytes(16)));
+        if (!$signal->isJournalledIn($this->events, $executionId)) {
+            $this->dispatcher->dispatchResumeAwaiting($executionId, $signal);
+            $this->events->append(new WorkflowSignalReceived($executionId, $name, $arguments, $requestId));
+        }
+        WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
+        $this->dispatcher->dispatchResume($executionId);
     }
 
     public function query(ExecutionId $executionId, string $name, array $arguments = []): mixed
