@@ -9,8 +9,11 @@ use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 /**
  * Options for {@see ExecutionContext::executeChildWorkflow()} (the equivalent of {@see \Temporal\Workflow\ChildWorkflowOptions}).
  *
- * The extra fields are logged for observability; the inline engine does not yet enforce all
- * the timeouts on the execution side.
+ * On the journal backends (in-memory, DBAL, Illuminate, Magento), `timeouts->execution` is enforced:
+ * the parent's journal holds a {@see Event\ChildWorkflowDeadline}, and a child that has not ended by
+ * then fails its parent's await with "Child workflow <id> timed out." `timeouts->run` and
+ * `timeouts->task` are journaled and not applied. The task timeout bounds a worker round trip,
+ * which the journal does not have.
  */
 final readonly class ChildWorkflowOptions
 {
