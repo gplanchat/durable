@@ -16,6 +16,7 @@ use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionContext;
@@ -28,6 +29,7 @@ use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
+use Gplanchat\Durable\Workflow\PendingUpdate;
 use Gplanchat\Durable\WorkflowEnvironment;
 use Gplanchat\Durable\WorkflowRegistry;
 use PHPUnit\Framework\TestCase;
@@ -153,11 +155,7 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
             return $received;
         };
 
-        try {
-            $engine->start($id, $handler);
-            self::fail('the workflow must wait for its signal');
-        } catch (WorkflowSuspendedException) {
-        }
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its signal');
         $store->append(new WorkflowSignalReceived($id, 'approve', ['by' => 'alice']));
 
         self::assertSame([['by' => 'alice']], $engine->resume($id, $handler));
@@ -222,11 +220,7 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         $id = ExecutionId::fromString('scenario-resume');
         $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->activityStub(ConformanceActivities::class)->quote([]));
 
-        try {
-            $engine->start($id, $handler);
-            self::fail('the workflow must wait for its activity');
-        } catch (WorkflowSuspendedException) {
-        }
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its activity');
         $runtime->runUntilIdle(new ExecutionContext($id, new EventStoreHistorySource($store, $id), new EventStoreCommandBuffer($store, $transport, $id)));
 
         self::assertSame(['total' => 7], $engine->resume($id, $handler));
@@ -246,21 +240,46 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         $id = ExecutionId::fromString('scenario-cancel');
         $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await(static fn(): bool => false);
 
-        try {
-            $engine->start($id, $handler);
-            self::fail('the workflow must wait');
-        } catch (WorkflowSuspendedException) {
-        }
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait');
         $store->append(new WorkflowCancellationRequested($id, 'operator', null));
 
-        try {
-            $engine->resume($id, $handler);
-            self::fail('the resume must end on the cancellation');
-        } catch (WorkflowCancelledException) {
-        }
+        self::assertInstanceOf(WorkflowCancelledException::class, $this->thrownBy(static fn() => $engine->resume($id, $handler)), 'the resume must end on the cancellation');
 
         self::assertCount(1, $this->eventsOf($store, 'scenario-cancel', WorkflowExecutionCancelled::class), 'the journal records the cancellation once');
         self::assertSame([], $this->eventsOf($store, 'scenario-cancel', ExecutionCompleted::class), 'a cancelled run does not complete');
+    }
+
+    public function testAnUpdateIsHandledAndItsOutcomeReturnedToTheCaller(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $engine = new ExecutionEngine(
+            $store,
+            new ExecutionRuntime($store, new InMemoryActivityTransport(), new RegistryActivityExecutor(), 0, null, true),
+        );
+        $id = ExecutionId::fromString('scenario-update');
+        $handler = static function (WorkflowEnvironment $wf): string {
+            $approved = false;
+            $wf->onUpdate('approve', static function (array $args) use (&$approved): array {
+                $approved = true;
+
+                return ['by' => $args['by']];
+            });
+            $wf->await(static function () use (&$approved): bool {
+                return $approved;
+            });
+
+            return 'approved';
+        };
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its update');
+
+        $update = new PendingUpdate('approve', ['by' => 'alice']);
+
+        self::assertSame('approved', $engine->resume($id, $handler, null, [$update]));
+        self::assertTrue($update->handled);
+        self::assertSame(['by' => 'alice'], $update->result);
+        self::assertNull($update->failure);
+        self::assertCount(1, $this->eventsOf($store, 'scenario-update', WorkflowUpdateHandled::class), 'the journal records the update once');
     }
 
     protected function runner(
@@ -275,6 +294,20 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
             0,
             $registry ?? new WorkflowRegistry(),
         );
+    }
+
+    /**
+     * Runs the call and returns what it threw, or null when it returned.
+     */
+    protected function thrownBy(callable $call): ?\Throwable
+    {
+        try {
+            $call();
+        } catch (\Throwable $e) {
+            return $e;
+        }
+
+        return null;
     }
 
     /**
