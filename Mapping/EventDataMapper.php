@@ -182,6 +182,7 @@ final class EventDataMapper
                     (string) ($payload['failure']['message'] ?? ''),
                     (int) ($payload['failure']['code'] ?? 0),
                 ) : null,
+                \is_string($payload['updateId'] ?? null) ? $payload['updateId'] : null,
             ),
             WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($id, $payload),
             WorkflowCancellationDelivered::class => new WorkflowCancellationDelivered(

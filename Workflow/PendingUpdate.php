@@ -31,5 +31,6 @@ final class PendingUpdate
     public function __construct(
         public readonly string $name,
         public readonly array $arguments = [],
+        public readonly ?string $updateId = null,
     ) {}
 }

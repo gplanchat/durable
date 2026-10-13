@@ -707,9 +707,9 @@ final class ExecutionContext
      *
      * @param array<string, mixed> $arguments
      */
-    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure, ?string $updateId = null): void
     {
-        $this->buffer()->recordUpdateHandled($updateName, $arguments, $result, $failure);
+        $this->buffer()->recordUpdateHandled($updateName, $arguments, $result, $failure, $updateId);
     }
 
     /**
