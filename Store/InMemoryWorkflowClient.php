@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Store;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
+use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -16,7 +17,8 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5.
+ * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
 {
@@ -27,6 +29,10 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
     {
+        $refused = null === $options ? [] : self::refusedOptions($options);
+        if ([] !== $refused) {
+            throw new WorkflowStartOptionsRefused('in-memory', $refused);
+        }
         if (!$this->metadata->insertIfAbsent($executionId, $workflowType, $input)) {
             throw new WorkflowExecutionAlreadyStarted($executionId->toString());
         }
@@ -63,6 +69,22 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
         throw $this->notYet('terminate');
+    }
+
+    /**
+     * Until task 2.6 no option takes effect on this backend: each one that differs from the
+     * defaults is refused.
+     *
+     * @return list<string>
+     */
+    private static function refusedOptions(WorkflowStartOptions $options): array
+    {
+        $defaults = WorkflowStartOptions::defaults();
+
+        return array_values(array_filter(
+            ['cronSchedule', 'taskQueue', 'timeouts', 'workflowIdReusePolicy', 'searchAttributes'],
+            static fn(string $name): bool => $options->{$name} != $defaults->{$name},
+        ));
     }
 
     private function notYet(string $method): UnsupportedByBackendException

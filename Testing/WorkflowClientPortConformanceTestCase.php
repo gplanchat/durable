@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Attribute\AsWorkflowRepository;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
+use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\TaskQueue;
+use Gplanchat\Durable\WorkflowRepository;
+use Gplanchat\Durable\WorkflowStartOptions;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -58,5 +64,51 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
         self::assertSame(ConformanceClientWorkflow::TYPE, $this->catalogUnderTest()->findRun($id)?->workflowName);
         self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+    }
+
+    public function testAStartWithDefaultOptionsIsNotRefused(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, [], WorkflowStartOptions::defaults());
+
+        self::assertNotNull($this->catalogUnderTest()->findRun($id));
+    }
+
+    public function testAnOptionTheBackendCannotHonourFailsTheStartAndStartsNothing(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+
+        try {
+            $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, [], new WorkflowStartOptions(taskQueue: TaskQueue::named('other')));
+            self::fail('A refused option must fail the start.');
+        } catch (WorkflowStartOptionsRefused $e) {
+            self::assertContains('taskQueue', $e->options);
+        }
+        self::assertNull($this->catalogUnderTest()->findRun($id));
+        self::assertNull($this->startedInputOf($id));
+    }
+
+    public function testARepositoryRefusesAnExecutionOfAnotherWorkflowType(): void
+    {
+        $this->clientUnderTest()->start(ExecutionId::fromString('exec-1'), ConformanceOtherClientWorkflow::TYPE);
+
+        $this->expectException(WorkflowTypeMismatch::class);
+        $this->repository()->get(ExecutionId::fromString('exec-1'));
+    }
+
+    public function testARepositoryFindsAnExecutionOfItsWorkflowType(): void
+    {
+        $this->clientUnderTest()->start(ExecutionId::fromString('exec-1'), ConformanceClientWorkflow::TYPE);
+
+        self::assertSame('exec-1', $this->repository()->get(ExecutionId::fromString('exec-1'))->executionId()->toString());
+    }
+
+    /**
+     * @return WorkflowRepository<ConformanceClientWorkflow>
+     */
+    private function repository(): WorkflowRepository
+    {
+        return new #[AsWorkflowRepository(ConformanceClientWorkflow::class)] class ($this->catalogUnderTest()) extends WorkflowRepository {};
     }
 }
