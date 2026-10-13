@@ -126,6 +126,7 @@ final readonly class ExecutionEngine
             new DroppingCommandBuffer(),
             new UnstartedChildRunner(),
             $this->uuidGenerator,
+            readOnly: true,
         );
         (new WorkflowFiberDriver(new InertLifecycle()))->run($context, $this->createEnvironment($context), $handler);
 

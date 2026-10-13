@@ -88,6 +88,11 @@ final class ExecutionContext
          * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
          */
         private readonly array $pendingUpdates = [],
+        /**
+         * A read-only pass runs no closure the journal does not hold: it answers a query, and the
+         * live pass runs that closure later, once.
+         */
+        private readonly bool $readOnly = false,
     ) {}
 
     /**
@@ -536,6 +541,10 @@ final class ExecutionContext
         if (null !== $recorded) {
             $deferred->resolve($recorded->result);
 
+            return $deferred->awaitable();
+        }
+
+        if ($this->readOnly) {
             return $deferred->awaitable();
         }
 
