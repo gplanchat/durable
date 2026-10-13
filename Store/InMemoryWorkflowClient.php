@@ -41,7 +41,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
             throw new WorkflowStartOptionsRefused('in-memory', $refused);
         }
         if (!$this->metadata->insertIfAbsent($executionId, $workflowType, $input)
-            && !$this->restarts($executionId, $workflowType, $input, $options?->workflowIdReusePolicy ?? WorkflowIdReusePolicy::AllowDuplicateFailedOnly)
+            && !$this->restarts($executionId, $workflowType, $input, $options->workflowIdReusePolicy ?? WorkflowIdReusePolicy::AllowDuplicateFailedOnly)
         ) {
             throw new WorkflowExecutionAlreadyStarted($executionId->toString());
         }
