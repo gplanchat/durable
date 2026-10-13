@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Handler;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowTaskCompleted;
 use Gplanchat\Durable\Event\WorkflowTaskStarted;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
@@ -77,6 +78,17 @@ final readonly class ResumeWorkflowHandler
             }
 
             return;
+        }
+
+        // A parent that gave up on this child ended it in its journal (a timeout, #979): a timer or a
+        // start still queued must not run it on, and complete it after its failure.
+        foreach ($this->eventStore->readStream($id) as $event) {
+            if ($event instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $event->kind()) {
+                $this->metadataStore->markCompleted($id);
+                $this->childWorkflowParentLinkStore->unlink($id);
+
+                return;
+            }
         }
 
         // Sent before the fact it announces (DUR050, DUR052): until that fact is journalled, this

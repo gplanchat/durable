@@ -106,7 +106,8 @@ final readonly class FireWorkflowTimersHandler
             $this->resumeDispatcher->dispatchResumeAwaiting($parent, AwaitedFact::child($childId));
             $message = \sprintf('Child workflow %s timed out.', $childId);
             $journal->append(new ChildWorkflowFailed($parent, ExecutionId::fromString($childId), $message));
-            if (ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childId)) {
+            // Ended whether it started or not: a start still queued finds the end and runs nothing.
+            if (!ParentChildWorkflowCoordinator::hasEnded($this->eventStore, ExecutionId::fromString($childId))) {
                 $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(ExecutionId::fromString($childId), $parent, $message));
             }
             $failed = true;
