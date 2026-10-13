@@ -80,7 +80,7 @@ final readonly class AwaitedFact
             };
             // A child id can run again under the same parent (a retry): the outcome that settles the
             // wait is the one after the latest scheduling.
-            if (AwaitedFactKind::Child === $this->kind && $event instanceof ChildWorkflowScheduled && isset($this->ids[0]) && $event->childExecutionId()->toString() === $this->ids[0]) {
+            if (AwaitedFactKind::Child === $this->kind && $event instanceof ChildWorkflowScheduled && $event->childExecutionId()->toString() === $this->ids[0]) {
                 $missing[$this->ids[0]] = true;
             }
             unset($missing[$id ?? '']);
