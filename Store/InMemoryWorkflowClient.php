@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
+use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Failure\WorkflowFailureRebuilder;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
@@ -21,7 +28,7 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * Result polls the journal for the ending (task 2.3). The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
  * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
@@ -30,6 +37,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
+        private readonly EventStoreInterface $events,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -70,8 +78,24 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
     {
         $this->assertKnown($executionId);
+        $startedAt = microtime(true);
 
-        throw $this->notYet('result');
+        // ponytail: polls the journal; nothing else runs in this process while we wait, so it
+        // only returns early for an ending another process (a worker) appends. Without a bound
+        // it waits for as long as the execution runs.
+        while (null === ($ending = $this->ending($executionId))) {
+            if (null !== $timeout && $timeout->hasElapsedSince($startedAt, microtime(true))) {
+                throw new WorkflowResultTimeout($executionId->toString(), $timeout);
+            }
+            usleep(10_000);
+        }
+
+        return match (true) {
+            $ending instanceof ExecutionCompleted => $ending->result(),
+            $ending instanceof WorkflowExecutionCancelled => throw new WorkflowCancelledException($executionId->toString(), $ending->reason()),
+            WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $ending->kind() => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
+            default => throw WorkflowFailureRebuilder::toThrowable($ending),
+        };
     }
 
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
@@ -119,6 +143,18 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
             throw new WorkflowExecutionAlreadyEnded($executionId->toString());
         }
+    }
+
+    private function ending(ExecutionId $executionId): ExecutionCompleted|WorkflowExecutionCancelled|WorkflowExecutionFailed|null
+    {
+        $ending = null;
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof ExecutionCompleted || $event instanceof WorkflowExecutionCancelled || $event instanceof WorkflowExecutionFailed) {
+                $ending = $event;
+            }
+        }
+
+        return $ending;
     }
 
     private function notYet(string $method): UnsupportedByBackendException
