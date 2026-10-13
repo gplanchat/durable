@@ -27,8 +27,7 @@ final class TimerWakeDelayCalculator
      */
     public static function millisecondsUntilNextTimerDue(EventStoreInterface $store, ExecutionId $executionId, float $nowSeconds): ?int
     {
-        // A child's deadline wakes the parent as a timer does (#979).
-        $pending = [...array_values(PendingTimers::of($store, $executionId)), ...array_values(PendingChildDeadlines::of($store, $executionId))];
+        $pending = PendingTimers::of($store, $executionId);
 
         if ([] === $pending) {
             return null;

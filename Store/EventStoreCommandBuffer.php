@@ -146,8 +146,8 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         }
 
         // The journal has no server to end a child that outlives its execution timeout: the
-        // deadline is written here, before the child (see PendingChildDeadlines), and a wake-up of
-        // the parent reads it (#979).
+        // deadline is written here, before the child (see PendingChildDeadlines), and the inline
+        // child runner reads it (#979).
         if (null !== $options->timeouts->execution) {
             $this->append(new ChildWorkflowDeadline($this->id, $childExecutionId, $this->nowSeconds() + $options->timeouts->execution->toSeconds()));
         }

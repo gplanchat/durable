@@ -12,8 +12,8 @@ use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
 /**
- * The child deadlines a parent's journal holds whose child has no outcome yet: what the wake-up
- * of a parent that waits on a child reads, next to {@see PendingTimers}.
+ * The child deadlines a parent's journal holds whose child has no outcome yet: what the inline
+ * child runner reads (#979).
  *
  * @internal
  */

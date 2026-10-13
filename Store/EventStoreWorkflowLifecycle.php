@@ -31,7 +31,6 @@ use Gplanchat\Durable\ParentClosureReason;
 use Gplanchat\Durable\Port\DeclaredActivityFailureInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
 use Gplanchat\Durable\Port\WorkflowLifecycleInterface;
-use Gplanchat\Durable\Timer\PendingChildDeadlines;
 
 /**
  * The in-memory backend's lifecycle outcomes: journal + closing of the children, and signalling
@@ -112,8 +111,7 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
     public function onSuspended(ExecutionId $executionId, Awaitable $pending): void
     {
         // Must go through the composites: an any(activity, timer) really is waiting on a deadline.
-        // A child await has no timer in it, but a deadline written for the child wakes the parent too (#979).
-        $waitingOnTimer = AwaitableInspector::waitsOnTimer($pending) || [] !== PendingChildDeadlines::of($this->eventStore, $executionId);
+        $waitingOnTimer = AwaitableInspector::waitsOnTimer($pending);
 
         throw new WorkflowSuspendedException(
             \sprintf('Workflow %s suspended (fiber mode)', $executionId->toString()),
