@@ -10,6 +10,8 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\NexusOperationAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdAlreadyUsedException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdCompletedException;
 use Gplanchat\Durable\Exception\ChildWorkflowIdInUseException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
@@ -908,11 +910,11 @@ final class ExecutionContext
         }
 
         if (WorkflowIdReusePolicy::RejectDuplicate === $options->workflowIdReusePolicy) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s is already used in the event store.', $childExecutionId));
+            throw ChildWorkflowIdAlreadyUsedException::forId($childExecutionId->toString());
         }
 
         if ($this->historySource->hasChildExecutionCompletedSuccessfully($childExecutionId)) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s already completed successfully; reuse is not allowed with AllowDuplicateFailedOnly.', $childExecutionId));
+            throw ChildWorkflowIdCompletedException::forId($childExecutionId->toString());
         }
     }
 
