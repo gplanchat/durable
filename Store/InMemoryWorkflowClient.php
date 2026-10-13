@@ -44,8 +44,8 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * {@see WorkflowResultTimeout} at once, with {@see Duration::infinity()} when no bound was given. A
  * run that continued as new gives the result of the next run in its chain. The journal holds no
  * run timeout until task 2.6, so no ending maps to a timed out execution. The query replays the journal
- * read-only ({@see ReadOnlyReplay}). The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
- * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
+ * read-only ({@see ReadOnlyReplay}). A run that continued as new refuses a signal, an update, a
+ * cancel and a terminate with {@see UnsupportedByBackendException}. A start with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
 {
@@ -147,7 +147,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
                 $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod('in-memory', 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
                 $timeout,
             ),
-            $ending instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $ending->kind() => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
+            $ending instanceof WorkflowExecutionFailed && \in_array($ending->kind(), [WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT, WorkflowExecutionFailed::KIND_TERMINATED], true) => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
             $ending instanceof WorkflowExecutionFailed => throw WorkflowFailureRebuilder::toThrowable($ending, $this->activityFailure($executionId, $ending)),
             default => throw new WorkflowResultTimeout($executionId->toString(), $timeout ?? Duration::infinity()),
         };
@@ -285,10 +285,5 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
             throw UnsupportedByBackendException::forMethod('in-memory', $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
         }
-    }
-
-    private function notYet(string $method): UnsupportedByBackendException
-    {
-        return UnsupportedByBackendException::forMethod('in-memory', $method, 'not implemented yet, see the workflow-repository change');
     }
 }

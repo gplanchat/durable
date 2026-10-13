@@ -330,6 +330,21 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
     }
 
+    public function testAResultOnAnExecutionTerminatedThroughTheClientThrowsTerminatedWithTheReason(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->terminate($id, 'stop');
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A terminated execution must throw.');
+        } catch (WorkflowTerminatedException $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame('stop', $e->reason);
+        }
+    }
+
     public function testAResultTimesOutOnARunningExecutionAndLeavesItRunning(): void
     {
         $id = ExecutionId::fromString('exec-1');
