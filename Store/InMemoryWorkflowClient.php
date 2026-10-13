@@ -98,9 +98,11 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         $defaults = WorkflowStartOptions::defaults();
 
-        return array_values(array_filter(
-            ['cronSchedule', 'taskQueue', 'timeouts', 'workflowIdReusePolicy', 'searchAttributes'],
-            static fn(string $name): bool => $options->{$name} != $defaults->{$name},
+        // Every public property: one added to WorkflowStartOptions later is refused, not accepted.
+        return array_keys(array_filter(
+            get_object_vars($options),
+            static fn(mixed $value, string $name): bool => $value != $defaults->{$name},
+            \ARRAY_FILTER_USE_BOTH,
         ));
     }
 

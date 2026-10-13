@@ -14,7 +14,6 @@ use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
-use Gplanchat\Durable\TaskQueue;
 use Gplanchat\Durable\WorkflowStartOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -40,6 +39,20 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     abstract protected function startedInputOf(ExecutionId $executionId): ?array;
 
     /**
+     * How many events the backend holds for the execution: above zero once a start has run the
+     * workflow's first pass, and unchanged by a start that fails.
+     */
+    abstract protected function historyLengthOf(ExecutionId $executionId): int;
+
+    /**
+     * The start options this backend cannot honour, each with the names the refusal must carry.
+     * A backend that honours an option leaves it out.
+     *
+     * @return iterable<string, array{WorkflowStartOptions, list<string>}>
+     */
+    abstract public static function refusedStartOptions(): iterable;
+
+    /**
      * Brings an execution started through the client to the given outcome.
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
@@ -56,12 +69,14 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertSame(ConformanceClientWorkflow::TYPE, $run->workflowName);
         self::assertSame(WorkflowRunStatus::Running, $run->status);
         self::assertSame(['tag' => 'a'], $this->startedInputOf($id));
+        self::assertGreaterThan(0, $this->historyLengthOf($id), 'The start only wrote a row: nothing ran the workflow.');
     }
 
     public function testASecondStartFailsAndTheFirstExecutionKeepsItsTypeAndInput(): void
     {
         $id = ExecutionId::fromString('exec-1');
         $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
+        $written = $this->historyLengthOf($id);
 
         try {
             $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second']);
@@ -71,6 +86,7 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
         self::assertSame(ConformanceClientWorkflow::TYPE, $this->catalogUnderTest()->findRun($id)?->workflowName);
         self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+        self::assertSame($written, $this->historyLengthOf($id));
     }
 
     public function testAStartWithDefaultOptionsIsNotRefused(): void
@@ -82,18 +98,23 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertNotNull($this->catalogUnderTest()->findRun($id));
     }
 
-    public function testAnOptionTheBackendCannotHonourFailsTheStartAndStartsNothing(): void
+    /**
+     * @param list<string> $names
+     */
+    #[DataProvider('refusedStartOptions')]
+    public function testAnOptionTheBackendCannotHonourFailsTheStartAndStartsNothing(WorkflowStartOptions $options, array $names): void
     {
         $id = ExecutionId::fromString('exec-1');
 
         try {
-            $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, [], new WorkflowStartOptions(taskQueue: TaskQueue::named('other')));
+            $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, [], $options);
             self::fail('A refused option must fail the start.');
         } catch (WorkflowStartOptionsRefused $e) {
-            self::assertContains('taskQueue', $e->options);
+            self::assertSame($names, $e->options);
         }
         self::assertNull($this->catalogUnderTest()->findRun($id));
         self::assertNull($this->startedInputOf($id));
+        self::assertSame(0, $this->historyLengthOf($id));
     }
 
     public function testARepositoryRefusesAnExecutionOfAnotherWorkflowType(): void
@@ -141,12 +162,24 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
     }
 
-    #[DataProvider('actingOperations')]
-    public function testAnEndedExecutionRefusesWhatActsOnIt(string $operation): void
+    /**
+     * @return iterable<string, array{string, WorkflowRunStatus}>
+     */
+    public static function endedExecutions(): iterable
+    {
+        foreach (self::actingOperations() as $operation => [$name]) {
+            foreach ([WorkflowRunStatus::Completed, WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled] as $outcome) {
+                yield $operation . ' on ' . $outcome->value => [$name, $outcome];
+            }
+        }
+    }
+
+    #[DataProvider('endedExecutions')]
+    public function testAnEndedExecutionRefusesWhatActsOnIt(string $operation, WorkflowRunStatus $outcome): void
     {
         $id = ExecutionId::fromString('exec-1');
         $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
-        $this->endRun($id, WorkflowRunStatus::Completed);
+        $this->endRun($id, $outcome);
 
         try {
             $this->call($operation, $id);
@@ -154,7 +187,7 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         } catch (WorkflowExecutionAlreadyEnded $e) {
             self::assertSame('exec-1', $e->executionId);
         }
-        self::assertSame(WorkflowRunStatus::Completed, $this->catalogUnderTest()->findRun($id)?->status);
+        self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     private function call(string $operation, ExecutionId $id): mixed
