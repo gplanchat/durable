@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Exception\DurableActivityFailedException;
+use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -19,6 +23,7 @@ use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Failure\FailureEnvelope;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
@@ -69,7 +74,10 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * Writes the ending event into the journal the way the backend does, so that the catalogue
      * and the journal both tell how the execution ended.
      */
-    abstract protected function appendEnding(Event $ending): void;
+    protected function appendEnding(Event $ending): void
+    {
+        self::fail('This backend does not override appendEnding(): the result cases cannot end an execution.');
+    }
 
     public function testAStartReturnsTheIdAndTheExecutionIsFoundRunning(): void
     {
@@ -275,7 +283,7 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     {
         $id = ExecutionId::fromString('exec-1');
         $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
-        $timeout = Duration::milliseconds(50);
+        $timeout = Duration::seconds(1);
 
         try {
             $this->clientUnderTest()->result($id, $timeout);
@@ -285,6 +293,50 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
             self::assertSame($timeout, $e->timeout);
         }
         self::assertSame(WorkflowRunStatus::Running, $this->catalogUnderTest()->findRun($id)?->status);
+    }
+
+    public function testAResultWithoutABoundOnARunningExecutionTimesOutAtOnceWithAnInfiniteBound(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        try {
+            $this->clientUnderTest()->result($id);
+            self::fail('A running execution cannot end during the call.');
+        } catch (WorkflowResultTimeout $e) {
+            self::assertTrue($e->timeout->isInfinite());
+        }
+    }
+
+    public function testAResultFollowsAContinueAsNewChainToTheLastRun(): void
+    {
+        $first = ExecutionId::fromString('exec-1');
+        $next = ExecutionId::fromString('exec-2');
+        $this->clientUnderTest()->start($first, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->start($next, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($first, ConformanceClientWorkflow::TYPE, [], [], $next));
+        $this->appendEnding(new ExecutionCompleted($next, 'last'));
+
+        self::assertSame('last', $this->clientUnderTest()->result($first, Duration::seconds(1)));
+    }
+
+    public function testAResultRethrowsTheActivityFailureWithItsCause(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $failed = ActivityFailed::fromEnvelope($id, 'act-1', FailureEnvelope::fromThrowable(new \DomainException('declined')), 'charge', 1);
+        $cause = DurableActivityFailedException::fromActivityFailed($failed);
+        $this->appendEnding($failed);
+        $this->appendEnding(WorkflowExecutionFailed::unhandledActivityFailure($id, 'act-1', 'charge', $cause));
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A failed execution must throw its failure.');
+        } catch (DurableWorkflowAlgorithmFailureException $e) {
+            self::assertSame('Workflow did not handle activity failure: ' . $cause->getMessage(), $e->getMessage());
+            self::assertInstanceOf(DurableActivityFailedException::class, $e->getPrevious());
+            self::assertSame('act-1', $e->getPrevious()->activityId());
+        }
     }
 
     private function call(string $operation, ExecutionId $id): mixed
