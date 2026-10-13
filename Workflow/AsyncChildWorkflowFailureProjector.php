@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Workflow;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\ChildWorkflowTimedOutException;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
@@ -31,6 +32,11 @@ final class AsyncChildWorkflowFailureProjector
         // Temporal gives the parent the text and nothing else, whichever path timed the child out (#979).
         if ($failure instanceof ChildWorkflowTimedOutException) {
             return new ChildWorkflowFailed($parentExecutionId, $childExecutionId, \sprintf('Child workflow %s timed out.', $childExecutionId->toString()));
+        }
+
+        // Likewise for a terminated child: the child's own journal keeps the `terminated` kind (#971).
+        if ($failure instanceof WorkflowTerminatedException) {
+            return new ChildWorkflowFailed($parentExecutionId, $childExecutionId, \sprintf('Child workflow %s was terminated.', $childExecutionId->toString()));
         }
 
         $wf = self::lastWorkflowExecutionFailed($store, $failedRun ?? $childExecutionId);

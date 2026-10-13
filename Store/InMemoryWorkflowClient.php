@@ -86,7 +86,8 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
     {
         $this->assertOnTheLiveRun($executionId, 'cancel');
-        // Idempotent, as on Temporal: a request already journalled for this run is not repeated.
+        // Idempotent, as Temporal is expected to be (unverified, probe 0.2): a request already
+        // journalled for this run is not repeated.
         foreach ($this->events->readStream($executionId) as $event) {
             if ($event instanceof WorkflowCancellationRequested) {
                 return;
@@ -99,15 +100,51 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
+        // A retry after a dispatch failed: the failure is journalled, the tail is not done.
+        $half = $this->halfTerminated($executionId);
+        if (null !== $half) {
+            $this->finishTermination($executionId, $half);
+
+            return;
+        }
         $this->assertOnTheLiveRun($executionId, 'terminate');
         // A pass that was running no longer writes (DUR053): it cannot complete a terminated run.
-        PassEventStore::open($this->events, $executionId)->append(WorkflowExecutionFailed::terminated($executionId, $reason));
-        // Marked completed after the failure: a resume already queued then takes the handler's
-        // "completed" path and runs no workflow code.
-        $this->metadata->markCompleted($executionId);
-        // What every ending runs: the run's own children, then the parent that waits for it.
+        $journal = PassEventStore::open($this->events, $executionId);
+        // A pass may have ended the run between the check and the claim.
+        $this->assertOnTheLiveRun($executionId, 'terminate');
+        $journal->append(WorkflowExecutionFailed::terminated($executionId, $reason));
+        $this->finishTermination($executionId, $reason);
+    }
+
+    /**
+     * What every ending runs, in the worker's order and idempotent: the run's own children, the
+     * parent that waits for it, and the row marked completed last, so that a retry repairs an
+     * ending that stopped half way.
+     */
+    private function finishTermination(ExecutionId $executionId, string $reason): void
+    {
         $this->coordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
         $this->linkedChildren->finalize($executionId, null, new WorkflowTerminatedException($executionId->toString(), $reason));
+        // A resume already queued then takes the handler's "completed" path and runs no workflow code.
+        $this->metadata->markCompleted($executionId);
+    }
+
+    /**
+     * The reason of a termination whose row is not marked completed yet; null otherwise.
+     */
+    private function halfTerminated(ExecutionId $executionId): ?string
+    {
+        $last = null;
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof WorkflowExecutionFailed) {
+                $last = $event;
+            }
+        }
+        if (WorkflowExecutionFailed::KIND_TERMINATED !== $last?->kind() || true === ($this->metadata->get($executionId)['completed'] ?? false)) {
+            return null;
+        }
+
+        return $last->failureMessage();
     }
 
     /**
