@@ -5,10 +5,18 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\Event;
+use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
+use Gplanchat\Durable\Exception\WorkflowFailedException;
+use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
@@ -56,6 +64,12 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * Brings an execution started through the client to the given outcome.
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
+
+    /**
+     * Writes the ending event into the journal the way the backend does, so that the catalogue
+     * and the journal both tell how the execution ended.
+     */
+    abstract protected function appendEnding(Event $ending): void;
 
     public function testAStartReturnsTheIdAndTheExecutionIsFoundRunning(): void
     {
@@ -188,6 +202,89 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
             self::assertSame('exec-1', $e->executionId);
         }
         self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
+    }
+
+    public function testAResultReturnsWhatACompletedExecutionReturned(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new ExecutionCompleted($id, ['done' => true]));
+
+        self::assertSame(['done' => true], $this->clientUnderTest()->result($id, Duration::seconds(1)));
+    }
+
+    public function testAResultRethrowsTheFailureOfAFailedExecution(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(WorkflowExecutionFailed::workflowHandlerFailure($id, new \DomainException('card refused', 7)));
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A failed execution must throw its failure.');
+        } catch (\DomainException $e) {
+            self::assertSame('card refused', $e->getMessage());
+            self::assertSame(7, $e->getCode());
+        }
+    }
+
+    public function testAResultNamesAFailureItCannotRebuild(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(WorkflowExecutionFailed::fromStoredPayload($id, [
+            'kind' => WorkflowExecutionFailed::KIND_WORKFLOW_HANDLER,
+            'failureClass' => 'Acme\\Gone\\NoSuchFailure',
+            'failureMessage' => 'card refused',
+        ]));
+
+        $this->expectException(WorkflowFailedException::class);
+        $this->clientUnderTest()->result($id, Duration::seconds(1));
+    }
+
+    public function testAResultThrowsCancelledForACancelledExecution(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowExecutionCancelled($id, 'stopped by an operator'));
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A cancelled execution must throw.');
+        } catch (WorkflowCancelledException $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame('stopped by an operator', $e->reason);
+        }
+    }
+
+    public function testAResultThrowsTerminatedForATerminatedExecution(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(WorkflowExecutionFailed::terminatedByParent($id, ExecutionId::fromString('parent-1')));
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A terminated execution must throw.');
+        } catch (WorkflowTerminatedException $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
+    }
+
+    public function testAResultTimesOutOnARunningExecutionAndLeavesItRunning(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $timeout = Duration::milliseconds(50);
+
+        try {
+            $this->clientUnderTest()->result($id, $timeout);
+            self::fail('A running execution must time the wait out.');
+        } catch (WorkflowResultTimeout $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame($timeout, $e->timeout);
+        }
+        self::assertSame(WorkflowRunStatus::Running, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     private function call(string $operation, ExecutionId $id): mixed
