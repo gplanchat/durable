@@ -128,7 +128,7 @@ final readonly class ExecutionEngine
             $this->uuidGenerator,
             readOnly: true,
         );
-        (new WorkflowFiberDriver(new InertLifecycle()))->run($context, $this->createEnvironment($context), $handler);
+        (new WorkflowFiberDriver(new InertLifecycle($this->eventStore)))->run($context, $this->createEnvironment($context), $handler);
 
         return $context;
     }
