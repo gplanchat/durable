@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Handler;
 
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\SupersededPassException;
 use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ExecutionRuntime;
+use Gplanchat\Durable\ParentChildWorkflowCoordinator;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowTimerDispatcher;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
@@ -16,6 +19,7 @@ use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\PassEventStore;
 use Gplanchat\Durable\Store\WorkflowTaskJournal;
+use Gplanchat\Durable\Timer\PendingChildDeadlines;
 use Gplanchat\Durable\Timer\PendingTimers;
 use Gplanchat\Durable\Timer\TimerWakeDelayCalculator;
 use Gplanchat\Durable\Transport\AwaitedFact;
@@ -60,12 +64,13 @@ final readonly class FireWorkflowTimersHandler
 
         try {
             $this->runtime->checkTimers($context, $journal);
+            $timedOut = $this->failChildrenPastTheirDeadline($id, $journal);
         } catch (SupersededPassException) {
             return; // the newer pass owns the execution
         }
         $after = $this->countTimerCompleted($id);
 
-        if ($after > $before) {
+        if ($after > $before || $timedOut) {
             WorkflowTaskJournal::schedule($this->eventStore, $this->resumeDispatcher, $id);
             $this->resumeDispatcher->dispatchResume($id);
 
@@ -84,6 +89,30 @@ final readonly class FireWorkflowTimersHandler
         if (null !== $ms) {
             $this->timerDispatcher->dispatchTimerFire(ExecutionId::fromString($message->executionId), max(0, $ms));
         }
+    }
+
+    /**
+     * A child that has no outcome when its deadline falls fails its parent's await with the text
+     * Temporal gives it, and ends in its own journal so that it no longer counts as running (#979).
+     * A child that reported first is not in the pending list: its outcome stands.
+     *
+     * @return bool whether a child was failed
+     */
+    private function failChildrenPastTheirDeadline(ExecutionId $parent, EventStoreInterface $journal): bool
+    {
+        $failed = false;
+        foreach (PendingChildDeadlines::dueAt($this->eventStore, $parent, $this->runtime->nowSeconds()) as $childId) {
+            // DUR052 §3: announced before the outcome is appended, as a child's own report is.
+            $this->resumeDispatcher->dispatchResumeAwaiting($parent, AwaitedFact::child($childId));
+            $message = \sprintf('Child workflow %s timed out.', $childId);
+            $journal->append(new ChildWorkflowFailed($parent, ExecutionId::fromString($childId), $message));
+            if (ParentChildWorkflowCoordinator::isChildRunActive($this->eventStore, $childId)) {
+                $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(ExecutionId::fromString($childId), $parent, $message));
+            }
+            $failed = true;
+        }
+
+        return $failed;
     }
 
     private function countTimerCompleted(ExecutionId $executionId): int
