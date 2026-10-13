@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
+use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
@@ -16,8 +17,6 @@ use PHPUnit\Framework\TestCase;
  */
 abstract class WorkflowClientPortConformanceTestCase extends TestCase
 {
-    protected const TYPE = 'durable.conformance.client';
-
     abstract protected function clientUnderTest(): WorkflowClientPort;
 
     /**
@@ -36,13 +35,28 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     {
         $id = ExecutionId::fromString('exec-1');
 
-        $returned = $this->clientUnderTest()->start($id, self::TYPE, ['tag' => 'a']);
+        $returned = $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'a']);
 
         self::assertTrue($id->equals($returned));
         $run = $this->catalogUnderTest()->findRun($id);
         self::assertNotNull($run);
-        self::assertSame(self::TYPE, $run->workflowName);
+        self::assertSame(ConformanceClientWorkflow::TYPE, $run->workflowName);
         self::assertSame(WorkflowRunStatus::Running, $run->status);
         self::assertSame(['tag' => 'a'], $this->startedInputOf($id));
+    }
+
+    public function testASecondStartFailsAndTheFirstExecutionKeepsItsTypeAndInput(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
+
+        try {
+            $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second']);
+            self::fail('A second start must fail.');
+        } catch (WorkflowExecutionAlreadyStarted $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
+        self::assertSame(ConformanceClientWorkflow::TYPE, $this->catalogUnderTest()->findRun($id)?->workflowName);
+        self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
     }
 }
