@@ -10,6 +10,7 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
@@ -158,6 +159,12 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
                 'workflowId' => $options->workflowId,
             ] + $options->toSchedulingMetadata(),
         ));
+
+        // The journal has no server to end a child that outlives its execution timeout: the
+        // deadline is written here, and a wake-up of the parent reads it (#979).
+        if (null !== $options->timeouts->execution) {
+            $this->append(new ChildWorkflowDeadline($this->id, $childExecutionId, $this->nowSeconds() + $options->timeouts->execution->toSeconds()));
+        }
     }
 
     public function completeWorkflow(mixed $result): void
