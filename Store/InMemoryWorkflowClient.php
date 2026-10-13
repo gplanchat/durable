@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ActivityFailed;
+use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
+use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
+use Gplanchat\Durable\Failure\WorkflowFailureRebuilder;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\Query\ReadOnlyReplay;
 use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\WorkflowStartOptions;
 
@@ -25,7 +35,12 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * The in-memory implementation of {@see WorkflowClientPort}, start, signal and update. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * Result reads the journal once (task 2.3): nothing else runs in this process during the call, so an
+ * ending can come only from an earlier append. An execution still open throws
+ * {@see WorkflowResultTimeout} at once, with {@see Duration::infinity()} when no bound was given. A
+ * run that continued as new gives the result of the next run in its chain. The journal holds no
+ * run timeout until task 2.6, so no ending maps to a timed out execution. The query replays the journal
+ * read-only ({@see ReadOnlyReplay}). The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
  * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
@@ -35,6 +50,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
         private readonly EventStoreInterface $events,
+        private readonly ReadOnlyReplay $queries,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -71,7 +87,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         $this->assertKnown($executionId);
 
-        throw $this->notYet('query');
+        return $this->queries->query($executionId, $name, $arguments);
     }
 
     /**
@@ -116,7 +132,19 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         $this->assertKnown($executionId);
 
-        throw $this->notYet('result');
+        $ending = $this->ending($executionId);
+
+        return match (true) {
+            $ending instanceof ExecutionCompleted => $ending->result(),
+            $ending instanceof WorkflowExecutionCancelled => throw new WorkflowCancelledException($executionId->toString(), $ending->reason()),
+            $ending instanceof WorkflowContinuedAsNew => $this->result(
+                $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod('in-memory', 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
+                $timeout,
+            ),
+            $ending instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $ending->kind() => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
+            $ending instanceof WorkflowExecutionFailed => throw WorkflowFailureRebuilder::toThrowable($ending, $this->activityFailure($executionId, $ending)),
+            default => throw new WorkflowResultTimeout($executionId->toString(), $timeout ?? Duration::infinity()),
+        };
     }
 
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
@@ -164,6 +192,31 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
             throw new WorkflowExecutionAlreadyEnded($executionId->toString());
         }
+    }
+
+    private function ending(ExecutionId $executionId): ExecutionCompleted|WorkflowExecutionCancelled|WorkflowExecutionFailed|WorkflowContinuedAsNew|null
+    {
+        $ending = null;
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof ExecutionCompleted || $event instanceof WorkflowExecutionCancelled || $event instanceof WorkflowExecutionFailed || $event instanceof WorkflowContinuedAsNew) {
+                $ending = $event;
+            }
+        }
+
+        return $ending;
+    }
+
+    private function activityFailure(ExecutionId $executionId, WorkflowExecutionFailed $failure): ?ActivityFailed
+    {
+        $activityId = $failure->context()['activityId'] ?? null;
+        $found = null;
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof ActivityFailed && $event->activityId() === $activityId) {
+                $found = $event;
+            }
+        }
+
+        return $found;
     }
 
     /**
