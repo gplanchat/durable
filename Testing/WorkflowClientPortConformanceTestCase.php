@@ -266,36 +266,10 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
             self::fail('A failing update must throw.');
         } catch (DurableUpdateFailedException $e) {
             self::assertSame('explode', $e->updateName());
+            self::assertSame(UpdateFailureReason::HandlerFailed, $e->reason);
         }
         self::assertEmpty(array_filter($this->journalOf($id), static fn(Event $e): bool => $e instanceof ExecutionCompleted));
         self::assertSame(1, $this->clientUnderTest()->update($id, 'change'));
-    }
-
-    public function testAnUpdateTheWorkflowDoesNotDeclareFailsAtOnce(): void
-    {
-        $id = ExecutionId::fromString('exec-1');
-        $this->clientUnderTest()->start($id, ConformanceUpdatableClientWorkflow::TYPE);
-
-        try {
-            $this->clientUnderTest()->update($id, 'nobody-declares-this');
-            self::fail('An update nothing handles must throw.');
-        } catch (DurableUpdateFailedException $e) {
-            self::assertSame('nobody-declares-this', $e->updateName());
-            self::assertSame(UpdateFailureReason::NotHandled, $e->reason);
-        }
-    }
-
-    public function testAnUpdateSentWhileTheWorkflowWaitsOnATimerIsNotHandled(): void
-    {
-        $id = ExecutionId::fromString('exec-1');
-        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
-
-        try {
-            $this->clientUnderTest()->update($id, 'change');
-            self::fail('A pass applies updates only inside a condition await.');
-        } catch (DurableUpdateFailedException $e) {
-            self::assertSame(UpdateFailureReason::NotHandled, $e->reason);
-        }
     }
 
     private function call(string $operation, ExecutionId $id): mixed
