@@ -6,11 +6,14 @@ namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowUpdateNotHandled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
@@ -20,7 +23,7 @@ use Gplanchat\Durable\Transport\AwaitedFact;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
- * The in-memory implementation of {@see WorkflowClientPort}, start and signal. A start inserts
+ * The in-memory implementation of {@see WorkflowClientPort}, start, signal and update. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
  * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
@@ -72,8 +75,30 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
         $this->assertNotEnded($executionId);
+        $updateId ??= bin2hex(random_bytes(16));
+        // The same id again is the same update: the first outcome answers, nothing runs twice.
+        $handled = $this->handledUpdate($executionId, $updateId);
+        if (null === $handled) {
+            WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
+            $this->dispatcher->dispatchResume($executionId, [['name' => $name, 'arguments' => $arguments, 'updateId' => $updateId]]);
+            $handled = $this->handledUpdate($executionId, $updateId) ?? throw new WorkflowUpdateNotHandled($executionId->toString(), $name);
+        }
+        if (null !== $handled->failure()) {
+            throw new DurableUpdateFailedException($name, $handled->failure()->message);
+        }
 
-        throw $this->notYet('update');
+        return $handled->result();
+    }
+
+    private function handledUpdate(ExecutionId $executionId, string $updateId): ?WorkflowUpdateHandled
+    {
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof WorkflowUpdateHandled && $event->updateId() === $updateId) {
+                return $event;
+            }
+        }
+
+        return null;
     }
 
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
