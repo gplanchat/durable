@@ -14,7 +14,8 @@ final class WorkflowResultTimeout extends \RuntimeException implements Exception
     public function __construct(
         public readonly string $executionId,
         public readonly Duration $timeout,
+        ?\Throwable $previous = null,
     ) {
-        parent::__construct('The workflow execution did not finish within the timeout given to the wait.');
+        parent::__construct('The workflow execution did not finish within the timeout given to the wait.', 0, $previous);
     }
 }
