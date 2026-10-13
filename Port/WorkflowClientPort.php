@@ -12,6 +12,7 @@ use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowTerminatedException;
+use Gplanchat\Durable\Exception\WorkflowTimedOutException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\WorkflowStartOptions;
 
@@ -78,6 +79,7 @@ interface WorkflowClientPort
      * @throws WorkflowResultTimeout
      * @throws WorkflowCancelledException
      * @throws WorkflowTerminatedException
+     * @throws WorkflowTimedOutException   when the execution or run timeout elapsed
      */
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed;
 

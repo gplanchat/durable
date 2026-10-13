@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Exception;
 
 /**
- * A start under an execution id that the backend refuses to start again. Whether an id may start
- * again after its execution ended is the id reuse policy's call, not this exception's. The
- * execution that started first is unchanged.
+ * A start under an execution id that cannot start again. The id reuse policy decides whether an
+ * ended execution's id can start again. The execution that started first is unchanged.
  */
 final class WorkflowExecutionAlreadyStarted extends \RuntimeException implements ExceptionInterface
 {
