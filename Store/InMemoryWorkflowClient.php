@@ -15,13 +15,14 @@ use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
+use Gplanchat\Durable\Query\ReadOnlyReplay;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
  * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * The query replays the journal read-only ({@see ReadOnlyReplay}). The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
  * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
@@ -30,6 +31,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
+        private readonly ReadOnlyReplay $queries,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -57,7 +59,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         $this->assertKnown($executionId);
 
-        throw $this->notYet('query');
+        return $this->queries->query($executionId, $name, $arguments);
     }
 
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
