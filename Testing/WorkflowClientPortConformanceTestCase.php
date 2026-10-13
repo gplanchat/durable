@@ -25,6 +25,7 @@ use Gplanchat\Durable\Exception\WorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowQueryNotFound;
 use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowStubMethodNotDeclared;
 use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
@@ -286,6 +287,81 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         $this->clientUnderTest()->start(ExecutionId::fromString('exec-1'), ConformanceClientWorkflow::TYPE);
 
         self::assertSame('exec-1', $this->repository()->get(ExecutionId::fromString('exec-1'))->executionId()->toString());
+    }
+
+    public function testAStubStartsAnExecutionWithItsInputByNameAndReturnsAStubBoundToIt(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+
+        $started = $this->repository()->create($id)->start(tag: 'first');
+
+        self::assertSame('exec-1', $started->executionId()->toString());
+        self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+        self::assertSame('exec-1', $this->repository()->get($id)->executionId()->toString());
+    }
+
+    public function testAStubStartsOnlyOnce(): void
+    {
+        $started = $this->repository()->create(ExecutionId::fromString('exec-1'))->start();
+
+        $this->expectException(WorkflowExecutionAlreadyStarted::class);
+        $started->start();
+    }
+
+    public function testAStubFromGetCannotStartAgain(): void
+    {
+        $this->clientUnderTest()->start(ExecutionId::fromString('exec-1'), ConformanceClientWorkflow::TYPE);
+
+        $this->expectException(WorkflowExecutionAlreadyStarted::class);
+        $this->repository()->get(ExecutionId::fromString('exec-1'))->start();
+    }
+
+    public function testAStubSendsSignalsAndAnswersQueriesThroughTheMethodsOfTheWorkflow(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $stub = $this->repository()->create(ExecutionId::fromString('exec-1'))->start();
+
+        self::assertSame('waiting', $stub->status()); // @phpstan-ignore method.notFound (typed by the PHPStan extension, a follow-up)
+        $stub->pay(); // @phpstan-ignore method.notFound (typed by the PHPStan extension, a follow-up)
+        self::assertSame('paid', $stub->status()); // @phpstan-ignore method.notFound (typed by the PHPStan extension, a follow-up)
+    }
+
+    public function testAStubRefusesAMethodTheWorkflowDoesNotDeclareAsASignalQueryOrUpdate(): void
+    {
+        $stub = $this->repository()->create(ExecutionId::fromString('exec-1'))->start();
+
+        try {
+            $stub->run(); // @phpstan-ignore method.notFound (typed by the PHPStan extension, a follow-up)
+            self::fail('The entry method is not reachable through the stub.');
+        } catch (WorkflowStubMethodNotDeclared $e) {
+            self::assertSame(ConformanceClientWorkflow::class, $e->workflowClass);
+            self::assertSame('run', $e->method);
+        }
+    }
+
+    public function testAStubTerminatesAnExecutionAndItsResultThrowsTerminated(): void
+    {
+        $stub = $this->repository()->create(ExecutionId::fromString('exec-1'))->start();
+
+        $stub->terminate('stop');
+
+        $this->expectException(WorkflowTerminatedException::class);
+        $stub->result(Duration::seconds(1));
+    }
+
+    public function testAStubCancelsAWaitingExecution(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $id = ExecutionId::fromString('exec-1');
+        $this->repository()->create($id)->start()->cancel();
+
+        self::assertSame(WorkflowRunStatus::Cancelled, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     /**
@@ -681,6 +757,6 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
 
     private function repository(): ConformanceClientWorkflowRepository
     {
-        return new ConformanceClientWorkflowRepository($this->catalogUnderTest());
+        return new ConformanceClientWorkflowRepository($this->catalogUnderTest(), $this->clientUnderTest());
     }
 }
