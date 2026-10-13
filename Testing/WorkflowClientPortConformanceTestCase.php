@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Testing;
 
-use Gplanchat\Durable\Attribute\AsWorkflowRepository;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -16,7 +15,6 @@ use Gplanchat\Durable\Observation\WorkflowRunStatus;
 use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\TaskQueue;
-use Gplanchat\Durable\WorkflowRepository;
 use Gplanchat\Durable\WorkflowStartOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -131,14 +129,21 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         $this->call($operation, ExecutionId::fromString('exec-nobody'));
     }
 
-    #[DataProvider('operations')]
+    /**
+     * A query and a result read an ended execution; the rest act on it.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function actingOperations(): iterable
+    {
+        foreach (['signal', 'update', 'cancel', 'terminate'] as $operation) {
+            yield $operation => [$operation];
+        }
+    }
+
+    #[DataProvider('actingOperations')]
     public function testAnEndedExecutionRefusesWhatActsOnIt(string $operation): void
     {
-        if (!\in_array($operation, ['signal', 'update', 'cancel', 'terminate'], true)) {
-            $this->addToAssertionCount(1); // A query and a result read an ended execution.
-
-            return;
-        }
         $id = ExecutionId::fromString('exec-1');
         $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
         $this->endRun($id, WorkflowRunStatus::Completed);
@@ -166,11 +171,8 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         };
     }
 
-    /**
-     * @return WorkflowRepository<ConformanceClientWorkflow>
-     */
-    private function repository(): WorkflowRepository
+    private function repository(): ConformanceClientWorkflowRepository
     {
-        return new #[AsWorkflowRepository(ConformanceClientWorkflow::class)] class ($this->catalogUnderTest()) extends WorkflowRepository {};
+        return new ConformanceClientWorkflowRepository($this->catalogUnderTest());
     }
 }
