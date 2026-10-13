@@ -10,8 +10,8 @@ namespace Gplanchat\Durable\Exception;
  */
 final class WorkflowExecutionAlreadyEnded extends \RuntimeException implements ExceptionInterface
 {
-    public function __construct(public readonly string $executionId)
+    public function __construct(public readonly string $executionId, ?\Throwable $previous = null)
     {
-        parent::__construct('The workflow execution has already ended.');
+        parent::__construct('The workflow execution has already ended.', 0, $previous);
     }
 }
