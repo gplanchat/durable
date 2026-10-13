@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Failure;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\DeadlineExceededException;
+use Gplanchat\Durable\Exception\DurableActivityFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\WorkflowFailedException;
 
 /**
  * Reads back, from the journal, the exception a failed execution raised, as the Temporal client's
- * `pollForCompletion()` raises it from the server's history. The journal keeps the class, message
- * and code of the failure, not the activity's own exception: an activity failure comes back
- * wrapped in {@see DurableWorkflowAlgorithmFailureException} around a {@see WorkflowFailedException}.
+ * `pollForCompletion()` raises it from the server's history. An unhandled activity failure comes
+ * back as {@see DurableWorkflowAlgorithmFailureException} around the activity's own failure,
+ * rebuilt from the journal's {@see ActivityFailed} when it is given, else around a
+ * {@see WorkflowFailedException}. A Nexus operation failure is not rebuilt yet: the journal event
+ * keeps no envelope for it, so it comes back as {@see WorkflowFailedException}.
  * A failure whose class does not load here, or does not take `(message, code)`, comes back as
  * {@see WorkflowFailedException}.
  *
@@ -22,23 +26,23 @@ use Gplanchat\Durable\Exception\WorkflowFailedException;
  */
 final class WorkflowFailureRebuilder
 {
-    /** The prefix {@see \Gplanchat\Durable\Store\EventStoreWorkflowLifecycle::onFailed()} gives each. */
-    private const ACTIVITY_KINDS = [
-        WorkflowExecutionFailed::KIND_UNHANDLED_CATASTROPHIC_ACTIVITY => 'Workflow did not handle catastrophic activity failure: ',
-        WorkflowExecutionFailed::KIND_UNHANDLED_ACTIVITY => 'Workflow did not handle activity failure: ',
-        WorkflowExecutionFailed::KIND_UNHANDLED_ACTIVITY_SUPERSEDED => 'Workflow did not handle superseded activity: ',
-        WorkflowExecutionFailed::KIND_UNHANDLED_DECLARED_ACTIVITY => 'Workflow did not handle declared activity failure: ',
-    ];
-
     private function __construct() {}
 
-    public static function toThrowable(WorkflowExecutionFailed $failure): \Throwable
+    /**
+     * @param ActivityFailed|null $activityFailure the journal's event for the activity an unhandled
+     *                                             activity failure names, when the journal holds it
+     */
+    public static function toThrowable(WorkflowExecutionFailed $failure, ?ActivityFailed $activityFailure = null): \Throwable
     {
         $executionId = $failure->executionId()->toString();
         $unrebuilt = new WorkflowFailedException($executionId, $failure->failureMessage());
 
-        if (isset(self::ACTIVITY_KINDS[$failure->kind()])) {
-            return new DurableWorkflowAlgorithmFailureException(self::ACTIVITY_KINDS[$failure->kind()] . $failure->failureMessage(), 0, $unrebuilt);
+        if (isset(WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[$failure->kind()])) {
+            return new DurableWorkflowAlgorithmFailureException(
+                WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[$failure->kind()] . $failure->failureMessage(),
+                0,
+                null === $activityFailure ? $unrebuilt : DurableActivityFailedException::toThrowable($activityFailure),
+            );
         }
 
         try {

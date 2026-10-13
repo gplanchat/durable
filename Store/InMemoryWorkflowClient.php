@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
@@ -28,7 +30,11 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * Result polls the journal for the ending (task 2.3). The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * Result reads the journal once (task 2.3): nothing else runs in this process during the call, so an
+ * ending can come only from an earlier append. An execution still open throws
+ * {@see WorkflowResultTimeout} at once, with {@see Duration::infinity()} when no bound was given. A
+ * run that continued as new gives the result of the next run in its chain. The journal holds no
+ * run timeout until task 2.6, so no ending maps to a timed out execution. The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
  * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
@@ -78,23 +84,19 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
     {
         $this->assertKnown($executionId);
-        $startedAt = microtime(true);
 
-        // ponytail: polls the journal; nothing else runs in this process while we wait, so it
-        // only returns early for an ending another process (a worker) appends. Without a bound
-        // it waits for as long as the execution runs.
-        while (null === ($ending = $this->ending($executionId))) {
-            if (null !== $timeout && $timeout->hasElapsedSince($startedAt, microtime(true))) {
-                throw new WorkflowResultTimeout($executionId->toString(), $timeout);
-            }
-            usleep(10_000);
-        }
+        $ending = $this->ending($executionId);
 
         return match (true) {
             $ending instanceof ExecutionCompleted => $ending->result(),
             $ending instanceof WorkflowExecutionCancelled => throw new WorkflowCancelledException($executionId->toString(), $ending->reason()),
-            WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $ending->kind() => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
-            default => throw WorkflowFailureRebuilder::toThrowable($ending),
+            $ending instanceof WorkflowContinuedAsNew => $this->result(
+                $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod('in-memory', 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
+                $timeout,
+            ),
+            $ending instanceof WorkflowExecutionFailed && WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT === $ending->kind() => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
+            $ending instanceof WorkflowExecutionFailed => throw WorkflowFailureRebuilder::toThrowable($ending, $this->activityFailure($executionId, $ending)),
+            default => throw new WorkflowResultTimeout($executionId->toString(), $timeout ?? Duration::infinity()),
         };
     }
 
@@ -145,16 +147,29 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         }
     }
 
-    private function ending(ExecutionId $executionId): ExecutionCompleted|WorkflowExecutionCancelled|WorkflowExecutionFailed|null
+    private function ending(ExecutionId $executionId): ExecutionCompleted|WorkflowExecutionCancelled|WorkflowExecutionFailed|WorkflowContinuedAsNew|null
     {
         $ending = null;
         foreach ($this->events->readStream($executionId) as $event) {
-            if ($event instanceof ExecutionCompleted || $event instanceof WorkflowExecutionCancelled || $event instanceof WorkflowExecutionFailed) {
+            if ($event instanceof ExecutionCompleted || $event instanceof WorkflowExecutionCancelled || $event instanceof WorkflowExecutionFailed || $event instanceof WorkflowContinuedAsNew) {
                 $ending = $event;
             }
         }
 
         return $ending;
+    }
+
+    private function activityFailure(ExecutionId $executionId, WorkflowExecutionFailed $failure): ?ActivityFailed
+    {
+        $activityId = $failure->context()['activityId'] ?? null;
+        $found = null;
+        foreach ($this->events->readStream($executionId) as $event) {
+            if ($event instanceof ActivityFailed && $event->activityId() === $activityId) {
+                $found = $event;
+            }
+        }
+
+        return $found;
     }
 
     private function notYet(string $method): UnsupportedByBackendException
