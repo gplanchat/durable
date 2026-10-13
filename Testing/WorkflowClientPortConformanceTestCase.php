@@ -233,7 +233,10 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * The backend's proof that the run ended with the `terminated` failure kind and that a later
      * resume of the run changes nothing.
      */
-    abstract protected function assertTerminationWasRecorded(ExecutionId $executionId, string $reason): void;
+    protected function assertTerminationWasRecorded(ExecutionId $executionId, string $reason): void
+    {
+        self::fail(\sprintf('%s must override assertTerminationWasRecorded() to prove the termination of "%s".', static::class, $executionId->toString()));
+    }
 
     private function call(string $operation, ExecutionId $id): mixed
     {
