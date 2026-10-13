@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Store;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Event\WorkflowCancellationRequested;
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -18,10 +20,10 @@ use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\WorkflowStartOptions;
 
 /**
- * The in-memory implementation of {@see WorkflowClientPort}, first slice: start. A start inserts
+ * The in-memory implementation of {@see WorkflowClientPort}, start, cancel and terminate. A start inserts
  * the metadata row, fails on a second start of the id, then dispatches the run (#603).
  *
- * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.5. A start
+ * The other operations throw {@see UnsupportedByBackendException} until tasks 2.1 to 2.3. A start
  * with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
@@ -30,6 +32,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly WorkflowMetadataStore $metadata,
         private readonly WorkflowResumeDispatcher $dispatcher,
         private readonly WorkflowRunCatalogInterface $catalog,
+        private readonly EventStoreInterface $events,
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
@@ -77,15 +80,18 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
     {
         $this->assertNotEnded($executionId);
-
-        throw $this->notYet('cancel');
+        $this->events->append(new WorkflowCancellationRequested($executionId, 'client_request_cancel'));
+        WorkflowTaskJournal::schedule($this->events, $this->dispatcher, $executionId);
+        $this->dispatcher->dispatchResume($executionId);
     }
 
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
         $this->assertNotEnded($executionId);
-
-        throw $this->notYet('terminate');
+        // Marked completed after the failure: a resume already queued then takes the handler's
+        // "completed" path and runs no workflow code.
+        $this->events->append(WorkflowExecutionFailed::terminated($executionId, $reason));
+        $this->metadata->markCompleted($executionId);
     }
 
     /**

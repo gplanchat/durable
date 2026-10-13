@@ -190,6 +190,35 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
+    public function testCancellingAWaitingRunEndsItCancelledAfterTheWorkflowReceivedTheRequest(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $before = $this->historyLengthOf($id);
+
+        $this->clientUnderTest()->cancel($id, 'req-1');
+
+        self::assertSame(WorkflowRunStatus::Cancelled, $this->catalogUnderTest()->findRun($id)?->status);
+        self::assertGreaterThan($before, $this->historyLengthOf($id));
+    }
+
+    public function testTerminatingAWaitingRunEndsItFailedAndRunsNothingMore(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->terminate($id, 'stop');
+
+        self::assertSame(WorkflowRunStatus::Failed, $this->catalogUnderTest()->findRun($id)?->status);
+        $this->assertTerminationWasRecorded($id, 'stop');
+    }
+
+    /**
+     * The backend's proof that the run ended with the `terminated` failure kind and that a later
+     * resume of the run changes nothing.
+     */
+    abstract protected function assertTerminationWasRecorded(ExecutionId $executionId, string $reason): void;
+
     private function call(string $operation, ExecutionId $id): mixed
     {
         $client = $this->clientUnderTest();
