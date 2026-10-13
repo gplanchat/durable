@@ -6,13 +6,17 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\RetryLimit;
+use Gplanchat\Durable\ChildWorkflowOptions;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ExecutionCompleted;
 use Gplanchat\Durable\Event\TimerCompleted;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
@@ -23,6 +27,7 @@ use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 use Gplanchat\Durable\WorkflowEnvironment;
 use Gplanchat\Durable\WorkflowRegistry;
+use Gplanchat\Durable\WorkflowTimeouts;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -170,6 +175,29 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
 
         self::assertSame(['echo' => 'hello'], $result);
         self::assertCount(1, $this->eventsOf($store, 'scenario-child', ChildWorkflowCompleted::class));
+    }
+
+    public function testAChildThatOutlivesItsExecutionTimeoutFailsItsParent(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceSlowChildWorkflow::class);
+
+        try {
+            $this->runner($store, null, $registry)->run(
+                ExecutionId::fromString('scenario-timeout'),
+                static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->childWorkflowStub(
+                    ConformanceSlowChildWorkflow::class,
+                    new ChildWorkflowOptions(workflowId: 'scenario-slow-child', timeouts: new WorkflowTimeouts(execution: Duration::seconds(5))),
+                )->run()),
+            );
+            self::fail('the child sleeps 60 s under a 5 s execution timeout: the parent must fail');
+        } catch (DurableChildWorkflowFailedException $e) {
+            self::assertSame('Child workflow scenario-slow-child timed out.', $e->getMessage());
+        }
+        self::assertCount(1, $this->eventsOf($store, 'scenario-timeout', ChildWorkflowDeadline::class));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-timeout', ChildWorkflowFailed::class));
     }
 
     public function testContinueAsNewFollowsTheChainToItsLastRun(): void
