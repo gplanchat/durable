@@ -166,10 +166,10 @@ final readonly class EventStoreWorkflowLifecycle implements WorkflowLifecycleInt
         $this->parentChildCoordinator?->onParentClosed($executionId, ParentClosureReason::Failed);
 
         throw match (true) {
-            $failure instanceof DurableCatastrophicActivityFailureException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle catastrophic activity failure: ' . $failure->getMessage(), 0, $failure),
-            $failure instanceof DurableActivityFailedException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle activity failure: ' . $failure->getMessage(), 0, $failure),
-            $failure instanceof ActivitySupersededException => new DurableWorkflowAlgorithmFailureException('Workflow did not handle superseded activity: ' . $failure->getMessage(), 0, $failure),
-            $failure instanceof DeclaredActivityFailureInterface => new DurableWorkflowAlgorithmFailureException('Workflow did not handle declared activity failure: ' . $failure->getMessage(), 0, $failure),
+            $failure instanceof DurableCatastrophicActivityFailureException => new DurableWorkflowAlgorithmFailureException(WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[WorkflowExecutionFailed::KIND_UNHANDLED_CATASTROPHIC_ACTIVITY] . $failure->getMessage(), 0, $failure),
+            $failure instanceof DurableActivityFailedException => new DurableWorkflowAlgorithmFailureException(WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[WorkflowExecutionFailed::KIND_UNHANDLED_ACTIVITY] . $failure->getMessage(), 0, $failure),
+            $failure instanceof ActivitySupersededException => new DurableWorkflowAlgorithmFailureException(WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[WorkflowExecutionFailed::KIND_UNHANDLED_ACTIVITY_SUPERSEDED] . $failure->getMessage(), 0, $failure),
+            $failure instanceof DeclaredActivityFailureInterface => new DurableWorkflowAlgorithmFailureException(WorkflowExecutionFailed::ACTIVITY_FAILURE_PREFIXES[WorkflowExecutionFailed::KIND_UNHANDLED_DECLARED_ACTIVITY] . $failure->getMessage(), 0, $failure),
             default => $failure,
         };
     }
