@@ -130,7 +130,7 @@ final class WorkflowEnvironment
      *
      * The deadline cancels what it bounded, and settling cancels the deadline. Cancelling an
      * activity stays *best effort*: the workflow will no longer be woken by it, but the attempt in
-     * flight may carry on server-side — Temporal receives a cancellation *request*.
+     * flight may carry on server-side; Temporal receives a cancellation *request*.
      *
      * A `Closure` is accepted in place of an awaitable: it is a **condition** on the workflow's
      * state, and the execution resumes as soon as it holds. It must be a function of the workflow's
