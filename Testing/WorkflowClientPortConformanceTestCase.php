@@ -78,7 +78,8 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     abstract public static function refusedStartOptions(): iterable;
 
     /**
-     * Brings an execution started through the client to the given outcome.
+     * Brings an execution started through the client to the given outcome, as a run that ended:
+     * the catalogue says so, and the backend no longer holds it as active.
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
 
@@ -227,6 +228,36 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         self::assertNull($this->catalogUnderTest()->findRun($id));
         self::assertNull($this->startedInputOf($id));
         self::assertSame(0, $this->historyLengthOf($id));
+    }
+
+    /**
+     * @return iterable<string, array{WorkflowRunStatus}>
+     */
+    public static function endedOutcomes(): iterable
+    {
+        foreach ([WorkflowRunStatus::Failed, WorkflowRunStatus::Cancelled, WorkflowRunStatus::Completed, WorkflowRunStatus::ContinuedAsNew] as $outcome) {
+            yield $outcome->value => [$outcome];
+        }
+    }
+
+    /**
+     * Until the owner settles what separates two runs of one id (#1083), every second start fails.
+     */
+    #[DataProvider('endedOutcomes')]
+    public function testAStartOfAnIdWhoseExecutionEndedFails(WorkflowRunStatus $outcome): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE, ['tag' => 'first']);
+        $this->endRun($id, $outcome);
+
+        try {
+            $this->clientUnderTest()->start($id, ConformanceOtherClientWorkflow::TYPE, ['tag' => 'second']);
+            self::fail('A second start must fail.');
+        } catch (WorkflowExecutionAlreadyStarted $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
+        self::assertSame(['tag' => 'first'], $this->startedInputOf($id));
+        self::assertSame($outcome, $this->catalogUnderTest()->findRun($id)?->status);
     }
 
     public function testARepositoryRefusesAnExecutionOfAnotherWorkflowType(): void
@@ -389,6 +420,21 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
     }
 
+    public function testAResultOnAnExecutionTerminatedThroughTheClientThrowsTerminatedWithTheReason(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->terminate($id, 'stop');
+
+        try {
+            $this->clientUnderTest()->result($id, Duration::seconds(1));
+            self::fail('A terminated execution must throw.');
+        } catch (WorkflowTerminatedException $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame('stop', $e->reason);
+        }
+    }
+
     public function testAResultTimesOutOnARunningExecutionAndLeavesItRunning(): void
     {
         $id = ExecutionId::fromString('exec-1');
@@ -548,6 +594,62 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
         self::assertEmpty(array_filter($this->journalOf($id), static fn(Event $e): bool => $e instanceof ExecutionCompleted));
         self::assertSame(1, $this->clientUnderTest()->update($id, 'change'));
+    }
+
+    public function testCancellingAWaitingRunEndsItCancelledAfterTheWorkflowReceivedTheRequest(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $before = $this->historyLengthOf($id);
+
+        $this->clientUnderTest()->cancel($id, 'req-1');
+
+        self::assertSame(WorkflowRunStatus::Cancelled, $this->catalogUnderTest()->findRun($id)?->status);
+        self::assertGreaterThan($before, $this->historyLengthOf($id));
+    }
+
+    /**
+     * Needs {@see ConformanceCompensatingClientWorkflow} registered by the backend.
+     */
+    public function testACancelledRunStaysRunningWhileItsWorkflowCompensatesAndASecondCancelAddsNothing(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceCompensatingClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->cancel($id);
+        $written = $this->historyLengthOf($id);
+        $this->clientUnderTest()->cancel($id);
+
+        self::assertSame(WorkflowRunStatus::Running, $this->catalogUnderTest()->findRun($id)?->status, 'The workflow compensates in its own code before the run ends.');
+        self::assertSame($written, $this->historyLengthOf($id), 'A second cancel of a run that already has one pending is a no-op.');
+    }
+
+    public function testTerminatingAWaitingRunEndsItFailedAndRunsNothingMore(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        $this->clientUnderTest()->terminate($id, 'stop');
+
+        self::assertSame(WorkflowRunStatus::Failed, $this->catalogUnderTest()->findRun($id)?->status);
+        $this->assertTerminationWasRecorded($id, 'stop');
+    }
+
+    /**
+     * The backend's proof that the run ended with the `terminated` failure kind and that a later
+     * resume of the run changes nothing.
+     */
+    protected function assertTerminationWasRecorded(ExecutionId $executionId, string $reason): void
+    {
+        self::fail(\sprintf('%s must override assertTerminationWasRecorded() to prove the termination of "%s".', static::class, $executionId->toString()));
     }
 
     private function call(string $operation, ExecutionId $id): mixed
