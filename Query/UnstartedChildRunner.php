@@ -21,6 +21,11 @@ final class UnstartedChildRunner implements ChildWorkflowRunnerInterface
         return true;
     }
 
+    /**
+     * Always false: the pass cannot tell whether another parent runs a child under the same
+     * explicit workflow id. A child beyond the live point, started with such an id, may therefore
+     * pass here where the live pass raises {@see \Gplanchat\Durable\Exception\ChildWorkflowIdInUseException}.
+     */
     public function isChildRunning(ExecutionId $childExecutionId): bool
     {
         return false;

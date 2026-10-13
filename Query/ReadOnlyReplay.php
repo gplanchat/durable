@@ -41,7 +41,7 @@ final class ReadOnlyReplay
     public function query(ExecutionId $executionId, string $name, array $arguments = []): mixed
     {
         $runId = $this->latestRun($executionId);
-        $row = $this->metadata->get($runId) ?? throw new WorkflowExecutionNotFound($runId->toString());
+        $row = $this->metadata->get($runId) ?? throw new WorkflowExecutionNotFound($executionId->toString());
 
         $handlers = $this->engine->replayWithoutWriting($runId, $this->registry->getHandler($row['workflowType'], $row['payload']))->queryHandlers();
         if (!$handlers->has($name)) {
