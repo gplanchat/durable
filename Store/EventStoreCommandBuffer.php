@@ -145,6 +145,13 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             }
         }
 
+        // The journal has no server to end a child that outlives its execution timeout: the
+        // deadline is written here, before the child (see PendingChildDeadlines), and a wake-up of
+        // the parent reads it (#979).
+        if (null !== $options->timeouts->execution) {
+            $this->append(new ChildWorkflowDeadline($this->id, $childExecutionId, $this->nowSeconds() + $options->timeouts->execution->toSeconds()));
+        }
+
         // The wire form is built here: the journal records the flat metadata the old code was
         // already giving it, including the two keys the core used to add by hand.
         $this->append(new ChildWorkflowScheduled(
@@ -159,12 +166,6 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
                 'workflowId' => $options->workflowId,
             ] + $options->toSchedulingMetadata(),
         ));
-
-        // The journal has no server to end a child that outlives its execution timeout: the
-        // deadline is written here, and a wake-up of the parent reads it (#979).
-        if (null !== $options->timeouts->execution) {
-            $this->append(new ChildWorkflowDeadline($this->id, $childExecutionId, $this->nowSeconds() + $options->timeouts->execution->toSeconds()));
-        }
     }
 
     public function completeWorkflow(mixed $result): void

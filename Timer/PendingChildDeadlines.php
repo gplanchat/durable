@@ -7,6 +7,7 @@ namespace Gplanchat\Durable\Timer;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowDeadline;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
+use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Store\EventStoreInterface;
 
@@ -25,14 +26,21 @@ final class PendingChildDeadlines
      */
     public static function of(EventStoreInterface $journal, ExecutionId $parentExecutionId): array
     {
+        // The deadline is written before the child is scheduled, so that a crash between the two
+        // leaves a deadline for a child that does not exist (never reported) instead of a child
+        // with no deadline (never bounded). The journal has no append of several events at once.
+        $armed = [];
         $pending = [];
         foreach ($journal->readStream($parentExecutionId) as $event) {
             if ($event instanceof ChildWorkflowDeadline) {
-                $pending[$event->childExecutionId()->toString()] = $event->dueAt();
+                $armed[$event->childExecutionId()->toString()] = $event->dueAt();
+            }
+            if ($event instanceof ChildWorkflowScheduled && isset($armed[$event->childExecutionId()->toString()])) {
+                $pending[$event->childExecutionId()->toString()] = $armed[$event->childExecutionId()->toString()];
             }
             // An outcome closes the deadline written before it, so a reused child id starts afresh.
             if ($event instanceof ChildWorkflowCompleted || $event instanceof ChildWorkflowFailed) {
-                unset($pending[$event->childExecutionId()->toString()]);
+                unset($pending[$event->childExecutionId()->toString()], $armed[$event->childExecutionId()->toString()]);
             }
         }
 
