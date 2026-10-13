@@ -26,6 +26,17 @@ final readonly class WorkflowExecutionFailed implements Event
     public const KIND_TERMINATED = 'terminated';
 
     /**
+     * The message prefix a caller sees for each kind of unhandled activity failure, on the journal
+     * backends and on Temporal.
+     */
+    public const ACTIVITY_FAILURE_PREFIXES = [
+        self::KIND_UNHANDLED_CATASTROPHIC_ACTIVITY => 'Workflow did not handle catastrophic activity failure: ',
+        self::KIND_UNHANDLED_ACTIVITY => 'Workflow did not handle activity failure: ',
+        self::KIND_UNHANDLED_ACTIVITY_SUPERSEDED => 'Workflow did not handle superseded activity: ',
+        self::KIND_UNHANDLED_DECLARED_ACTIVITY => 'Workflow did not handle declared activity failure: ',
+    ];
+
+    /**
      * @param array<string, mixed> $context
      */
     private function __construct(
