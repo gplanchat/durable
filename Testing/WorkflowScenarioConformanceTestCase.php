@@ -10,15 +10,22 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
+use Gplanchat\Durable\Store\EventStoreCommandBuffer;
+use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
 use Gplanchat\Durable\WorkflowEnvironment;
@@ -201,6 +208,59 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         $completed = $this->eventsOf($store, $id, ExecutionCompleted::class);
         self::assertCount(1, $completed, 'the last run completes');
         self::assertSame(['runs' => 3], $completed[0]->result());
+    }
+
+    public function testAResumedWorkflowPicksUpWhereItSuspendedWithoutStartingAgain(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $activities = new RegistryActivityExecutor();
+        $activities->register('durable.conformance.quote', static fn(): array => ['total' => 7]);
+        $transport = new InMemoryActivityTransport();
+        $runtime = new ExecutionRuntime($store, $transport, $activities, 0, null, true);
+        $engine = new ExecutionEngine($store, $runtime);
+        $id = ExecutionId::fromString('scenario-resume');
+        $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->activityStub(ConformanceActivities::class)->quote([]));
+
+        try {
+            $engine->start($id, $handler);
+            self::fail('the workflow must wait for its activity');
+        } catch (WorkflowSuspendedException) {
+        }
+        $runtime->runUntilIdle(new ExecutionContext($id, new EventStoreHistorySource($store, $id), new EventStoreCommandBuffer($store, $transport, $id)));
+
+        self::assertSame(['total' => 7], $engine->resume($id, $handler));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ExecutionStarted::class), 'a resume does not start the run again');
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ActivityCompleted::class));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ExecutionCompleted::class));
+    }
+
+    public function testACancellationRequestEndsTheWaitingWorkflowAsCancelled(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $engine = new ExecutionEngine(
+            $store,
+            new ExecutionRuntime($store, new InMemoryActivityTransport(), new RegistryActivityExecutor(), 0, null, true),
+        );
+        $id = ExecutionId::fromString('scenario-cancel');
+        $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await(static fn(): bool => false);
+
+        try {
+            $engine->start($id, $handler);
+            self::fail('the workflow must wait');
+        } catch (WorkflowSuspendedException) {
+        }
+        $store->append(new WorkflowCancellationRequested($id, 'operator', null));
+
+        try {
+            $engine->resume($id, $handler);
+            self::fail('the resume must end on the cancellation');
+        } catch (WorkflowCancelledException) {
+        }
+
+        self::assertCount(1, $this->eventsOf($store, 'scenario-cancel', WorkflowExecutionCancelled::class), 'the journal records the cancellation once');
+        self::assertSame([], $this->eventsOf($store, 'scenario-cancel', ExecutionCompleted::class), 'a cancelled run does not complete');
     }
 
     protected function runner(
