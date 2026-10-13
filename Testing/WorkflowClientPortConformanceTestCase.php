@@ -8,6 +8,7 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
+use Gplanchat\Durable\Exception\WorkflowQueryNotFound;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
@@ -56,6 +57,54 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
      * Brings an execution started through the client to the given outcome.
      */
     abstract protected function endRun(ExecutionId $executionId, WorkflowRunStatus $outcome): void;
+
+    /**
+     * Delivers a signal to a running execution. A backend whose client does not deliver signals
+     * yet overrides this; the others keep the port.
+     */
+    protected function deliverSignal(ExecutionId $executionId, string $name): void
+    {
+        $this->clientUnderTest()->signal($executionId, $name);
+    }
+
+    public function testAQueryAnswersTheStateBeforeAndAfterASignal(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        self::assertSame('waiting', $this->clientUnderTest()->query($id, 'status'));
+
+        $this->deliverSignal($id, 'pay');
+
+        self::assertSame('paid', $this->clientUnderTest()->query($id, 'status'));
+    }
+
+    public function testAQueryAddsNoEventToTheHistory(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->deliverSignal($id, 'pay');
+        $written = $this->historyLengthOf($id);
+
+        $this->clientUnderTest()->query($id, 'status');
+        $this->clientUnderTest()->query($id, 'status');
+
+        self::assertSame($written, $this->historyLengthOf($id));
+    }
+
+    public function testAQueryTheWorkflowDoesNotDeclareFailsNamingTheExecutionAndTheQuery(): void
+    {
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+
+        try {
+            $this->clientUnderTest()->query($id, 'nobody-declares-this');
+            self::fail('An unknown query name must fail.');
+        } catch (WorkflowQueryNotFound $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame('nobody-declares-this', $e->queryName);
+        }
+    }
 
     public function testAStartReturnsTheIdAndTheExecutionIsFoundRunning(): void
     {
