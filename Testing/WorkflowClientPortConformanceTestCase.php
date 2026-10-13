@@ -241,9 +241,22 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
     }
 
     /**
+     * The outcomes after which a second start of the same id fails. All four on the journal
+     * backends, which refuse every second start until the owner settles what separates two runs of
+     * one id (#1083). A backend whose server decides otherwise lists only what it refuses, and
+     * tests the rest on its own.
+     *
+     * @return iterable<string, array{WorkflowRunStatus}>
+     */
+    public static function endedOutcomesThatRefuseARestart(): iterable
+    {
+        return static::endedOutcomes();
+    }
+
+    /**
      * Until the owner settles what separates two runs of one id (#1083), every second start fails.
      */
-    #[DataProvider('endedOutcomes')]
+    #[DataProvider('endedOutcomesThatRefuseARestart')]
     public function testAStartOfAnIdWhoseExecutionEndedFails(WorkflowRunStatus $outcome): void
     {
         $id = ExecutionId::fromString('exec-1');
