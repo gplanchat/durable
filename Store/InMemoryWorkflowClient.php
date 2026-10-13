@@ -54,7 +54,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
-        $this->assertNotEnded($executionId);
+        $this->assertAcceptsMessages($executionId, 'signal');
         // The order of DUR052, as the Symfony handler keeps it: announce, append, schedule, resume.
         $signal = AwaitedFact::signal($requestId ??= bin2hex(random_bytes(16)));
         if (!$signal->isJournalledIn($this->events, $executionId)) {
@@ -74,7 +74,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
-        $this->assertNotEnded($executionId);
+        $this->assertAcceptsMessages($executionId, 'update');
         $updateId ??= bin2hex(random_bytes(16));
         // The same id again is the same update: the first outcome answers, nothing runs twice.
         $handled = $this->handledUpdate($executionId, $updateId);
@@ -152,6 +152,18 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
             throw new WorkflowExecutionAlreadyEnded($executionId->toString());
+        }
+    }
+
+    /**
+     * A signal or an update goes to the run that is current. This backend does not follow a
+     * continue-as-new chain yet (task 1.7): delivering to the old run would lose the message.
+     */
+    private function assertAcceptsMessages(ExecutionId $executionId, string $method): void
+    {
+        $this->assertNotEnded($executionId);
+        if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
+            throw UnsupportedByBackendException::forMethod('in-memory', $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
         }
     }
 
