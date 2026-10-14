@@ -57,13 +57,15 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         private readonly ReadOnlyReplay $queries,
         private readonly LinkedChildFinalizer $linkedChildren,
         private readonly ?ParentChildWorkflowCoordinatorInterface $coordinator = null,
+        /** The name the refusals give for this backend: a database backend that reuses this client says so. */
+        private readonly string $backend = 'in-memory',
     ) {}
 
     public function start(ExecutionId $executionId, string $workflowType, array $input = [], ?WorkflowStartOptions $options = null): ExecutionId
     {
         $refused = null === $options ? [] : self::refusedOptions($options);
         if ([] !== $refused) {
-            throw new WorkflowStartOptionsRefused('in-memory', $refused);
+            throw new WorkflowStartOptionsRefused($this->backend, $refused);
         }
         if (!$this->metadata->insertIfAbsent($executionId, $workflowType, $input)) {
             throw new WorkflowExecutionAlreadyStarted($executionId->toString());
@@ -144,7 +146,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
             $ending instanceof ExecutionCompleted => $ending->result(),
             $ending instanceof WorkflowExecutionCancelled => throw new WorkflowCancelledException($executionId->toString(), $ending->reason()),
             $ending instanceof WorkflowContinuedAsNew => $this->result(
-                $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod('in-memory', 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
+                $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod($this->backend, 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
                 $timeout,
             ),
             $ending instanceof WorkflowExecutionFailed && \in_array($ending->kind(), [WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT, WorkflowExecutionFailed::KIND_TERMINATED], true) => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
@@ -283,7 +285,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     {
         $this->assertNotEnded($executionId);
         if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
-            throw UnsupportedByBackendException::forMethod('in-memory', $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
+            throw UnsupportedByBackendException::forMethod($this->backend, $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
         }
     }
 }

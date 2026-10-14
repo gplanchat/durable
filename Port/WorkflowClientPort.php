@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Gplanchat\Durable\Port;
 
 use Gplanchat\Durable\Duration;
+use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
@@ -65,6 +66,7 @@ interface WorkflowClientPort
      *
      * @throws WorkflowExecutionNotFound
      * @throws WorkflowExecutionAlreadyEnded
+     * @throws DurableUpdateFailedException  the handler failed, or no pass applied the update
      */
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed;
 
