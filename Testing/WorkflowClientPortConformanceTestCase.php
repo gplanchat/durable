@@ -626,6 +626,59 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         }
     }
 
+    public function testACancelReachesTheCurrentRunOfAChain(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $first = ExecutionId::fromString('exec-1');
+        $next = ExecutionId::fromString('exec-2');
+        $this->clientUnderTest()->start($first, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->start($next, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($first, ConformanceClientWorkflow::TYPE, [], [], $next));
+        $written = $this->historyLengthOf($first);
+
+        $this->clientUnderTest()->cancel($first);
+
+        self::assertSame($written, $this->historyLengthOf($first), 'The ended run of the chain is left alone.');
+        self::assertContains(WorkflowCancellationRequested::class, array_map(static fn(Event $e): string => $e::class, $this->journalOf($next)));
+    }
+
+    public function testATerminateReachesTheCurrentRunOfAChain(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $first = ExecutionId::fromString('exec-1');
+        $next = ExecutionId::fromString('exec-2');
+        $this->clientUnderTest()->start($first, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->start($next, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($first, ConformanceClientWorkflow::TYPE, [], [], $next));
+
+        $this->clientUnderTest()->terminate($first, 'stop');
+
+        $this->assertTerminationWasRecorded($next, 'stop');
+    }
+
+    public function testACancelOnAChainWhoseLastRunEndedFailsAsAlreadyEnded(): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $first = ExecutionId::fromString('exec-1');
+        $next = ExecutionId::fromString('exec-2');
+        $this->clientUnderTest()->start($first, ConformanceClientWorkflow::TYPE);
+        $this->clientUnderTest()->start($next, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($first, ConformanceClientWorkflow::TYPE, [], [], $next));
+        $this->appendEnding(new ExecutionCompleted($next, 'last'));
+
+        $this->expectException(WorkflowExecutionAlreadyEnded::class);
+        $this->clientUnderTest()->cancel($first);
+    }
+
     public function testAResultRethrowsTheActivityFailureWithItsCause(): void
     {
         if ($this->withoutWorkflowCode()) {
