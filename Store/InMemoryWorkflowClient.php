@@ -14,13 +14,14 @@ use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
 use Gplanchat\Durable\Event\WorkflowUpdateHandled;
 use Gplanchat\Durable\Exception\DurableUpdateFailedException;
-use Gplanchat\Durable\Exception\UnsupportedByBackendException;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
+use Gplanchat\Durable\Exception\WorkflowContinuedWithoutSuccessor;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
+use Gplanchat\Durable\Exception\WorkflowSuccessorNotStarted;
 use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\Failure\WorkflowFailureRebuilder;
@@ -42,10 +43,12 @@ use Gplanchat\Durable\WorkflowStartOptions;
  * Result reads the journal once (task 2.3): nothing else runs in this process during the call, so an
  * ending can come only from an earlier append. An execution still open throws
  * {@see WorkflowResultTimeout} at once, with {@see Duration::infinity()} when no bound was given. A
- * run that continued as new gives the result of the next run in its chain. The journal holds no
- * run timeout until task 2.6, so no ending maps to a timed out execution. The query replays the journal
- * read-only ({@see ReadOnlyReplay}). A run that continued as new refuses a signal, an update, a
- * cancel and a terminate with {@see UnsupportedByBackendException}. A start with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
+ * run that continued as new gives the result of the last run of its chain, and a signal, an update,
+ * a cancel and a terminate reach the run that is current. A chain whose next run never started
+ * throws {@see WorkflowSuccessorNotStarted}, and one that names none throws
+ * {@see WorkflowContinuedWithoutSuccessor}. The journal holds no run timeout until task 2.6, so no
+ * ending maps to a timed out execution. The query replays the journal read-only
+ * ({@see ReadOnlyReplay}). A start with options throws {@see WorkflowStartOptionsRefused} until task 2.6.
  */
 final class InMemoryWorkflowClient implements WorkflowClientPort
 {
@@ -76,11 +79,12 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     }
 
     /**
-     * @throws UnsupportedByBackendException the run continued as new
+     * @throws WorkflowContinuedWithoutSuccessor
+     * @throws WorkflowSuccessorNotStarted
      */
     public function signal(ExecutionId $executionId, string $name, array $arguments = [], ?string $requestId = null): void
     {
-        $this->assertAcceptsMessages($executionId, 'signal');
+        $executionId = $this->currentOpenRun($executionId);
         // The order of DUR052, as the Symfony handler keeps it: announce, append, schedule, resume.
         $signal = AwaitedFact::signal($requestId ??= bin2hex(random_bytes(16)));
         if (!$signal->isJournalledIn($this->events, $executionId)) {
@@ -104,12 +108,13 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
      * caller receives a {@see DurableUpdateFailedException} whose reason is
      * {@see UpdateFailureReason::NotHandled}, and the update is not queued for later.
      *
-     * @throws UnsupportedByBackendException   the run continued as new
+     * @throws WorkflowContinuedWithoutSuccessor
+     * @throws WorkflowSuccessorNotStarted
      * @throws DurableUpdateFailedException
      */
     public function update(ExecutionId $executionId, string $name, array $arguments = [], ?string $updateId = null): mixed
     {
-        $this->assertAcceptsMessages($executionId, 'update');
+        $executionId = $this->currentOpenRun($executionId);
         $updateId ??= bin2hex(random_bytes(16));
         // The same id again is the same update: the first outcome answers, nothing runs twice.
         $handled = $this->handledUpdate($executionId, $updateId);
@@ -138,17 +143,12 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function result(ExecutionId $executionId, ?Duration $timeout = null): mixed
     {
-        $this->assertKnown($executionId);
-
+        $executionId = $this->current($executionId);
         $ending = $this->ending($executionId);
 
         return match (true) {
             $ending instanceof ExecutionCompleted => $ending->result(),
             $ending instanceof WorkflowExecutionCancelled => throw new WorkflowCancelledException($executionId->toString(), $ending->reason()),
-            $ending instanceof WorkflowContinuedAsNew => $this->result(
-                $ending->newExecutionId() ?? throw UnsupportedByBackendException::forMethod($this->backend, 'result on a continued-as-new run', 'the run recorded no next execution id, so the chain cannot be followed'),
-                $timeout,
-            ),
             $ending instanceof WorkflowExecutionFailed && \in_array($ending->kind(), [WorkflowExecutionFailed::KIND_TERMINATED_BY_PARENT, WorkflowExecutionFailed::KIND_TERMINATED], true) => throw new WorkflowTerminatedException($executionId->toString(), $ending->failureMessage()),
             $ending instanceof WorkflowExecutionFailed => throw WorkflowFailureRebuilder::toThrowable($ending, $this->activityFailure($executionId, $ending)),
             default => throw new WorkflowResultTimeout($executionId->toString(), $timeout ?? Duration::infinity()),
@@ -157,7 +157,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function cancel(ExecutionId $executionId, ?string $requestId = null): void
     {
-        $this->assertAcceptsMessages($executionId, 'cancel');
+        $executionId = $this->currentOpenRun($executionId);
         // Idempotent, as Temporal is expected to be (unverified, probe 0.2): a request already
         // journalled for this run is not repeated.
         foreach ($this->events->readStream($executionId) as $event) {
@@ -172,6 +172,7 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
     public function terminate(ExecutionId $executionId, string $reason = ''): void
     {
+        $executionId = $this->current($executionId);
         // A retry after a dispatch failed: the failure is journalled, the tail is not done.
         $half = $this->halfTerminated($executionId);
         if (null !== $half) {
@@ -179,11 +180,11 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
 
             return;
         }
-        $this->assertAcceptsMessages($executionId, 'terminate');
+        $this->assertNotEnded($executionId);
         // A pass that was running no longer writes (DUR053): it cannot complete a terminated run.
         $journal = PassEventStore::open($this->events, $executionId);
         // A pass may have ended the run between the check and the claim.
-        $this->assertAcceptsMessages($executionId, 'terminate');
+        $this->assertNotEnded($executionId);
         $journal->append(WorkflowExecutionFailed::terminated($executionId, $reason));
         $this->finishTermination($executionId, $reason);
     }
@@ -242,12 +243,9 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
         return ($this->catalog->findRun($executionId) ?? throw new WorkflowExecutionNotFound($executionId->toString()))->status;
     }
 
-    /**
-     * A run that continued as new is not ended: its chain goes on (design, task 1.7).
-     */
     private function assertNotEnded(ExecutionId $executionId): void
     {
-        if (!\in_array($this->assertKnown($executionId), [WorkflowRunStatus::Running, WorkflowRunStatus::ContinuedAsNew], true)) {
+        if (WorkflowRunStatus::Running !== $this->assertKnown($executionId)) {
             throw new WorkflowExecutionAlreadyEnded($executionId->toString());
         }
     }
@@ -278,14 +276,38 @@ final class InMemoryWorkflowClient implements WorkflowClientPort
     }
 
     /**
-     * A signal, an update, a cancel or a terminate goes to the run that is current. This backend does
-     * not follow a continue-as-new chain yet (task 1.7): delivering to the old run would lose the message.
+     * The run that is current in the chain that starts at the given one, which is the given one
+     * unless it continued as new (design, task 1.7). The chain is read from the journal, run by run.
+     *
+     * @throws WorkflowExecutionNotFound
+     * @throws WorkflowContinuedWithoutSuccessor a run continued as new and names no next run
+     * @throws WorkflowSuccessorNotStarted       the next run it names does not exist
      */
-    private function assertAcceptsMessages(ExecutionId $executionId, string $method): void
+    private function current(ExecutionId $executionId): ExecutionId
     {
-        $this->assertNotEnded($executionId);
-        if (WorkflowRunStatus::ContinuedAsNew === $this->assertKnown($executionId)) {
-            throw UnsupportedByBackendException::forMethod($this->backend, $method, 'the run continued as new and the chain is not followed yet, see the workflow-repository change');
+        $status = $this->assertKnown($executionId);
+        while (true) {
+            $ending = $this->ending($executionId);
+            if (!$ending instanceof WorkflowContinuedAsNew && WorkflowRunStatus::ContinuedAsNew !== $status) {
+                return $executionId;
+            }
+            $next = $ending instanceof WorkflowContinuedAsNew ? $ending->newExecutionId() : null;
+            if (null === $next) {
+                throw new WorkflowContinuedWithoutSuccessor($executionId->toString());
+            }
+            $status = ($this->catalog->findRun($next) ?? throw new WorkflowSuccessorNotStarted($executionId->toString(), $next->toString()))->status;
+            $executionId = $next;
         }
+    }
+
+    /**
+     * A signal, an update or a cancel goes to the run that is current; it fails when that run has ended.
+     */
+    private function currentOpenRun(ExecutionId $executionId): ExecutionId
+    {
+        $current = $this->current($executionId);
+        $this->assertNotEnded($current);
+
+        return $current;
     }
 }

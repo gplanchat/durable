@@ -8,6 +8,7 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityFailed;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
 use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowExecutionFailed;
@@ -18,6 +19,7 @@ use Gplanchat\Durable\Exception\DurableUpdateFailedException;
 use Gplanchat\Durable\Exception\DurableWorkflowAlgorithmFailureException;
 use Gplanchat\Durable\Exception\UpdateFailureReason;
 use Gplanchat\Durable\Exception\WorkflowCancelledException;
+use Gplanchat\Durable\Exception\WorkflowContinuedWithoutSuccessor;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyEnded;
 use Gplanchat\Durable\Exception\WorkflowExecutionAlreadyStarted;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
@@ -26,6 +28,7 @@ use Gplanchat\Durable\Exception\WorkflowQueryNotFound;
 use Gplanchat\Durable\Exception\WorkflowResultTimeout;
 use Gplanchat\Durable\Exception\WorkflowStartOptionsRefused;
 use Gplanchat\Durable\Exception\WorkflowStubMethodNotDeclared;
+use Gplanchat\Durable\Exception\WorkflowSuccessorNotStarted;
 use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
 use Gplanchat\Durable\ExecutionId;
@@ -571,6 +574,56 @@ abstract class WorkflowClientPortConformanceTestCase extends TestCase
         $this->appendEnding(new ExecutionCompleted($next, 'last'));
 
         self::assertSame('last', $this->clientUnderTest()->result($first, Duration::seconds(1)));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function chainOperations(): iterable
+    {
+        yield 'result' => ['result'];
+        yield 'cancel' => ['cancel'];
+        yield 'terminate' => ['terminate'];
+    }
+
+    #[DataProvider('chainOperations')]
+    public function testAChainCallFailsNamingBothIdsWhenTheNextRunNeverStarted(string $operation): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $first = ExecutionId::fromString('exec-1');
+        $next = ExecutionId::fromString('exec-2');
+        $this->clientUnderTest()->start($first, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($first, ConformanceClientWorkflow::TYPE, [], [], $next));
+
+        try {
+            $this->call($operation, $first);
+            self::fail('A chain whose next run never started cannot be followed.');
+        } catch (WorkflowSuccessorNotStarted $e) {
+            self::assertSame('exec-1', $e->executionId);
+            self::assertSame('exec-2', $e->successorId);
+        }
+    }
+
+    #[DataProvider('chainOperations')]
+    public function testAChainCallOnARunWithoutASuccessorIdFailsByName(string $operation): void
+    {
+        if ($this->withoutWorkflowCode()) {
+            return;
+        }
+
+        $id = ExecutionId::fromString('exec-1');
+        $this->clientUnderTest()->start($id, ConformanceClientWorkflow::TYPE);
+        $this->appendEnding(new WorkflowContinuedAsNew($id, ConformanceClientWorkflow::TYPE, []));
+
+        try {
+            $this->call($operation, $id);
+            self::fail('A continuation without a successor id cannot be followed.');
+        } catch (WorkflowContinuedWithoutSuccessor $e) {
+            self::assertSame('exec-1', $e->executionId);
+        }
     }
 
     public function testAResultRethrowsTheActivityFailureWithItsCause(): void
