@@ -15,7 +15,7 @@ use Gplanchat\Durable\Transport\AwaitedFact;
 interface WorkflowResumeDispatcher
 {
     /**
-     * @param list<array{name: string, arguments: array<string, mixed>}> $pendingUpdates updates to
+     * @param list<array{name: string, arguments: array<string, mixed>, updateId?: string|null}> $pendingUpdates updates to
      *        hand back to the execution for the pass this resume triggers
      */
     public function dispatchResume(ExecutionId $executionId, array $pendingUpdates = []): void;

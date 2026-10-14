@@ -6,6 +6,7 @@ namespace Gplanchat\Durable\Event;
 
 use Gplanchat\Durable\Exception\DeadlineExceededException;
 use Gplanchat\Durable\Exception\DurableNexusOperationFailedException;
+use Gplanchat\Durable\Exception\WorkflowTerminatedException;
 use Gplanchat\Durable\ExecutionId;
 
 /**
@@ -22,6 +23,18 @@ final readonly class WorkflowExecutionFailed implements Event
     public const KIND_WORKFLOW_HANDLER = 'workflow_handler_failure';
     public const KIND_UNHANDLED_NEXUS_OPERATION = 'unhandled_nexus_operation_failure';
     public const KIND_TERMINATED_BY_PARENT = 'terminated_by_parent';
+    public const KIND_TERMINATED = 'terminated';
+
+    /**
+     * The message prefix a caller sees for each kind of unhandled activity failure, on the journal
+     * backends and on Temporal.
+     */
+    public const ACTIVITY_FAILURE_PREFIXES = [
+        self::KIND_UNHANDLED_CATASTROPHIC_ACTIVITY => 'Workflow did not handle catastrophic activity failure: ',
+        self::KIND_UNHANDLED_ACTIVITY => 'Workflow did not handle activity failure: ',
+        self::KIND_UNHANDLED_ACTIVITY_SUPERSEDED => 'Workflow did not handle superseded activity: ',
+        self::KIND_UNHANDLED_DECLARED_ACTIVITY => 'Workflow did not handle declared activity failure: ',
+    ];
 
     /**
      * @param array<string, mixed> $context
@@ -163,6 +176,14 @@ final readonly class WorkflowExecutionFailed implements Event
             0,
             ['parentExecutionId' => $parentExecutionId->toString()],
         );
+    }
+
+    /**
+     * Ended from outside by {@see \Gplanchat\Durable\Port\WorkflowClientPort::terminate()}; no workflow code ran to close it.
+     */
+    public static function terminated(ExecutionId $executionId, string $reason): self
+    {
+        return new self($executionId, self::KIND_TERMINATED, WorkflowTerminatedException::class, $reason, 0, []);
     }
 
     public function executionId(): ExecutionId

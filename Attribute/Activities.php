@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable\Attribute;
 
-use Gplanchat\Durable\Activity\ActivityCancellationType;
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\ActivityTimeouts;
 use Gplanchat\Durable\Activity\RetryLimit;
@@ -60,7 +59,6 @@ final readonly class Activities
         public readonly ?float $maximumInterval = null,
         public readonly array $nonRetryable = [],
         public readonly ?string $taskQueue = null,
-        public readonly ?ActivityCancellationType $cancellationType = null,
         public readonly ?string $summary = null,
     ) {}
 
@@ -81,7 +79,7 @@ final readonly class Activities
             'maximumInterval' => $this->maximumInterval,
         ];
         if (null === $this->attempts && null === $this->backoffCoefficient && [] === $this->nonRetryable
-            && null === $this->taskQueue && null === $this->cancellationType && null === $this->summary
+            && null === $this->taskQueue && null === $this->summary
             && [] === array_filter($durations, static fn(?float $d): bool => null !== $d)) {
             return null;
         }
@@ -121,7 +119,6 @@ final readonly class Activities
                 scheduleToClose: $seconds['scheduleToClose'],
                 heartbeat: $seconds['heartbeat'],
             )),
-            cancellationType: $this->cancellationType ?? ActivityCancellationType::TryCancel,
             summary: $this->summary,
         );
     }

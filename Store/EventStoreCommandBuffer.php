@@ -10,6 +10,7 @@ use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCancelled;
 use Gplanchat\Durable\Event\ActivityScheduled;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\Event;
 use Gplanchat\Durable\Event\ExecutionCompleted;
@@ -120,7 +121,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
         ));
     }
 
-    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure, ?string $updateId = null): void
     {
         $this->append(new WorkflowUpdateHandled(
             $this->id,
@@ -128,6 +129,7 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             $arguments,
             $result,
             $failure,
+            $updateId,
         ));
     }
 
@@ -142,6 +144,13 @@ final readonly class EventStoreCommandBuffer implements WorkflowCommandBufferInt
             if (null !== $value) {
                 throw new UnsupportedByBackendException(\sprintf('The journal backend (in-memory, DBAL, Illuminate, Magento Database) cannot apply ChildWorkflowOptions::$%s: it only records it. Remove the option, or run on the Temporal backend.', $name));
             }
+        }
+
+        // The journal has no server to end a child that outlives its execution timeout: the
+        // deadline is written here, before the child (see PendingChildDeadlines), and the inline
+        // child runner reads it (#979).
+        if (null !== $options->timeouts->execution) {
+            $this->append(new ChildWorkflowDeadline($this->id, $childExecutionId, $this->nowSeconds() + $options->timeouts->execution->toSeconds()));
         }
 
         // The wire form is built here: the journal records the flat metadata the old code was

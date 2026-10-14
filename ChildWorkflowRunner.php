@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Gplanchat\Durable;
 
+use Gplanchat\Durable\Event\WorkflowExecutionFailed;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
+use Gplanchat\Durable\Exception\ChildWorkflowTimedOutException;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\WorkflowResumeDispatcher;
 use Gplanchat\Durable\Store\ChildWorkflowParentLinkStoreInterface;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Store\WorkflowMetadataStore;
 use Gplanchat\Durable\Store\WorkflowTaskJournal;
+use Gplanchat\Durable\Timer\PendingChildDeadlines;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -101,9 +104,26 @@ final readonly class ChildWorkflowRunner implements ChildWorkflowRunnerInterface
             clock: $this->queueClock,
             // The child's time starts at its parent's (virtual) now, not at the real now (#652).
             virtualTimeStartsAt: $this->runtime->clock(),
+            childDeadlineAt: null === $parentExecutionId ? null : (PendingChildDeadlines::of($this->eventStore, $parentExecutionId)[$childExecutionId->toString()] ?? null),
         );
         $handler = $this->workflowRegistry->getHandler($workflowType, $input);
 
-        return $runner->run($childExecutionId, $handler, $workflowType);
+        try {
+            return $runner->run($childExecutionId, $handler, $workflowType);
+        } catch (ChildWorkflowTimedOutException $timedOut) {
+            if (null === $parentExecutionId) {
+                throw $timedOut; // no parent, no deadline: unreachable, kept for the types
+            }
+            // The run that was stopped ends here (after continue-as-new, not the first one), so that
+            // it no longer counts as running. The parent gets the wording Temporal gives its parent
+            // (TemporalEventConverter::childFailed()) from the projector.
+            $this->eventStore->append(WorkflowExecutionFailed::terminatedByParent(
+                ExecutionId::fromString($timedOut->childExecutionId),
+                $parentExecutionId,
+                \sprintf('Child workflow %s timed out.', $childExecutionId->toString()),
+            ));
+
+            throw $timedOut;
+        }
     }
 }

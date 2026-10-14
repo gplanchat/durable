@@ -7,8 +7,12 @@ namespace Gplanchat\Durable;
 use Gplanchat\Durable\Activity\ActivityContractResolver;
 use Gplanchat\Durable\Debug\WorkflowExecutionObserverInterface;
 use Gplanchat\Durable\Event\ExecutionStarted;
+use Gplanchat\Durable\Exception\ReadOnlyPassNeedsDistributedRuntime;
 use Gplanchat\Durable\Port\ChildWorkflowRunnerInterface;
 use Gplanchat\Durable\Port\ParentChildWorkflowCoordinatorInterface;
+use Gplanchat\Durable\Query\DroppingCommandBuffer;
+use Gplanchat\Durable\Query\InertLifecycle;
+use Gplanchat\Durable\Query\UnstartedChildRunner;
 use Gplanchat\Durable\Store\EventStoreCommandBuffer;
 use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
@@ -100,6 +104,33 @@ final readonly class ExecutionEngine
         );
 
         return $this->runHandler($context, $this->createEnvironment($context), $handler, $journal);
+    }
+
+    /**
+     * Replays an execution up to its current suspension point, as {@see resume()} does, but writes
+     * nothing: the command buffer drops every command, a child is not started, no outcome is
+     * recorded. The returned context holds the workflow's query handlers, bound to the instance
+     * the replay built, which holds the state the live execution holds.
+     *
+     * @throws ReadOnlyPassNeedsDistributedRuntime if the runtime would run queued work when the workflow awaits
+     */
+    public function replayWithoutWriting(ExecutionId $executionId, callable $handler): ExecutionContext
+    {
+        if (!$this->runtime->isDistributed()) {
+            throw new ReadOnlyPassNeedsDistributedRuntime();
+        }
+
+        $context = new ExecutionContext(
+            $executionId,
+            new EventStoreHistorySource($this->eventStore, $executionId),
+            new DroppingCommandBuffer(),
+            new UnstartedChildRunner(),
+            $this->uuidGenerator,
+            readOnly: true,
+        );
+        (new WorkflowFiberDriver(new InertLifecycle($this->eventStore)))->run($context, $this->createEnvironment($context), $handler);
+
+        return $context;
     }
 
     private function createEnvironment(ExecutionContext $context): WorkflowEnvironment

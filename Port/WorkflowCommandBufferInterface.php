@@ -78,7 +78,7 @@ interface WorkflowCommandBufferInterface
      *
      * @param array<string, mixed> $arguments
      */
-    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void;
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure, ?string $updateId = null): void;
 
     /**
      * Records a child workflow to schedule (COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION for Temporal).

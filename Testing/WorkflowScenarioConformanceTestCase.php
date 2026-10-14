@@ -6,23 +6,40 @@ namespace Gplanchat\Durable\Testing;
 
 use Gplanchat\Durable\Activity\ActivityOptions;
 use Gplanchat\Durable\Activity\RetryLimit;
+use Gplanchat\Durable\ChildWorkflowOptions;
 use Gplanchat\Durable\Duration;
 use Gplanchat\Durable\Event\ActivityCompleted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
+use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ExecutionCompleted;
+use Gplanchat\Durable\Event\ExecutionStarted;
 use Gplanchat\Durable\Event\TimerCompleted;
+use Gplanchat\Durable\Event\WorkflowCancellationRequested;
 use Gplanchat\Durable\Event\WorkflowContinuedAsNew;
+use Gplanchat\Durable\Event\WorkflowExecutionCancelled;
 use Gplanchat\Durable\Event\WorkflowSignalReceived;
+use Gplanchat\Durable\Event\WorkflowUpdateHandled;
+use Gplanchat\Durable\Exception\ChildWorkflowIdAlreadyUsedException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdCompletedException;
+use Gplanchat\Durable\Exception\DurableChildWorkflowFailedException;
+use Gplanchat\Durable\Exception\WorkflowCancelledException;
 use Gplanchat\Durable\Exception\WorkflowSuspendedException;
+use Gplanchat\Durable\ExecutionContext;
 use Gplanchat\Durable\ExecutionEngine;
 use Gplanchat\Durable\ExecutionId;
 use Gplanchat\Durable\ExecutionRuntime;
 use Gplanchat\Durable\InMemoryWorkflowRunner;
 use Gplanchat\Durable\RegistryActivityExecutor;
+use Gplanchat\Durable\Store\EventStoreCommandBuffer;
+use Gplanchat\Durable\Store\EventStoreHistorySource;
 use Gplanchat\Durable\Store\EventStoreInterface;
 use Gplanchat\Durable\Transport\InMemoryActivityTransport;
+use Gplanchat\Durable\Workflow\PendingUpdate;
 use Gplanchat\Durable\WorkflowEnvironment;
+use Gplanchat\Durable\WorkflowIdReusePolicy;
 use Gplanchat\Durable\WorkflowRegistry;
+use Gplanchat\Durable\WorkflowTimeouts;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -146,11 +163,7 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
             return $received;
         };
 
-        try {
-            $engine->start($id, $handler);
-            self::fail('the workflow must wait for its signal');
-        } catch (WorkflowSuspendedException) {
-        }
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its signal');
         $store->append(new WorkflowSignalReceived($id, 'approve', ['by' => 'alice']));
 
         self::assertSame([['by' => 'alice']], $engine->resume($id, $handler));
@@ -170,6 +183,45 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
 
         self::assertSame(['echo' => 'hello'], $result);
         self::assertCount(1, $this->eventsOf($store, 'scenario-child', ChildWorkflowCompleted::class));
+    }
+
+    public function testAChildThatOutlivesItsExecutionTimeoutFailsItsParent(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceSlowChildWorkflow::class);
+
+        try {
+            $this->runner($store, null, $registry)->run(
+                ExecutionId::fromString('scenario-timeout'),
+                static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->childWorkflowStub(
+                    ConformanceSlowChildWorkflow::class,
+                    new ChildWorkflowOptions(workflowId: 'scenario-slow-child', timeouts: new WorkflowTimeouts(execution: Duration::seconds(5))),
+                )->run()),
+            );
+            self::fail('the child sleeps 60 s under a 5 s execution timeout: the parent must fail');
+        } catch (DurableChildWorkflowFailedException $e) {
+            self::assertSame('Child workflow scenario-slow-child timed out.', $e->getMessage());
+        }
+        self::assertCount(1, $this->eventsOf($store, 'scenario-timeout', ChildWorkflowDeadline::class));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-timeout', ChildWorkflowFailed::class));
+    }
+
+    public function testAChildIdThatCompletedIsRefusedUnderRejectDuplicate(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+
+        $this->expectException(ChildWorkflowIdAlreadyUsedException::class);
+        $this->startTwiceUnder(WorkflowIdReusePolicy::RejectDuplicate, 'scenario-reuse-reject');
+    }
+
+    public function testAChildIdThatCompletedIsRefusedUnderAllowDuplicateFailedOnly(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+
+        $this->expectException(ChildWorkflowIdCompletedException::class);
+        $this->startTwiceUnder(WorkflowIdReusePolicy::AllowDuplicateFailedOnly, 'scenario-reuse-failed-only');
     }
 
     public function testContinueAsNewFollowsTheChainToItsLastRun(): void
@@ -203,6 +255,96 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
         self::assertSame(['runs' => 3], $completed[0]->result());
     }
 
+    public function testAResumedWorkflowPicksUpWhereItSuspendedWithoutStartingAgain(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $activities = new RegistryActivityExecutor();
+        $activities->register('durable.conformance.quote', static fn(): array => ['total' => 7]);
+        $transport = new InMemoryActivityTransport();
+        $runtime = new ExecutionRuntime($store, $transport, $activities, 0, null, true);
+        $engine = new ExecutionEngine($store, $runtime);
+        $id = ExecutionId::fromString('scenario-resume');
+        $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await($wf->activityStub(ConformanceActivities::class)->quote([]));
+
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its activity');
+        $runtime->runUntilIdle(new ExecutionContext($id, new EventStoreHistorySource($store, $id), new EventStoreCommandBuffer($store, $transport, $id)));
+
+        self::assertSame(['total' => 7], $engine->resume($id, $handler));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ExecutionStarted::class), 'a resume does not start the run again');
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ActivityCompleted::class));
+        self::assertCount(1, $this->eventsOf($store, 'scenario-resume', ExecutionCompleted::class));
+    }
+
+    public function testACancellationRequestEndsTheWaitingWorkflowAsCancelled(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $engine = new ExecutionEngine(
+            $store,
+            new ExecutionRuntime($store, new InMemoryActivityTransport(), new RegistryActivityExecutor(), 0, null, true),
+        );
+        $id = ExecutionId::fromString('scenario-cancel');
+        $handler = static fn(WorkflowEnvironment $wf): mixed => $wf->await(static fn(): bool => false);
+
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait');
+        $store->append(new WorkflowCancellationRequested($id, 'operator', null));
+
+        self::assertInstanceOf(WorkflowCancelledException::class, $this->thrownBy(static fn() => $engine->resume($id, $handler)), 'the resume must end on the cancellation');
+
+        self::assertCount(1, $this->eventsOf($store, 'scenario-cancel', WorkflowExecutionCancelled::class), 'the journal records the cancellation once');
+        self::assertSame([], $this->eventsOf($store, 'scenario-cancel', ExecutionCompleted::class), 'a cancelled run does not complete');
+    }
+
+    public function testAnUpdateIsHandledAndItsOutcomeReturnedToTheCaller(): void
+    {
+        $this->assertHolds(__FUNCTION__);
+        $store = $this->createEventStore();
+        $engine = new ExecutionEngine(
+            $store,
+            new ExecutionRuntime($store, new InMemoryActivityTransport(), new RegistryActivityExecutor(), 0, null, true),
+        );
+        $id = ExecutionId::fromString('scenario-update');
+        $handler = static function (WorkflowEnvironment $wf): string {
+            $approved = false;
+            $wf->onUpdate('approve', static function (array $args) use (&$approved): array {
+                $approved = true;
+
+                return ['by' => $args['by']];
+            });
+            $wf->await(static function () use (&$approved): bool {
+                return $approved;
+            });
+
+            return 'approved';
+        };
+        self::assertInstanceOf(WorkflowSuspendedException::class, $this->thrownBy(static fn() => $engine->start($id, $handler)), 'the workflow must wait for its update');
+
+        $update = new PendingUpdate('approve', ['by' => 'alice']);
+
+        self::assertSame('approved', $engine->resume($id, $handler, null, [$update]));
+        self::assertTrue($update->handled);
+        self::assertSame(['by' => 'alice'], $update->result);
+        self::assertNull($update->failure);
+        self::assertCount(1, $this->eventsOf($store, 'scenario-update', WorkflowUpdateHandled::class), 'the journal records the update once');
+    }
+
+    private function startTwiceUnder(WorkflowIdReusePolicy $policy, string $parentId): void
+    {
+        $registry = new WorkflowRegistry();
+        $registry->registerClass(ConformanceChildWorkflow::class);
+
+        $this->runner($this->createEventStore(), null, $registry)->run(
+            ExecutionId::fromString($parentId),
+            static function (WorkflowEnvironment $wf) use ($policy): mixed {
+                $options = new ChildWorkflowOptions(workflowId: 'scenario-reused-child', workflowIdReusePolicy: $policy);
+                $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class, $options)->run('first'));
+
+                return $wf->await($wf->childWorkflowStub(ConformanceChildWorkflow::class, $options)->run('second'));
+            },
+        );
+    }
+
     protected function runner(
         EventStoreInterface $store,
         ?RegistryActivityExecutor $activities = null,
@@ -215,6 +357,20 @@ abstract class WorkflowScenarioConformanceTestCase extends TestCase
             0,
             $registry ?? new WorkflowRegistry(),
         );
+    }
+
+    /**
+     * Runs the call and returns what it threw, or null when it returned.
+     */
+    protected function thrownBy(callable $call): ?\Throwable
+    {
+        try {
+            $call();
+        } catch (\Throwable $e) {
+            return $e;
+        }
+
+        return null;
     }
 
     /**

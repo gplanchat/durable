@@ -14,6 +14,7 @@ use Gplanchat\Durable\Event\ActivityTaskCompleted;
 use Gplanchat\Durable\Event\ActivityTaskFailed;
 use Gplanchat\Durable\Event\ActivityTaskStarted;
 use Gplanchat\Durable\Event\ChildWorkflowCompleted;
+use Gplanchat\Durable\Event\ChildWorkflowDeadline;
 use Gplanchat\Durable\Event\ChildWorkflowFailed;
 use Gplanchat\Durable\Event\ChildWorkflowScheduled;
 use Gplanchat\Durable\Event\Event;
@@ -157,6 +158,7 @@ final class EventDataMapper
             ChildWorkflowScheduled::class => self::toDomainEventChildWorkflowScheduled($id, $payload),
             ChildWorkflowCompleted::class => new ChildWorkflowCompleted($id, ExecutionId::fromString((string) $payload['childExecutionId']), $payload['result'] ?? null),
             ChildWorkflowFailed::class => self::toDomainEventChildWorkflowFailed($id, $payload),
+            ChildWorkflowDeadline::class => new ChildWorkflowDeadline($id, ExecutionId::fromString((string) $payload['childExecutionId']), (float) $payload['dueAt']),
             WorkflowContinuedAsNew::class => new WorkflowContinuedAsNew(
                 $id,
                 (string) $payload['nextWorkflowType'],
@@ -180,6 +182,7 @@ final class EventDataMapper
                     (string) ($payload['failure']['message'] ?? ''),
                     (int) ($payload['failure']['code'] ?? 0),
                 ) : null,
+                \is_string($payload['updateId'] ?? null) ? $payload['updateId'] : null,
             ),
             WorkflowCancellationRequested::class => self::toDomainEventWorkflowCancellationRequested($id, $payload),
             WorkflowCancellationDelivered::class => new WorkflowCancellationDelivered(

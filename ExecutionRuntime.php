@@ -53,6 +53,14 @@ final class ExecutionRuntime
     }
 
     /**
+     * Whether a workflow that awaits suspends (true) or the runtime runs the queued work itself.
+     */
+    public function isDistributed(): bool
+    {
+        return $this->distributed;
+    }
+
+    /**
      * @param Awaitable<mixed> $awaitable
      */
     public function await(Awaitable $awaitable, ExecutionContext $context): mixed

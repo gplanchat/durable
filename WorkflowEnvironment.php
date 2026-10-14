@@ -130,8 +130,7 @@ final class WorkflowEnvironment
      *
      * The deadline cancels what it bounded, and settling cancels the deadline. Cancelling an
      * activity stays *best effort*: the workflow will no longer be woken by it, but the attempt in
-     * flight may carry on server-side — Temporal receives a cancellation *request*
-     * ({@see \Gplanchat\Durable\Activity\ActivityCancellationType}).
+     * flight may carry on server-side; Temporal receives a cancellation *request*.
      *
      * A `Closure` is accepted in place of an awaitable: it is a **condition** on the workflow's
      * state, and the execution resumes as soon as it holds. It must be a function of the workflow's
@@ -257,7 +256,7 @@ final class WorkflowEnvironment
         // Recorded here, and not by the caller of the pass: the record has to precede what the
         // workflow does in response, or a replay would apply them the other way round. It is the
         // order Temporal produces — the acceptance before the workflow's commands.
-        $this->context->recordUpdateHandled($message['name'], $message['payload'], $pending->result, $pending->failure);
+        $this->context->recordUpdateHandled($message['name'], $message['payload'], $pending->result, $pending->failure, $pending->updateId);
     }
 
     /**

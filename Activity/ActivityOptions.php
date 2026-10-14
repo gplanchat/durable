@@ -54,7 +54,6 @@ final readonly class ActivityOptions
         /** Business activity ID (a UUID otherwise). */
         public ?string $activityId = null,
         ?ActivityTimeouts $timeouts = null,
-        public ActivityCancellationType $cancellationType = ActivityCancellationType::TryCancel,
         /** Summary for UI display (the "summary" field on the Temporal side). */
         public ?string $summary = null,
     ) {
@@ -99,7 +98,6 @@ final readonly class ActivityOptions
         Duration|float|null $maximumInterval = null,
         ?string $summary = null,
         ?string $activityId = null,
-        ActivityCancellationType $cancellationType = ActivityCancellationType::TryCancel,
     ): self {
         return new self(
             \is_int($retryLimit) ? RetryLimit::ofAttempts($retryLimit) : $retryLimit,
@@ -112,7 +110,6 @@ final readonly class ActivityOptions
             $timeouts instanceof ActivityTimeouts || null === $timeouts
                 ? $timeouts
                 : ActivityTimeouts::attempt(self::duration($timeouts)),
-            $cancellationType,
             $summary,
         );
     }
@@ -164,7 +161,6 @@ final readonly class ActivityOptions
             $this->taskQueue,
             $this->activityId,
             $this->timeouts,
-            $this->cancellationType,
             $this->summary,
         );
     }
@@ -180,7 +176,6 @@ final readonly class ActivityOptions
             $this->taskQueue,
             $this->activityId,
             $timeouts,
-            $this->cancellationType,
             $this->summary,
         );
     }
@@ -206,7 +201,6 @@ final readonly class ActivityOptions
             'initial_interval_seconds' => $this->initialInterval->toSeconds(),
             'backoff_coefficient' => $this->backoffCoefficient,
             'non_retryable_exceptions' => $this->nonRetryableExceptions,
-            'cancellation_type' => $this->cancellationType->value,
         ];
         if (null !== $this->maximumInterval) {
             $activityOptions['maximum_interval_seconds'] = $this->maximumInterval->toSeconds();
@@ -235,11 +229,6 @@ final readonly class ActivityOptions
             return null;
         }
 
-        $cancellation = ActivityCancellationType::TryCancel;
-        if (isset($opts['cancellation_type'])) {
-            $cancellation = ActivityCancellationType::tryFrom((int) $opts['cancellation_type']) ?? ActivityCancellationType::TryCancel;
-        }
-
         return new self(
             RetryLimit::fromWireValue((int) ($opts['max_attempts'] ?? 0)),
             Duration::seconds((float) ($opts['initial_interval_seconds'] ?? 1.0)),
@@ -249,7 +238,6 @@ final readonly class ActivityOptions
             TaskQueue::fromNullable(isset($opts['task_queue']) ? (string) $opts['task_queue'] : null),
             isset($opts['activity_id']) ? (string) $opts['activity_id'] : null,
             ActivityTimeouts::fromMetadata($opts),
-            $cancellation,
             isset($opts['summary']) ? (string) $opts['summary'] : null,
         );
     }

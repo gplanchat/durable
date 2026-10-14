@@ -9,6 +9,7 @@ use Gplanchat\Durable\Exception\WorkflowClassNotFound;
 use Gplanchat\Durable\Exception\WorkflowExecutionNotFound;
 use Gplanchat\Durable\Exception\WorkflowRepositoryNotDeclared;
 use Gplanchat\Durable\Exception\WorkflowTypeMismatch;
+use Gplanchat\Durable\Port\WorkflowClientPort;
 use Gplanchat\Durable\Port\WorkflowRunCatalogInterface;
 use Gplanchat\Durable\Stub\WorkflowStub;
 use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
@@ -18,27 +19,31 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  * `#[AsWorkflowRepository]` and adds the finders named after the domain. The attribute is read on
  * the subclass itself and is not inherited.
  *
- * The constructor takes the run catalogue only and is final, so a subclass cannot change it. The
- * client port (task 1.1) will join the repository as a collaborator that leaves this constructor
- * as it is.
+ * The constructor takes the run catalogue, the client port and, for a host that builds the
+ * repository without a subclass, the workflow class. It is final, so a subclass cannot change it.
  *
  * @template T of object
  */
-abstract class WorkflowRepository
+class WorkflowRepository
 {
+    /**
+     * @param class-string<T>|null $workflow
+     */
     final public function __construct(
         private readonly WorkflowRunCatalogInterface $catalog,
+        private readonly WorkflowClientPort $client,
+        /** The workflow served instead of the attribute's: how a host builds the repository that `#[RepositoryFor]` asks for. */
+        private readonly ?string $workflow = null,
     ) {}
 
     /**
      * A stub for an execution that has not started. Contacts no backend; without an id, generates one.
+     *
+     * @return WorkflowStub<T>
      */
-    public function create(?ExecutionId $id = null): WorkflowStub
+    public function create(?ExecutionId $id = null, ?WorkflowStartOptions $options = null): WorkflowStub
     {
-        // Called only to refuse a repository that carries no attribute.
-        $this->workflowClass();
-
-        return new WorkflowStub($id ?? ExecutionId::generate());
+        return new WorkflowStub($id ?? ExecutionId::generate(), $this->client, $this->workflowClass(), false, $options);
     }
 
     /**
@@ -48,6 +53,8 @@ abstract class WorkflowRepository
      * the catalogue reports as another one, `UnknownWorkflow` included (the Temporal catalogue's
      * stand-in when the type is missing), raises {@see WorkflowTypeMismatch} on every backend.
      * The conformance test of task 1.1 must exercise every backend.
+     *
+     * @return WorkflowStub<T>
      *
      * @throws WorkflowExecutionNotFound
      * @throws WorkflowTypeMismatch
@@ -67,7 +74,7 @@ abstract class WorkflowRepository
             throw new WorkflowTypeMismatch($id->toString(), $expected, $run->workflowName);
         }
 
-        return new WorkflowStub($id);
+        return new WorkflowStub($id, $this->client, $workflowClass, true);
     }
 
     /**
@@ -75,6 +82,11 @@ abstract class WorkflowRepository
      */
     private function workflowClass(): string
     {
+        if (null !== $this->workflow) {
+            /** @var class-string<T> */
+            return $this->workflow;
+        }
+
         $attributes = (new \ReflectionClass($this))->getAttributes(AsWorkflowRepository::class);
         if ([] === $attributes) {
             throw new WorkflowRepositoryNotDeclared(static::class);

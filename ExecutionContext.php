@@ -10,6 +10,8 @@ use Gplanchat\Durable\Awaitable\Awaitable;
 use Gplanchat\Durable\Awaitable\NexusOperationAwaitable;
 use Gplanchat\Durable\Awaitable\TimerAwaitable;
 use Gplanchat\Durable\Exception\ActivitySupersededException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdAlreadyUsedException;
+use Gplanchat\Durable\Exception\ChildWorkflowIdCompletedException;
 use Gplanchat\Durable\Exception\ChildWorkflowIdInUseException;
 use Gplanchat\Durable\Exception\ChildWorkflowStartDeferred;
 use Gplanchat\Durable\Exception\ContinueAsNewRequested;
@@ -63,6 +65,7 @@ final class ExecutionContext
      * rule over the same log: that is what makes a condition's verdict reproducible.
      */
     private int $messageCursor = 0;
+    private int $pendingTaken = 0;
 
     /** @var array<string, int> the version each change point resolved to in this pass */
     private array $decidedVersions = [];
@@ -86,6 +89,11 @@ final class ExecutionContext
          * @var list<\Gplanchat\Durable\Workflow\PendingUpdate>
          */
         private readonly array $pendingUpdates = [],
+        /**
+         * A read-only pass runs no closure the journal does not hold: it answers a query, and the
+         * live pass runs that closure later, once.
+         */
+        private readonly bool $readOnly = false,
     ) {}
 
     /**
@@ -537,6 +545,10 @@ final class ExecutionContext
             return $deferred->awaitable();
         }
 
+        if ($this->readOnly) {
+            return $deferred->awaitable();
+        }
+
         $result = $closure();
         $this->buffer()->recordSideEffect($this->uuid(), $result);
         $deferred->resolve($result);
@@ -679,25 +691,17 @@ final class ExecutionContext
 
         // The log is exhausted: what is left are the updates that arrived outside the log for
         // this pass.
-        $recorded = $this->countRecordedMessages();
-        $pending = $this->pendingUpdates[$this->messageCursor - $recorded] ?? null;
+        // Counted apart from the cursor: an update journalled during this pass joins the log, so
+        // a difference between the two would hand the same pending update out again.
+        $pending = $this->pendingUpdates[$this->pendingTaken] ?? null;
         if (null === $pending) {
             return null;
         }
 
+        ++$this->pendingTaken;
         ++$this->messageCursor;
 
         return ['kind' => 'update', 'name' => $pending->name, 'payload' => $pending->arguments, 'pending' => $pending];
-    }
-
-    private function countRecordedMessages(): int
-    {
-        $count = 0;
-        while (null !== $this->historySource->messageAt($count)) {
-            ++$count;
-        }
-
-        return $count;
     }
 
     /**
@@ -705,9 +709,9 @@ final class ExecutionContext
      *
      * @param array<string, mixed> $arguments
      */
-    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure): void
+    public function recordUpdateHandled(string $updateName, array $arguments, mixed $result, ?FailureEnvelope $failure, ?string $updateId = null): void
     {
-        $this->buffer()->recordUpdateHandled($updateName, $arguments, $result, $failure);
+        $this->buffer()->recordUpdateHandled($updateName, $arguments, $result, $failure, $updateId);
     }
 
     /**
@@ -908,11 +912,11 @@ final class ExecutionContext
         }
 
         if (WorkflowIdReusePolicy::RejectDuplicate === $options->workflowIdReusePolicy) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s is already used in the event store.', $childExecutionId));
+            throw ChildWorkflowIdAlreadyUsedException::forId($childExecutionId->toString());
         }
 
         if ($this->historySource->hasChildExecutionCompletedSuccessfully($childExecutionId)) {
-            throw new \InvalidArgumentException(\sprintf('Child workflow execution id %s already completed successfully; reuse is not allowed with AllowDuplicateFailedOnly.', $childExecutionId));
+            throw ChildWorkflowIdCompletedException::forId($childExecutionId->toString());
         }
     }
 
