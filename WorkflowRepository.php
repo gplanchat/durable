@@ -19,16 +19,21 @@ use Gplanchat\Durable\Workflow\WorkflowDefinitionLoader;
  * `#[AsWorkflowRepository]` and adds the finders named after the domain. The attribute is read on
  * the subclass itself and is not inherited.
  *
- * The constructor takes the run catalogue and the client port and is final, so a subclass cannot
- * change it.
+ * The constructor takes the run catalogue, the client port and, for a host that builds the
+ * repository without a subclass, the workflow class. It is final, so a subclass cannot change it.
  *
  * @template T of object
  */
-abstract class WorkflowRepository
+class WorkflowRepository
 {
+    /**
+     * @param class-string<T>|null $workflow
+     */
     final public function __construct(
         private readonly WorkflowRunCatalogInterface $catalog,
         private readonly WorkflowClientPort $client,
+        /** The workflow served instead of the attribute's: how a host builds the repository that `#[RepositoryFor]` asks for. */
+        private readonly ?string $workflow = null,
     ) {}
 
     /**
@@ -77,6 +82,11 @@ abstract class WorkflowRepository
      */
     private function workflowClass(): string
     {
+        if (null !== $this->workflow) {
+            /** @var class-string<T> */
+            return $this->workflow;
+        }
+
         $attributes = (new \ReflectionClass($this))->getAttributes(AsWorkflowRepository::class);
         if ([] === $attributes) {
             throw new WorkflowRepositoryNotDeclared(static::class);
